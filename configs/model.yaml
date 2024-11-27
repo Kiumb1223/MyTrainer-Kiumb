@@ -1,0 +1,13 @@
+#---------------------------------#
+# Configuration for model architecture, hyperparameters, and initialization
+# - K_NEIGHBOR         : Number of neighbors to consider in graph-based models.
+# - CROP_RESIZE_TO_CNN : Resize input images to this size before feeding into CNN.
+# - NODE_EMBED_SIZE    : Size of node embedding in graph-based models (e.g., for object tracking).
+# - EDGE_EMBED_SIZE    : Size of edge embedding in graph-based models.
+# - SINKHORN_ITERS     : Number of iterations for Sinkhorn algorithm (used for optimal transport).
+#---------------------------------#
+K_NEIGHBOR: 2  
+RESIZE_TO_CNN: [224, 224]  
+NODE_EMBED_SIZE: 32  
+EDGE_EMBED_SIZE: 18  
+SINKHORN_ITERS: 8  
