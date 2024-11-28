@@ -13,13 +13,14 @@ import torch
 import datetime
 import torch.nn as nn
 from loguru import logger
-from typing import  Optional
+from typing import  Optional,Union
 from utils.misc import get_model_info
 from torch.utils.data import DataLoader
 from utils.lr_scheduler import LRScheduler
 from torch.nn.utils import clip_grad_norm_
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
+from torch.optim.lr_scheduler import _LRScheduler
 from torch.nn.parallel import DistributedDataParallel
 from utils.metric import MeterBuffer, gpu_mem_usage,occupy_mem
 from utils.distributed import get_rank, get_local_rank,synchronize
@@ -31,7 +32,7 @@ class GraphTrainer:
     def __init__(self,
                  model: nn.Module, 
                  optimizer: torch.optim.Optimizer, 
-                 lr_scheduler:LRScheduler, 
+                 lr_scheduler:Union[LRScheduler,_LRScheduler], 
                  loss_func: nn.Module,
                  max_epoch:int,
                  train_loader:DataLoader, 
@@ -41,7 +42,7 @@ class GraphTrainer:
                  work_dir:str='work_dir',
                  log_period:int=10,        # iteration interval
                  checkpoint_period:int=10, # epoch interval
-                 
+                 device:str = None,
                  bt_occupy:Optional[bool] = False,
                  ):
         model.train()
@@ -66,8 +67,9 @@ class GraphTrainer:
         self.ckpt_dir   = os.path.join(self.work_dir, 'checkpoints')
         self.tb_log_dir = os.path.join(self.work_dir, 'tb_logs')
 
+        self.device     = device if device is not None else 'cpu'
         self.bt_occupy  = bt_occupy   # pre-allocate memory of GPU
-        self.rank   = get_rank()
+        self.rank       = get_rank()
         if self.rank == 0:
             os.makedirs(self.work_dir, exist_ok=True)
             os.makedirs(self.ckpt_dir, exist_ok=True)
@@ -146,6 +148,9 @@ class GraphTrainer:
 
     def after_epoch(self):
         '''save latest checkpoint and eval model'''
+
+        self.lr_scheduler.step()
+
         self.save_checkpoint("latest.pth")
         if (self.cur_epoch + 1) % self.checkpoint_period == 0:
             if self.val_loader is not None:
@@ -195,9 +200,10 @@ class GraphTrainer:
         self._grad_scaler.step(self.optimizer)
         self._grad_scaler.update()
 
-        lr = self.lr_scheduler.update_lr(self.cur_total_iter + 1)
-        for param_group in self.optimizer.param_groups:
-            param_group["lr"] = lr
+        lr = self.optimizer.param_groups[0]['lr']
+        # lr = self.lr_scheduler.update_lr(self.cur_total_iter + 1)
+        # for param_group in self.optimizer.param_groups:
+        #     param_group["lr"] = lr
         
         iter_end_time = time.perf_counter()
 

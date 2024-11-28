@@ -16,6 +16,7 @@ from models.lossFunc import GraphLoss
 from utils.trainer import GraphTrainer
 from torch.utils.data import DataLoader
 from utils.lr_scheduler import LRScheduler
+from torch.optim.lr_scheduler import StepLR
 from models.graphTracker import GraphTracker
 from torch.nn.parallel import DistributedDataParallel
 from utils.distributed import get_rank,init_distributed
@@ -37,13 +38,17 @@ def main():
         EMABLE_AMP        = True,
         WORK_DIR          = "experiments",
 
-        LR                = 1.25e-4,
+        LR                = 3e-4,
         WEIGHT_DECAY      = 1e-4,
-        MIN_LR_RATIO      = 0.05,
         BATCH_SIZE        = 2,
         MAXEPOCH          = 50,
+        
+        # StepLR
+        LR_DROP           = 40,
+        # Lr scheduler (self)
         WARMUP_EPOCHS     = 5,
         NO_AUG_EPOCHS     = 0,
+        MIN_LR_RATIO      = 0.05,
         SCHEDULER         = 'yoloxwarmcos',
         WARM_LR           = 0,
 
@@ -114,17 +119,18 @@ def main():
         model = DistributedDataParallel(model,device_ids=[local_rank])
         
     optimizer = AdamW(model.parameters(), lr=cfg.LR,weight_decay=cfg.WEIGHT_DECAY)
-    lr_scheduler = LRScheduler(name=cfg.SCHEDULER,lr = cfg.LR,
-                iters_per_epoch = len(train_loader),total_epochs =cfg.MAXEPOCH,
-                warmup_epochs=cfg.WARMUP_EPOCHS,warmup_lr_start=cfg.WARM_LR,
-                no_aug_epochs=cfg.NO_AUG_EPOCHS,min_lr_ratio=cfg.MIN_LR_RATIO,)
+    # lr_scheduler = LRScheduler(name=cfg.SCHEDULER,lr = cfg.LR,
+    #             iters_per_epoch = len(train_loader),total_epochs =cfg.MAXEPOCH,
+    #             warmup_epochs=cfg.WARMUP_EPOCHS,warmup_lr_start=cfg.WARM_LR,
+    #             no_aug_epochs=cfg.NO_AUG_EPOCHS,min_lr_ratio=cfg.MIN_LR_RATIO,)
     
+    lr_scheduler = StepLR(optimizer,cfg.LR_DROP)
     loss_func = GraphLoss()
 
     graphTrainer = GraphTrainer(
         model=model,optimizer=optimizer,lr_scheduler=lr_scheduler,loss_func=loss_func,
         max_epoch=cfg.MAXEPOCH,train_loader=train_loader,enable_amp=cfg.EMABLE_AMP,
-        work_dir=cfg.WORK_DIR,log_period=cfg.LOG_PERIOD,checkpoint_period=cfg.CHECKPOINT_PERIOD
+        work_dir=cfg.WORK_DIR,log_period=cfg.LOG_PERIOD,checkpoint_period=cfg.CHECKPOINT_PERIOD,device = cfg.DEVICE
     )
     #---------------------------------#
     #  Training

@@ -87,7 +87,7 @@ def get_model_info(model:torch.nn.Module) -> str:
 
 def get_exp_info(cfg:Namespace) -> str:
     '''get some experimental information'''
-    training_keywords = ["BATCH", "EPOCH","AMP","DEVICE"]
+    training_keywords = ["BATCH", "MAXEPOCH","AMP","DEVICE"]
     training_params = {k: v for k, v in vars(cfg).items() if any(keyword in k.upper() for keyword in training_keywords)}
     return tabulate(training_params.items(),headers=['Setting','Value'],tablefmt="grid")
 
