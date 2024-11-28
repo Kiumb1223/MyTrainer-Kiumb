@@ -14,34 +14,35 @@ import datetime
 import torch.nn as nn
 from loguru import logger
 from typing import  Optional
-from utils.logger import setup_logger
+from utils.misc import get_model_info
 from torch.utils.data import DataLoader
 from utils.lr_scheduler import LRScheduler
 from torch.nn.utils import clip_grad_norm_
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
-from utils.misc import collect_env,get_model_info,set_random_seed
-from utils.metric import MeterBuffer, gpu_mem_usage
 from torch.nn.parallel import DistributedDataParallel
-from utils.distributed import get_world_size, synchronize, get_rank, is_main_process
+from utils.metric import MeterBuffer, gpu_mem_usage,occupy_mem
+from utils.distributed import get_rank, get_local_rank,synchronize
 
-__all__ = ['MotTrainer']
 
-class MotTrainer:
-    def __init__(self, model: nn.Module, 
+__all__ = ['GraphTrainer']
+
+class GraphTrainer:
+    def __init__(self,
+                 model: nn.Module, 
                  optimizer: torch.optim.Optimizer, 
                  lr_scheduler:LRScheduler, 
                  loss_func: nn.Module,
                  max_epoch:int,
                  train_loader:DataLoader, 
                  val_loader:DataLoader=None, 
-                 seed:int=0,
                  enable_amp:bool=False,
                  clip_grad_norm:float=0.0, 
                  work_dir:str='work_dir',
                  log_period:int=10,        # iteration interval
                  checkpoint_period:int=10, # epoch interval
-                 device:str=None
+                 
+                 bt_occupy:Optional[bool] = False,
                  ):
         model.train()
         self.model   = model
@@ -58,22 +59,22 @@ class MotTrainer:
         self.log_period = log_period
         self.checkpoint_period = checkpoint_period
         
-        self.seed   = seed
-        self.device = device
-        self.rank   = get_rank()
+
         self._train_iter = iter(self.train_loader)
         self.meter  = MeterBuffer(window_size=10)
         self.epoch_len  = len(self.train_loader)
         self.ckpt_dir   = os.path.join(self.work_dir, 'checkpoints')
         self.tb_log_dir = os.path.join(self.work_dir, 'tb_logs')
 
-        os.makedirs(self.work_dir, exist_ok=True)
-        os.makedirs(self.ckpt_dir, exist_ok=True)
-        os.makedirs(self.tb_log_dir, exist_ok=True)
+        self.bt_occupy  = bt_occupy   # pre-allocate memory of GPU
+        self.rank   = get_rank()
         if self.rank == 0:
+            os.makedirs(self.work_dir, exist_ok=True)
+            os.makedirs(self.ckpt_dir, exist_ok=True)
+            os.makedirs(self.tb_log_dir, exist_ok=True)
             self.tbWritter = SummaryWriter(self.tb_log_dir)
 
-        setup_logger(self.work_dir, self.rank,f'log_rank{self.rank}.txt')
+
 
     @property
     def cur_total_iter(self) -> int:
@@ -112,14 +113,8 @@ class MotTrainer:
         '''
 
         '''
-        set_random_seed(self.seed)
-        #---------------------------------#
-        #  print some necessary infomation
-        #---------------------------------#
         self._start_train_time = time.perf_counter()
-        logger.info("Environment info:\n" + collect_env())
         logger.info("Model info:\n" + get_model_info(self.model))
-
 
         split_line = "-" * 50
         logger.info(f"\n{split_line}\n"
@@ -127,25 +122,31 @@ class MotTrainer:
                     f"Checkpoint directory: {self.ckpt_dir}\n"
                     f"Tensorboard directory: {self.tb_log_dir}\n"
                     f"{split_line}")
-        #---------------------------------#
-        # Initialize some variables
-        #---------------------------------#
         self._grad_scaler = GradScaler(enabled=self._enable_amp)
         if self._enable_amp:
             logger.info("Automatic Mixed Precision (AMP) training is on.")
         
+        if self.bt_occupy:
+            occupy_mem(get_local_rank(), mem_ratio=0.95)
+        
         self.load_checkpoint(ckpt_path,auto_resume)
 
     def after_train(self):
-        self.tbWritter.close()
+        if self.rank == 0 :
+            self.tbWritter.close()
         logger.info(f"Total training time: {datetime.timedelta(seconds=time.perf_counter() - self._start_train_time)}")
     
     def before_epoch(self):
-        pass
+        '''distributed data parallel setting'''
+        if hasattr(self.train_loader.sampler,"set_epoch"):
+            self.train_loader.sampler.set_epoch(self.cur_epoch)
+        elif hasattr(self.train_loader.batch_sampler.sampler,"set_epoch"):
+            # batch sampler in Pytorch warps the sampler as its attributes
+            self.train_loader.batch_sampler.sampler.set_epoch(self.cur_epoch)
+
     def after_epoch(self):
         '''save latest checkpoint and eval model'''
         self.save_checkpoint("latest.pth")
-
         if (self.cur_epoch + 1) % self.checkpoint_period == 0:
             if self.val_loader is not None:
                 self.eval_save_model()
@@ -162,6 +163,7 @@ class MotTrainer:
         try:
             batch = next(self._train_iter)
         except StopIteration:
+            logger.warning("StopIteration Occur.")
             self._train_iter = iter(self.train_loader)
             batch = next(self._train_iter)
         data_end_time = time.perf_counter()
@@ -170,7 +172,7 @@ class MotTrainer:
         # Calculate loss
         #---------------------------------#
         with autocast(enabled=self._enable_amp):
-            det,tra,gt_mtx_list = batch
+            tra,det,gt_mtx_list = batch
             det,tra = det.to(self.device),tra.to(self.device)
             gt_mtx_list   = [i.to(self.device) for i in gt_mtx_list]
             pred_mtx_list = self.model(det,tra)
@@ -225,11 +227,12 @@ class MotTrainer:
             )
 
             logger.info(
-                f"{progress_str}, mem: {gpu_mem_usage():.0f}Mb, {time_str}, " +
+                f"{progress_str}, mem: {gpu_mem_usage():.0f}MB, {time_str}, " +
                 f"{loss_str}, lr: {self.meter['lr'].latest:.3e}, {eta_str}"
             )
-            # write to tensorboard
-            self.tbWritter.add_scalar('Train/loss',list(loss_meter.values())[-1].latest, self.cur_epoch + 1)
+            if self.rank == 0:
+                # write to tensorboard
+                self.tbWritter.add_scalar('Train/loss',list(loss_meter.values())[-1].latest, self.cur_epoch + 1)
             # empty the meters
             self.meter.clear_meters()
         
@@ -296,19 +299,29 @@ class MotTrainer:
         Save training state: ``start_epoch``, ``model``,
             ``optimizer``, ``grad_scaler`` (optional).
         '''
-        data = {
-            "start_epoch": self.cur_epoch + 1,
-            "model": self.model_or_module.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
-        }
-        if self._enable_amp:
-            data["grad_scaler"] = self._grad_scaler.state_dict()
+        if self.rank == 0:
+            data = {
+                "start_epoch": self.cur_epoch + 1,
+                "model": self.model_or_module.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
+            }
+            if self._enable_amp:
+                data["grad_scaler"] = self._grad_scaler.state_dict()
 
-        file_path = os.path.join(self.ckpt_dir, file_name)
-        logger.info(f"Saving checkpoint to {file_path}")
-        torch.save(data, file_path)
+            file_path = os.path.join(self.ckpt_dir, file_name)
+            logger.info(f"Saving checkpoint to {file_path}")
+            torch.save(data, file_path)
 
     def eval_save_model(self):
+        if self.rank == 0:
+
+            self.model.eval()
+            #---------------------------------#
+            # eval and save the best model 
+            # wait to implement
+            #---------------------------------#
+            self.model.train()
+            self.tbWritter('wait to write')
+            
+        synchronize()
         
-        self.model.eval()
-        pass

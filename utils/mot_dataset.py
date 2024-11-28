@@ -37,6 +37,7 @@ class MOTGraph(Dataset):
         # self.transform        = Compose((Resize(cfg['RESIZE_TO_CNN']), ToTensor(), 
         #                                  Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])))
         self.resize_to_cnn = cfg['RESIZE_TO_CNN']
+        self.device        = cfg['DEVICE']
         #---------------------------------#
         #  dets_dict -  {seq_name : {frame_idx:[frame_idx,tra_id,x,y,w,h,xc,yc],....},....}
         #---------------------------------#
@@ -131,9 +132,9 @@ class MOTGraph(Dataset):
         gt_matrix = self.construct_label(current_detections,tracklets_dict)
 
         return {
-            'det_graph':detection_graph,
-            'tra_graph':tracklet_graph,
-            'gt_matrix':gt_matrix
+            'det_graph':detection_graph.to(self.device),
+            'tra_graph':tracklet_graph.to(self.device),
+            'gt_matrix':gt_matrix.to(self.device)
         }
 
     # @staticmethod
@@ -153,7 +154,7 @@ class MOTGraph(Dataset):
                     np.log(h1 / h2),
                     np.log(w1 / w2)
                 ])
-            return torch.tensor(edge_attr, dtype=torch.float32)
+            return torch.as_tensor(edge_attr, dtype=torch.float32)
 
         def build_graph(detections,k, is_tracklet=False):
             """Generic graph construction function."""
@@ -166,14 +167,14 @@ class MOTGraph(Dataset):
                 prev_frame_idx = None
                 if prev_frame_idx != frame_id:
                     image_name = os.path.join(image_dir, f"{int(item[0]):06d}" + '.jpg')
-                    image_tensor = read_image(image_name).to(torch.float32)
+                    image_tensor = read_image(image_name).to(torch.float32).to(self.device)
                     image_tensor = F.normalize(image_tensor,mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
                 patch = F.crop(image_tensor,y,x,h,w)
                 patch = F.resize(patch,size=self.resize_to_cnn)
                 positions.append([xc,yc])
                 node_attr.append(patch)
             
-            positions = torch.tensor(positions, dtype=torch.float32)
+            positions = torch.as_tensor(positions, dtype=torch.float32)
             edge_indices = knn(positions, positions, k=k,num_workers=2)
             edge_indices, _ = remove_self_loops(edge_indices)
             edge_attr = compute_edge_attr(detections, edge_indices,is_tracklet)

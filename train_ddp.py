@@ -6,20 +6,22 @@
 :EditTime   :2024/11/25 14:52:12
 :Author     :Kiumb
 '''
+
 import torch
 from loguru import logger
 from torch.optim import AdamW
 from argparse import Namespace
 from utils.logger import setup_logger
 from models.lossFunc import GraphLoss
-from utils.distributed import get_rank
 from utils.trainer import GraphTrainer
 from torch.utils.data import DataLoader
 from utils.lr_scheduler import LRScheduler
 from models.graphTracker import GraphTracker
+from torch.nn.parallel import DistributedDataParallel
+from utils.distributed import get_rank,init_distributed
+from torch.utils.data.distributed import DistributedSampler
 from utils.graphDataset import GraphDataset, graph_collate_fn
 from utils.misc import collect_env,get_exp_info,set_random_seed
-
 @logger.catch
 def main():
 
@@ -30,7 +32,7 @@ def main():
         RANDOM_SEED       = 1,
         LOG_PERIOD        = 10,       # Iteration 
         CHECKPOINT_PERIOD = 5,        # Epoch
-        DEVICE            = 'cuda:0',
+        DEVICE            = 'cuda',
         NUM_WORKS         = 0,
         EMABLE_AMP        = True,
         WORK_DIR          = "experiments",
@@ -81,29 +83,36 @@ def main():
         TRACKBACK_WINDOW  = 10,
     )
 
+    rank , local_rank ,world_size = init_distributed()
+    is_distributed = world_size > 1 
     #---------------------------------#
     #  print some necessary infomation
     #---------------------------------#
-    setup_logger(cfg.WORK_DIR,get_rank(),f'log_rank{get_rank()}.txt')
+    setup_logger(cfg.WORK_DIR,rank,f'log_rank{get_rank()}.txt')
     logger.info("Environment info:\n" + collect_env())
     logger.info("Config info:\n" + get_exp_info(cfg))
 
     #---------------------------------#
     #  prepare training
     #---------------------------------#
-    set_random_seed(cfg.RANDOM_SEED)
+    set_random_seed(None if cfg.RANDOM_SEED < 0 else cfg.RANDOM_SEED + rank)
     train_dataset = GraphDataset(cfg,'Train_split')  # Move tensor to the device specified in cfg.DEVICE
     test_dataset  = GraphDataset(cfg,'Validation')
 
-    train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,
+    train_sampler = DistributedSampler(train_dataset) if is_distributed else None
+
+    train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,sampler=train_sampler,
                                pin_memory=False if cfg.DEVICE.startswith('cuda') and torch.cuda.is_available() else True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
 
-    test_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,
+    test_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,
                                pin_memory=False if cfg.DEVICE.startswith('cuda') and torch.cuda.is_available() else True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
     model = GraphTracker(cfg).to(cfg.DEVICE)
+    if is_distributed:
+        model = DistributedDataParallel(model,device_ids=[local_rank])
+        
     optimizer = AdamW(model.parameters(), lr=cfg.LR,weight_decay=cfg.WEIGHT_DECAY)
     lr_scheduler = LRScheduler(name=cfg.SCHEDULER,lr = cfg.LR,
                 iters_per_epoch = len(train_loader),total_epochs =cfg.MAXEPOCH,
@@ -115,13 +124,12 @@ def main():
     graphTrainer = GraphTrainer(
         model=model,optimizer=optimizer,lr_scheduler=lr_scheduler,loss_func=loss_func,
         max_epoch=cfg.MAXEPOCH,train_loader=train_loader,enable_amp=cfg.EMABLE_AMP,
-        work_dir=cfg.WORK_DIR,log_period=cfg.LOG_PERIOD,checkpoint_period=cfg.CHECKPOINT_PERIOD  
+        work_dir=cfg.WORK_DIR,log_period=cfg.LOG_PERIOD,checkpoint_period=cfg.CHECKPOINT_PERIOD
     )
     #---------------------------------#
     #  Training
     #---------------------------------#
     graphTrainer.train()
-
 if __name__ == '__main__':
     main()
     # cProfile.run('main()',filename='TimeAnalysis.out')

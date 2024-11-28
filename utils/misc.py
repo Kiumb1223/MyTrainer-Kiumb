@@ -12,6 +12,7 @@ import torch
 import random
 import logging
 import numpy as np
+from argparse import Namespace
 from typing import Optional
 from tabulate import tabulate
 from collections import defaultdict
@@ -19,7 +20,7 @@ from easydict import EasyDict as edict
 from torch_geometric.profile.utils import get_model_size,count_parameters
 
 
-__all__ = ["collect_env", "get_model_info","set_random_seed", "symlink","load_config"]
+__all__ = ["collect_env", "get_model_info","get_exp_info","set_random_seed", "symlink","load_config"]
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def collect_env() -> str:
         - GPU devices: Device type of each GPU.
         - PyTorch: PyTorch version.
         - TorchVision (optional): TorchVision version.
-        - OpenCV (optional): OpenCV version.
+        - Pytorch-geometric (optional): Pytorch-geometric version.
 
     Returns:
         str: A string describing the running environment.
@@ -69,20 +70,26 @@ def collect_env() -> str:
     except ModuleNotFoundError:
         pass
 
-    try:
-        import cv2
-        env_info.append(("OpenCV", cv2.__version__))
-    except ModuleNotFoundError:
-        pass
+    # try:
+    #     import cv2
+    #     env_info.append(("OpenCV", cv2.__version__))
+    # except ModuleNotFoundError:
+    #     pass
 
-    return tabulate(env_info)
+    return tabulate(env_info,tablefmt="grid")
 
 def get_model_info(model:torch.nn.Module) -> str:
     '''get model information'''
     model_info = []
     model_info.append(("Model size(MB)", get_model_size(model)/(1024*1024)))
     model_info.append(("Number of parameters(M)", count_parameters(model)/1e6))
-    return tabulate(model_info)
+    return tabulate(model_info,tablefmt="grid")
+
+def get_exp_info(cfg:Namespace) -> str:
+    '''get some experimental information'''
+    training_keywords = ["BATCH", "EPOCH","AMP","DEVICE"]
+    training_params = {k: v for k, v in vars(cfg).items() if any(keyword in k.upper() for keyword in training_keywords)}
+    return tabulate(training_params.items(),headers=['Setting','Value'],tablefmt="grid")
 
 def set_random_seed(seed: Optional[int] = None, deterministic: bool = False) -> None:
     """Set random seed.

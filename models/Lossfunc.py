@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from models.hungarian import hungarian
+from models.graphToolkit import hungarian
 
 __all__ = ['GraphLoss']
 
@@ -37,13 +37,14 @@ class GraphLoss(nn.Module):
         num_graphs = len(pred_mtx_list)
         assert num_graphs == len(gt_mtx_list)
         loss  = torch.zeros(1,dtype=pred_mtx_list[0].dtype,device=pred_mtx_list[0].device)
+        n_sum = torch.zeros(1,dtype=pred_mtx_list[0].dtype,device=pred_mtx_list[0].device)
         for i in range(num_graphs):
             tra_ns,det_ns = gt_mtx_list[i].shape
-            n_sum = torch.tensor(tra_ns + det_ns,device=loss.device,dtype=loss.dtype)
+            n_sum = torch.as_tensor(tra_ns,device=loss.device,dtype=loss.dtype)
             loss += F.binary_cross_entropy(
                 pred_mtx_list[i][:-1,:-1],
                 gt_mtx_list[i], reduction='sum') / n_sum
-        return loss 
+        return loss / num_graphs
     
 
 class PermutationLossHung(nn.Module):

@@ -8,31 +8,37 @@
 '''
 
 
+
 import torch 
 import torch.nn as nn 
-
-from models.Sinkhorn import Sinkhorn
+from loguru import logger
+from functools import partial
 from torch_geometric.data import Batch
-from models.GraphConv import GraphConv
+from models.graphConv import GraphConv
+from models.graphToolkit import Sinkhorn,sinkhorn_unrolled
 
-__all__ =['Tracker']
+__all__ =['GraphTracker']
 
-class Tracker(nn.Module):
+class GraphTracker(nn.Module):
     def __init__(self,cfg):
         super().__init__()
 
-        self.device = cfg['DEVICE']
+        self.k = cfg.K_NEIGHBOR
+        self.device = cfg.DEVICE
         # Graph Layer
-        self.graphconvLayer = GraphConv(cfg['K_NEIGHBOR'],cfg['NODE_EMBED_SIZE'],
-                                        cfg['EDGE_EMBED_SIZE'],cfg['NUM_WORKS'])
+        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE)
         # Sinkhorn Layer 
-        self.eplison = nn.Parameter(torch.zeros(1))
         self.alpha   = nn.Parameter(torch.ones(1))
+        self.eplison = nn.Parameter(torch.zeros(1))
 
-        self.sinkhornLayer = Sinkhorn.apply
-        self.sinkhorn_iters=cfg['SINKHORN_ITERS']
-    
-    def forward(self,det_graph_batch:Batch,tra_graph_batch:Batch):
+        # Maybe occur some error when using :class:Sinkhorn
+        # self.sinkhornLayer = Sinkhorn.apply
+        # self.sinkhorn_iters=cfg.SINKHORN_ITERS
+
+        self.sinkhornLayer = partial(sinkhorn_unrolled,num_sink = cfg.SINKHORN_ITERS)
+        
+
+    def forward(self,det_graph_batch:Batch,tra_graph_batch:Batch) -> torch.Tensor:
 
         num_graph         = det_graph_batch.num_graphs # Actually equal to 'batch-size'
         det_batch_indices = det_graph_batch.batch      # Batch indices for detection graph
@@ -42,8 +48,9 @@ class Tracker(nn.Module):
         # Feed the detection graph and trajectory graph into the graph network
         # and return the node feature for each graph 
         #---------------------------------#
-        det_node_feats = self.graphconvLayer(det_graph_batch)
-        tra_node_feats = self.graphconvLayer(tra_graph_batch)
+
+        det_node_feats = self.graphconvLayer(det_graph_batch,self.k)
+        tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
         
         #---------------------------------#
         # Optimal transport
@@ -77,8 +84,12 @@ class Tracker(nn.Module):
             a_aug[-1] = norm * n
             b_aug[-1] = norm * m
 
+            # pred_mtx = self.sinkhornLayer(couplings,a_aug,b_aug,
+            #                             self.sinkhorn_iters,torch.exp(self.eplison) + 0.03)
+
             pred_mtx = self.sinkhornLayer(couplings,a_aug,b_aug,
-                                        self.sinkhorn_iters,torch.exp(self.eplison) + 0.03)
+                                          lambd_sink = torch.exp(self.eplison) + 0.03)
+            
             pred_mtx_list.append(pred_mtx)
             # if self.training:
             #     return self.compute_loss(output,gt_matrix)
