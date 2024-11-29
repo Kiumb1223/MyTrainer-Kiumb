@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple
 _LOCAL_PROCESS_GROUP = None
 __all__ = [
     "all_gather", "gather", "reduce_dict", "setup_print_for_distributed", "get_world_size",
-    "get_rank", "is_main_process", "init_distributed","synchronize"
+    "get_rank", "is_main_process", "init_distributed","synchronize","get_local_rank"
 ]
 
 def synchronize():

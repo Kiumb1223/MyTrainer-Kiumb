@@ -21,8 +21,8 @@ from torch.nn.utils import clip_grad_norm_
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import _LRScheduler
+from utils.metric import MeterBuffer, gpu_mem_usage
 from torch.nn.parallel import DistributedDataParallel
-from utils.metric import MeterBuffer, gpu_mem_usage,occupy_mem
 from utils.distributed import get_rank, get_local_rank,synchronize
 
 
@@ -43,7 +43,6 @@ class GraphTrainer:
                  log_period:int=10,        # iteration interval
                  checkpoint_period:int=10, # epoch interval
                  device:str = None,
-                 bt_occupy:Optional[bool] = False,
                  ):
         model.train()
         self.model   = model
@@ -68,7 +67,6 @@ class GraphTrainer:
         self.tb_log_dir = os.path.join(self.work_dir, 'tb_logs')
 
         self.device     = device if device is not None else 'cpu'
-        self.bt_occupy  = bt_occupy   # pre-allocate memory of GPU
         self.rank       = get_rank()
         if self.rank == 0:
             os.makedirs(self.work_dir, exist_ok=True)
@@ -128,8 +126,6 @@ class GraphTrainer:
         if self._enable_amp:
             logger.info("Automatic Mixed Precision (AMP) training is on.")
         
-        if self.bt_occupy:
-            occupy_mem(get_local_rank(), mem_ratio=0.95)
         
         self.load_checkpoint(ckpt_path,auto_resume)
 

@@ -5,6 +5,9 @@
 :Description:
 :EditTime   :2024/11/25 14:52:12
 :Author     :Kiumb
+
+python -m torch.distributed.launch  --nproc_per_node 2 train_ddp.py
+
 '''
 
 import torch
@@ -114,7 +117,8 @@ def main():
                                pin_memory=False if cfg.DEVICE.startswith('cuda') and torch.cuda.is_available() else True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
-    model = GraphTracker(cfg).to(cfg.DEVICE)
+    model = GraphTracker(cfg)
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model) .to(cfg.DEVICE)
     if is_distributed:
         model = DistributedDataParallel(model,device_ids=[local_rank])
         
