@@ -76,7 +76,7 @@ class EdgeEncoder(nn.Module):
             edge_index (Tensor): Edge indices of KNN for all graphs. 'soure_to_target'
         """
 
-        if not hasattr(batch,'num_graphs'): # Date Type
+        if isinstance(batch,Data): # Date Type
             edge_index = knn(batch.location_info,k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_edge_index=True)
             return edge_index
         
@@ -100,15 +100,22 @@ class EdgeEncoder(nn.Module):
         
         return edge_index 
 
-    def compute_edge_attr(self,batch:Union[Batch,Data]) -> torch.Tensor:
+    def compute_edge_attr(self,batch:Union[Batch,Data],flow:Optional[str]='source_to_target') -> torch.Tensor:
         '''
         Compute edge_attr in the either Batch or Data
 
         Returns:
             edge_attr (Tensor): the shape is [num_nodes,5].
         '''
-        source_indice = batch.edge_index[0]
-        target_indice = batch.edge_index[1]
+        
+        if flow == 'source_to_target':
+            source_indice = batch.edge_index[0]
+            target_indice = batch.edge_index[1]
+        elif flow == 'target_to_source':
+            source_indice = batch.edge_index[1]
+            target_indice = batch.edge_index[0]
+        else:
+            raise ValueError('flow must be either source_to_target or target_to_source')
         
         source_x      = batch.x[source_indice]
         target_x      = batch.x[target_indice]

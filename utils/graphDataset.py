@@ -25,7 +25,7 @@ class GraphDataset(torch.utils.data.Dataset):
         super(GraphDataset, self).__init__()
 
         self.mode             = mode
-        self.device           = cfg.DEVICE
+        # self.device           = cfg.DEVICE
         self.resize_to_cnn    = cfg.RESIZE_TO_CNN
         self.trackback_window = cfg.TRACKBACK_WINDOW
 
@@ -121,7 +121,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 prev_frame_idx = frame_idx
                 im_path = os.path.join(imgs_dir, f"{frame_idx:06d}.jpg")
                 # im_tensor = read_image(im_path).to(torch.float32)
-                im_tensor = read_image(im_path).to(torch.float32).to(self.device)
+                im_tensor = read_image(im_path).to(torch.float32)
                 im_tensor = F.normalize(im_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
             patch = F.crop(im_tensor,y,x,h,w)
             patch = F.resize(patch,self.resize_to_cnn)
@@ -129,7 +129,7 @@ class GraphDataset(torch.utils.data.Dataset):
             location_info.append(det[4:])   # STORE w h xc yc 
         raw_node_attr = torch.stack(raw_node_attr,dim=0)
         # locate_info = torch.as_tensor(locate_info,dtype=torch.float32)
-        location_info = torch.as_tensor(location_info,dtype=torch.float32,device=self.device)
+        location_info = torch.as_tensor(location_info,dtype=torch.float32)
         return Data(x=raw_node_attr,location_info=location_info)
     
     def construct_label(self,current_detections,tracklets_dict):
@@ -140,7 +140,7 @@ class GraphDataset(torch.utils.data.Dataset):
         n_tras = len(tracklets_dict.keys())
         # gt_matrix_aug = torch.zeros(n_tras + 1,n_dets + 1)
         # gt_matrix = torch.zeros(n_tras,n_dets,dtype=torch.float32)
-        gt_matrix = torch.zeros(n_tras,n_dets,dtype=torch.float32,device=self.device)
+        gt_matrix = torch.zeros(n_tras,n_dets,dtype=torch.float32)
         for i,id in enumerate(tracklets_dict.keys()):
             for j,detection in enumerate(current_detections):
                 if id == detection[1]:  # the same object

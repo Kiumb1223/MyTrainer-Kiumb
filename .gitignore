@@ -1,0 +1,10 @@
+datasets/
+*.jpg
+*.txt
+.vscode/
+experiments/
+utils/__pycache__
+models/__pycache__
+configs/__pycache__
+*.ipynb
+*.out

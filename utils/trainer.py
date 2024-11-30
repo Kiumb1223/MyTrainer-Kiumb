@@ -73,7 +73,7 @@ class GraphTrainer:
             os.makedirs(self.ckpt_dir, exist_ok=True)
             os.makedirs(self.tb_log_dir, exist_ok=True)
             self.tbWritter = SummaryWriter(self.tb_log_dir)
-
+            
 
 
     @property
