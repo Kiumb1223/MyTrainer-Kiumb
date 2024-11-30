@@ -41,7 +41,7 @@ class GraphTracker(nn.Module):
 
     def forward(self,det_graph_batch:Union[Batch,Data] ,tra_graph_batch:Union[Batch,Data]) -> list:
         
-        if isinstance(det_graph_batch,Data):
+        if not hasattr(det_graph_batch,'num_graphs'):
             det_graph_batch = Batch.from_data_list([det_graph_batch]) 
             tra_graph_batch = Batch.from_data_list([tra_graph_batch]) 
             det_graph_batch.to(self.device)
@@ -76,7 +76,7 @@ class GraphTracker(nn.Module):
             corr = torch.mm(tra_feats,det_feats.transpose(1,0))
             n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
             n2   = torch.norm(det_feats,dim=-1,keepdim=True)
-            cost =  - corr / torch.mm(n1,n2.transpose(1,0))  
+            cost = - corr / torch.mm(n1,n2.transpose(1,0))  
 
             # 2. Prepare the augmented cost matrix for Sinkhorn
             m , n = cost.shape

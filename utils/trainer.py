@@ -215,9 +215,9 @@ class GraphTrainer:
             # write to console 
             left_iters = self.epoch_len * self.max_epoch - (self.cur_total_iter + 1)
             eta_seconds = self.meter["iter_time"].global_avg * left_iters
-            eta_str = f"ETA: {datetime.timedelta(seconds=int(eta_seconds))}"
+            eta_str = f"ETA: {str(datetime.timedelta(seconds=int(eta_seconds)))}"
 
-            progress_str = f"epoch: {self.cur_epoch + 1}/{self.max_epoch}, iter: {self.cur_iter + 1}/{self.epoch_len}"
+            progress_str = f"Epoch: [{self.cur_epoch + 1}][{self.cur_iter + 1}/{self.epoch_len}]"
             loss_meter = self.meter.get_filtered_meter("loss")
             loss_str = ", ".join(
                 ["{}: {:.3f}".format(k, v.latest.item()) for k, v in loss_meter.items()]
@@ -229,8 +229,8 @@ class GraphTrainer:
             )
 
             logger.info(
-                f"{progress_str}, mem: {gpu_mem_usage():.0f}MB, {time_str}, " +
-                f"{loss_str}, lr: {self.meter['lr'].latest:.3e}, {eta_str}"
+                f"{progress_str} {eta_str} {loss_str} {time_str} max_mem: {gpu_mem_usage():.0f}M " 
+                +f"lr: {self.meter['lr'].latest:.3e}"
             )
             if self.rank == 0:
                 # write to tensorboard

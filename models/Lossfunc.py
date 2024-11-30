@@ -20,14 +20,12 @@ class GraphLoss(nn.Module):
         self.use_focal_loss = use_focal_loss
         self.alpha = alpha
         self.gamma = gamma
-        
-        self.pos_weight = nn.Parameter(torch.ones(1))
 
     def focal_loss(self, pred: Tensor, target: Tensor) -> Tensor:
         """
         # 添加Focal Loss以更好地处理类别不平衡问题
         """
-        eps = 1e-6  # 数值稳定性
+        eps = 1e-6  # numerical stability
         pred = torch.clamp(pred, eps, 1 - eps)
 
         ce_loss = -(target * torch.log(pred) + (1 - target) * torch.log(1 - pred))
