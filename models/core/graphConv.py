@@ -9,7 +9,7 @@ from torch.nn import Module
 from models.graphToolkit import knn
 from torch_geometric.data import Batch,Data
 from torch_geometric.nn import MessagePassing
-from models.graphEncoder import NodeEncoder,EdgeEncoder
+from models.core.graphEncoder import NodeEncoder,EdgeEncoder
 
 __all__ = ['GraphConv']
 
@@ -102,7 +102,10 @@ class GraphConv(Module):
         #---------------------------------#
         # Initialize the Node and edge embeddings
         #---------------------------------#
-        graph = self.nodeEncoder(graph)
+        
+        if len(graph.x.shape) != 2  :   # [N, node_embed_size] or [N,3,224,224]
+            graph = self.nodeEncoder(graph)
+        
         graph = self.edgeEncoder(graph,k)
 
         node_embedding = graph.x

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 '''
-:File       :train.py
+:File       :train_ddp.py
 :Description:
-:EditTime   :2024/11/25 14:52:12
+:EditTime   :2024/11/25 14:53:12
 :Author     :Kiumb
 
 python -m torch.distributed.launch  --nproc_per_node 2 train_ddp.py
@@ -13,14 +13,14 @@ python -m torch.distributed.launch  --nproc_per_node 2 train_ddp.py
 import torch
 from loguru import logger
 from torch.optim import AdamW
-from argparse import Namespace
+from configs.config import get_config
 from utils.logger import setup_logger
 from models.lossFunc import GraphLoss
-from utils.trainer import GraphTrainer
 from torch.utils.data import DataLoader
+from models.graphModel import GraphModel
 from utils.lr_scheduler import LRScheduler
+from utils.graphTrainer import GraphTrainer
 from torch.optim.lr_scheduler import StepLR
-from models.graphTracker import GraphTracker
 from torch.nn.parallel import DistributedDataParallel
 from utils.distributed import get_rank,init_distributed
 from torch.utils.data.distributed import DistributedSampler
@@ -29,67 +29,7 @@ from utils.misc import collect_env,get_exp_info,set_random_seed
 @logger.catch
 def main():
 
-    cfg = Namespace(
-        #---------------------------------#
-        #  Experimental setting
-        #---------------------------------#
-        RANDOM_SEED       = 1,
-        LOG_PERIOD        = 10,       # Iteration 
-        CHECKPOINT_PERIOD = 5,        # Epoch
-        DEVICE            = 'cuda',
-        NUM_WORKS         = 0,
-        EMABLE_AMP        = True,
-        WORK_DIR          = "experiments",
-
-        LR                = 3e-4,
-        WEIGHT_DECAY      = 1e-4,
-        BATCH_SIZE        = 2,
-        MAXEPOCH          = 50,
-        
-        # StepLR
-        LR_DROP           = 40,
-        # Lr scheduler (self)
-        WARMUP_EPOCHS     = 5,
-        NO_AUG_EPOCHS     = 0,
-        MIN_LR_RATIO      = 0.05,
-        SCHEDULER         = 'yoloxwarmcos',
-        WARM_LR           = 0,
-
-        #---------------------------------#
-        #  Model related
-        #---------------------------------#
-        MAXAGE            = 100,  # Maximum age for tracking an object
-        K_NEIGHBOR        = 2,    # Excluding self-loop
-        RESIZE_TO_CNN     = [224, 224],
-        NODE_EMBED_SIZE   = 32,
-        EDGE_EMBED_SIZE   = 18,
-        SINKHORN_ITERS    = 8,
-
-        #---------------------------------#
-        #  Dataset related
-        #---------------------------------#
-        DETECTOR          = 'FRCNN',
-        DATA_DIR          = 'datasets/MOT17/train',
-        ACCEPTABLE_OBJ_TYPE=[1, 2, 7],
-        MOT17_TRAIN_NAME  = [
-            'MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09',
-            'MOT17-10', 'MOT17-11', 'MOT17-13'
-        ],
-        MOT17_TRAIN_START = [2, 2, 2, 2, 2, 2, 2],
-        MOT17_VAL_NAME    = [
-            'MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09',
-            'MOT17-10', 'MOT17-11', 'MOT17-13'
-        ],
-        MOT17_VAL_START   = [501, 951, 738, 426, 555, 801, 651],
-        MOT17ALLFRAMENUM  = {
-            'MOT17-01': 450, 'MOT17-02': 600, 'MOT17-03': 1500,
-            'MOT17-04': 1050, 'MOT17-05': 837, 'MOT17-06': 1194,
-            'MOT17-07': 500, 'MOT17-08': 625, 'MOT17-09': 525,
-            'MOT17-10': 654, 'MOT17-11': 900, 'MOT17-12': 900,
-            'MOT17-13': 750, 'MOT17-14': 750
-        },
-        TRACKBACK_WINDOW  = 10,
-    )
+    cfg = get_config()
 
     rank , local_rank ,world_size = init_distributed()
     is_distributed = world_size > 1 
@@ -109,15 +49,13 @@ def main():
 
     train_sampler = DistributedSampler(train_dataset) if is_distributed else None
 
-    train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,sampler=train_sampler,
-                               pin_memory=False if cfg.DEVICE.startswith('cuda') and torch.cuda.is_available() else True,
+    train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,sampler=train_sampler,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
 
-    test_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,
-                               pin_memory=False if cfg.DEVICE.startswith('cuda') and torch.cuda.is_available() else True,
+    test_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
-    model = GraphTracker(cfg)
+    model = GraphModel(cfg)
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model) .to(cfg.DEVICE)
     if is_distributed:
         model = DistributedDataParallel(model,device_ids=[local_rank])
@@ -137,9 +75,10 @@ def main():
         work_dir=cfg.WORK_DIR,log_period=cfg.LOG_PERIOD,checkpoint_period=cfg.CHECKPOINT_PERIOD,device = cfg.DEVICE
     )
     #---------------------------------#
-    #  Training
+    #  start Training
     #---------------------------------#
     graphTrainer.train()
+
 if __name__ == '__main__':
     main()
     # cProfile.run('main()',filename='TimeAnalysis.out')

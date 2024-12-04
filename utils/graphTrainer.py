@@ -174,11 +174,12 @@ class GraphTrainer:
         #---------------------------------#
         with autocast(enabled=self._enable_amp):
             tra,det,gt_mtx_list = batch
-            det,tra = det.to(self.device),tra.to(self.device)
+            tra,det = tra.to(self.device),det.to(self.device)
             gt_mtx_list   = [i.to(self.device) for i in gt_mtx_list]
-            pred_mtx_list = self.model(det,tra)
+            pred_mtx_list = self.model(tra,det)
         # RuntimeError: torch.nn.functional.binary_cross_entropy and torch.nn.BCELoss are unsafe to autocast.
         # Tackle this error by disabling the  Mixed Precision Training 
+
         losses = self.loss_func(pred_mtx_list,gt_mtx_list)
         
         #---------------------------------#

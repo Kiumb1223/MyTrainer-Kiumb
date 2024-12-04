@@ -25,8 +25,8 @@ class GraphLoss(nn.Module):
         """
         # 添加Focal Loss以更好地处理类别不平衡问题
         """
-        eps = 1e-6  # numerical stability
-        pred = torch.clamp(pred, eps, 1 - eps)
+        # eps = 1e-6  # numerical stability
+        # pred = torch.clamp(pred, eps, 1 - eps)
 
         ce_loss = -(target * torch.log(pred) + (1 - target) * torch.log(1 - pred))
         pt = target * pred + (1 - target) * (1 - pred)

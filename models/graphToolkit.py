@@ -5,12 +5,11 @@ import torch
 import numpy as np
 from torch import Tensor
 from loguru import logger
-from typing import Optional
 import scipy.optimize as opt
 import torch.nn.functional as F
-from multiprocessing import Pool
+from typing import Optional,Tuple
 
-__all__ = ['knn','sinkhorn_unrolled','Sinkhorn','hungarian']
+__all__ = ['knn','hungarian','sinkhorn_unrolled','Sinkhorn']
 
 
 def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: Optional[bool]=False,
@@ -43,6 +42,7 @@ def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: O
         cosine_similarity_matrix = torch.mm(x_normalized, x_normalized.T)
         dist_matrix = 1 - cosine_similarity_matrix  
     else:           # Euclidean distance
+        assert len(x.shape) == 2  
         dist_matrix = torch.cdist(x, x) 
         
     if not bt_self_loop:
@@ -60,6 +60,49 @@ def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: O
         return torch.stack([indices1.flatten(), indices2], dim=0)
     else:
         return torch.stack([indices2, indices1.flatten()], dim=0)
+
+def hungarian(affinity_mtx: torch.Tensor,match_thresh: float=0.1  ):
+    r"""
+    Solve optimal LAP permutation by hungarian algorithm. The time cost is :math:`O(n^3)`.
+
+    :param affinity_mtx: size - :math:`( n_tra \times n_det)`
+    :param match_thresh: threshold for valid match
+
+    :return  match_mtx: size - :math:`( n_tra \times n_det)`, match matrix
+    :return  match_idx: size - :math:`( 2 \times n_match)`, match index
+    :return  unmatch_tra: size - :math:`( n_unmatch_tra)`, unmatched trajectory index
+    :return  unmatch_det: size - :math:`( n_unmatch_det)`, unmatched detection index
+    """
+    if affinity_mtx[0] is None: # frame_idx == 1 
+        num_det = affinity_mtx[1]
+        return np.array([]),np.array([]),np.array([]),np.arange(num_det)
+    
+    affinity_mtx = affinity_mtx[:-1,:-1].cpu().numpy()  # remove last row and column
+
+    num_rows , num_cols = affinity_mtx.shape
+
+    all_rows = np.arange(num_rows)
+    all_cols = np.arange(num_cols)
+    hungarian_mtx = np.zeros_like(affinity_mtx)
+
+    cost_mtx  = affinity_mtx * -1
+    row, col = opt.linear_sum_assignment(cost_mtx)
+    
+    hungarian_mtx[row, col] = 1
+    valid_mask = (
+        (hungarian_mtx == 1) &
+        (affinity_mtx >= match_thresh)
+    )
+    
+    match_mtx   = np.where(valid_mask,hungarian_mtx,0)
+    valid_row,valid_col = np.where(valid_mask)
+
+    match_idx   = np.vstack([valid_row,valid_col])
+    unmatch_tra = np.setdiff1d(all_rows, valid_row,assume_unique=True)
+    unmatch_det = np.setdiff1d(all_cols, valid_col,assume_unique=True)
+
+    return match_mtx,match_idx,unmatch_tra,unmatch_det
+
 
 '''
 Extracted from https://github.com/marvin-eisenberger/implicit-sinkhorn, with minor modifications
@@ -126,67 +169,3 @@ class Sinkhorn(torch.autograd.Function):
         grad_b = -ctx.lambd_sink * grad_b.squeeze(dim=-1)
         return grad_p, grad_a, grad_b, None, None, None
 
-
-'''
-Extracted from https://github.com/Thinklab-SJTU/ThinkMatch/blob/master/src/lap_solvers/hungarian.py
-And much thanks to their brilliant work :)
-'''
-def hungarian(s: Tensor, n1: Tensor=None, n2: Tensor=None, nproc: int=1) -> Tensor:
-    r"""
-    Solve optimal LAP permutation by hungarian algorithm. The time cost is :math:`O(n^3)`.
-
-    :param s: :math:`(b\times n_1 \times n_2)` input 3d tensor. :math:`b`: batch size
-    :param n1: :math:`(b)` number of objects in dim1
-    :param n2: :math:`(b)` number of objects in dim2
-    :param nproc: number of parallel processes (default: ``nproc=1`` for no parallel)
-    :return: :math:`(b\times n_1 \times n_2)` optimal permutation matrix
-
-    .. note::
-        We support batched instances with different number of nodes, therefore ``n1`` and ``n2`` are
-        required to specify the exact number of objects of each dimension in the batch. If not specified, we assume
-        the batched matrices are not padded.
-    """
-    if len(s.shape) == 2:
-        s = s.unsqueeze(0)
-        matrix_input = True
-    elif len(s.shape) == 3:
-        matrix_input = False
-    else:
-        raise ValueError('input data shape not understood: {}'.format(s.shape))
-
-    device = s.device
-    batch_num = s.shape[0]
-
-    perm_mat = s.cpu().detach().numpy() * -1
-    if n1 is not None:
-        n1 = n1.cpu().numpy()
-    else:
-        n1 = [None] * batch_num
-    if n2 is not None:
-        n2 = n2.cpu().numpy()
-    else:
-        n2 = [None] * batch_num
-
-    if nproc > 1:
-        with Pool(processes=nproc) as pool:
-            mapresult = pool.starmap_async(_hung_kernel, zip(perm_mat, n1, n2))
-            perm_mat = np.stack(mapresult.get())
-    else:
-        perm_mat = np.stack([_hung_kernel(perm_mat[b], n1[b], n2[b]) for b in range(batch_num)])
-
-    perm_mat = torch.from_numpy(perm_mat).to(device)
-
-    if matrix_input:
-        perm_mat.squeeze_(0)
-
-    return perm_mat
-
-def _hung_kernel(s: torch.Tensor, n1=None, n2=None):
-    if n1 is None:
-        n1 = s.shape[0]
-    if n2 is None:
-        n2 = s.shape[1]
-    row, col = opt.linear_sum_assignment(s[:n1, :n2])
-    perm_mat = np.zeros_like(s)
-    perm_mat[row, col] = 1
-    return perm_mat

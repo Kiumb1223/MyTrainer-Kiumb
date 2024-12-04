@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 '''
 
-1. By maintaining a lookup table(self.dets_dict), we can quickily retrive the detections infomation for each frame(time-consumption:0.3ms).
+1. By maintaining a lookup table(self.dets_dict), 
+we can quickily retrive the detections infomation for each frame(time-consumption:0.3ms).
 2. Simplify the construction of graph data to improce code efficiency
 
 '''
@@ -64,8 +65,8 @@ class GraphDataset(torch.utils.data.Dataset):
             txt_path   = os.path.join(seq_path,'gt','gt.txt') 
             detections = np.loadtxt(txt_path,delimiter=',')
             valid_mask = (
-                (detections[:, 2] > 0) & (detections[:, 3] > 0) &
-                (detections[:, 4] > 0) & (detections[:, 5] > 0) &
+                (detections[:, 2] >= 0) & (detections[:, 3] >= 0) &
+                # (detections[:, 4] >= 0) & (detections[:, 5] >= 0) &
                 (np.isin(detections[:, 7], [1, 2, 7])) &
                 (start_frame <= detections[:, 0]) & (detections[:, 0] <= end_frame)
             )
@@ -88,6 +89,7 @@ class GraphDataset(torch.utils.data.Dataset):
         return len(self.frame_list)
 
     def __getitem__(self,idx:int):
+        # print(self.frame_list[idx])
         seq_name , current_frame = self.frame_list[idx].split('*')[0], int(self.frame_list[idx].split('*')[1])
 
         imgs_dir = os.path.join(self.dataset_dir,seq_name,'img1')
@@ -117,6 +119,7 @@ class GraphDataset(torch.utils.data.Dataset):
         for det in detections: # det = [frame_idx,tracklet_id,x,y,w,h,xc,yc]
             frame_idx = int(det[0])
             x,y , w,h = map(int,det[2:6])
+            xc , yc   = map(float,det[6:])
             if frame_idx != prev_frame_idx:
                 prev_frame_idx = frame_idx
                 im_path = os.path.join(imgs_dir, f"{frame_idx:06d}.jpg")
@@ -126,7 +129,7 @@ class GraphDataset(torch.utils.data.Dataset):
             patch = F.crop(im_tensor,y,x,h,w)
             patch = F.resize(patch,self.resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append(det[4:])   # STORE w h xc yc 
+            location_info.append([xc,yc,w,h])   # STORE  xc yc  w h
         raw_node_attr = torch.stack(raw_node_attr,dim=0)
         # locate_info = torch.as_tensor(locate_info,dtype=torch.float32)
         location_info = torch.as_tensor(location_info,dtype=torch.float32)
@@ -143,7 +146,7 @@ class GraphDataset(torch.utils.data.Dataset):
         gt_matrix = torch.zeros(n_tras,n_dets,dtype=torch.float32)
         for i,id in enumerate(tracklets_dict.keys()):
             for j,detection in enumerate(current_detections):
-                if id == detection[1]:  # the same object
+                if id == detection[1]:  # the same id
                     gt_matrix[i,j] = 1  
                     break               
         return gt_matrix
@@ -155,7 +158,7 @@ def graph_collate_fn(batch):
     tra_graphs, det_graphs, gt_matrices = zip(*batch)
 
     # Batch 'det_graph' and 'tra_graph' using PyTorch Geometric's Batch class
-    det_graph_batch = Batch.from_data_list(list(tra_graphs))
-    tra_graph_batch = Batch.from_data_list(list(det_graphs))
+    tra_graph_batch = Batch.from_data_list(list(tra_graphs))
+    det_graph_batch = Batch.from_data_list(list(det_graphs))
     
-    return det_graph_batch, tra_graph_batch, list(gt_matrices)
+    return tra_graph_batch, det_graph_batch, list(gt_matrices)

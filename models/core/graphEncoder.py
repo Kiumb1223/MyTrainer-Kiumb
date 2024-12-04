@@ -76,8 +76,8 @@ class EdgeEncoder(nn.Module):
             edge_index (Tensor): Edge indices of KNN for all graphs. 'soure_to_target'
         """
 
-        if isinstance(batch,Data): # Date Type
-            edge_index = knn(batch.location_info,k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_edge_index=True)
+        if not hasattr(batch,'num_graphs'): # Date Type
+            edge_index = knn(batch.location_info[:2],k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_edge_index=True)
             return edge_index
         
         # Batch Type
@@ -85,7 +85,7 @@ class EdgeEncoder(nn.Module):
         for i in range(batch.num_graphs):
             start, end = batch.ptr[i:i+2]
             
-            sub_positions = batch.location_info[start:end,-2:]
+            sub_positions = batch.location_info[start:end,:2]
             
             indices,k2 = knn(sub_positions, k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop, bt_edge_index=False)
             
@@ -123,11 +123,11 @@ class EdgeEncoder(nn.Module):
         source_info   = batch.location_info[source_indice]
         target_info   = batch.location_info[target_indice]
 
-        # location_info = [w,h,xc,yc]
-        feat1 = 2 * (source_info[:,-2] - target_info[:,-2]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
-        feat2 = 2 * (source_info[:,-1] - target_info[:,-1]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
-        feat3 = torch.log(source_info[:,-3] / (target_info[:,-3] + 1e-8) )
-        feat4 = torch.log(source_info[:,-4] / (target_info[:,-4] + 1e-8) )
+        # location_info = [xc,yc,w,h]
+        feat1 = 2 * (source_info[:,-4] - target_info[:,-4]) / (source_info[:,-1] + target_info[:,-1] + 1e-8)
+        feat2 = 2 * (source_info[:,-3] - target_info[:,-3]) / (source_info[:,-1] + target_info[:,-1] + 1e-8)
+        feat3 = torch.log(source_info[:,-1] / (target_info[:,-1] + 1e-8) )
+        feat4 = torch.log(source_info[:,-2] / (target_info[:,-2] + 1e-8) )
         feat5 = F.cosine_similarity(source_x,target_x,dim=1)
         edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5],dim=1)
 

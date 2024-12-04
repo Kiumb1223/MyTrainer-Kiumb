@@ -1,108 +1,241 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 '''
-:File       :Tracker.py
-:Description:
-:EditTime   :2024/11/20 15:47:09
-:Author     :Kiumb
+@File     :     graphTracker.py
+@Time     :     2024/12/01 14:31:31
+@Author   :     Louis Swift
+@Desc     :     
 '''
-
-
-
-import torch 
-import torch.nn as nn 
-from typing import Union
+import gc
+import torch
+import numpy as np
 from loguru import logger
-from functools import partial
-from torch_geometric.data import Batch,Data
-from models.graphConv import GraphConv
-from models.graphToolkit import Sinkhorn,sinkhorn_unrolled
+from typing import Tuple,List
+from enum import Enum,unique,auto
+from torch_geometric.data import Data
+from models.graphModel import GraphModel
+from models.graphToolkit import hungarian
+import torchvision.transforms.functional as F
 
-__all__ =['GraphTracker']
+__all__ = ['TrackManager']
 
-class GraphTracker(nn.Module):
-    def __init__(self,cfg):
-        super().__init__()
+@unique
+class LifeSpan(Enum):
+    '''the lifespace of each tracker,for trajectory management'''
+    Born  = auto()
+    Active= auto()
+    Sleep = auto()
+    Dead  = auto()
 
-        self.k = cfg.K_NEIGHBOR
-        self.device = cfg.DEVICE
-        # Graph Layer
-        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE)
-        # Sinkhorn Layer 
-        self.alpha   = nn.Parameter(torch.ones(1))
-        self.eplison = nn.Parameter(torch.zeros(1))
+class Tracker:
+    '''the tracker class'''
 
-        # Maybe occur some error when using :class:Sinkhorn
-        # self.sinkhornLayer = Sinkhorn.apply
-        # self.sinkhorn_iters=cfg.SINKHORN_ITERS
+    _track_id = 0
 
-        self.sinkhornLayer = partial(sinkhorn_unrolled,num_sink = cfg.SINKHORN_ITERS)
+    def __init__(self,start_frame,appearance_feat,conf,tlwh,cnt_to_active,max_cnt_to_dead,feature_list_size):
         
+        self.track_id  = None # when state: Born to Active, this will be assigned
+        self.track_len = 0
+        self.sleep_cnt = 0 
+        self.state     = LifeSpan.Born
 
-    def forward(self,det_graph_batch:Union[Batch,Data] ,tra_graph_batch:Union[Batch,Data]) -> list:
+        self.start_frame   = start_frame 
+
+        self.conf = conf
+        self.tlwh = tlwh # (top left x, top left y, width, height)
+        self.appearance_feats_list = []
+        self.appearance_feats_list.append(appearance_feat) 
         
-        if not hasattr(det_graph_batch,'num_graphs'):
-            det_graph_batch = Batch.from_data_list([det_graph_batch]) 
-            tra_graph_batch = Batch.from_data_list([tra_graph_batch]) 
-            det_graph_batch.to(self.device)
-            tra_graph_batch.to(self.device)
+        self._cnt_to_active     = cnt_to_active
+        self._max_cnt_to_dead   = max_cnt_to_dead  
+        self._feature_list_size = feature_list_size
 
-        num_graph         = det_graph_batch.num_graphs # Actually equal to 'batch-size'
-        det_batch_indices = det_graph_batch.batch      # Batch indices for detection graph
-        tra_batch_indices = tra_graph_batch.batch      # Batch indices for trajectory graph
-
-        #---------------------------------#
-        # Feed the detection graph and trajectory graph into the graph network
-        # and return the node feature for each graph 
-        #---------------------------------#
-
-        det_node_feats = self.graphconvLayer(det_graph_batch,self.k)
-        tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
+    def to_active(self,frame_idx,appearance_feat,conf,tlwh):
         
-        #---------------------------------#
-        # Optimal transport
-        # > Reference:https://github.com/magicleap/SuperGluePretrainedNetwork
-        #   1. compute the affinity matrix
-        #   2. perform matrix augumentation 
-        #---------------------------------#
-        pred_mtx_list = []
-        for graph_idx in range(num_graph):
-
-            # Slice node features for the current graph 
-            det_feats = det_node_feats[det_batch_indices == graph_idx]  
-            tra_feats = tra_node_feats[tra_batch_indices == graph_idx]  
-
-            # 1. Compute affinity matrix for the current graph 
-            corr = torch.mm(tra_feats,det_feats.transpose(1,0))
-            n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
-            n2   = torch.norm(det_feats,dim=-1,keepdim=True)
-            cost = - corr / torch.mm(n1,n2.transpose(1,0))  
-
-            # 2. Prepare the augmented cost matrix for Sinkhorn
-            m , n = cost.shape
-            bins0 = self.alpha.expand(m, 1)
-            bins1 = self.alpha.expand(1, n)
-            alpha = self.alpha.expand(1, 1)
-            couplings = torch.cat([torch.cat([cost,bins0],dim=-1),
-                                   torch.cat([bins1,alpha],dim=-1)],dim=0)
-            norm  = 1 / (m+n)  
-            a_aug = torch.full((m+1,),norm,device=self.device,dtype=torch.float32) 
-            b_aug = torch.full((n+1,),norm,device=self.device,dtype=torch.float32) 
-            a_aug[-1] = norm * n
-            b_aug[-1] = norm * m
-
-            # pred_mtx = self.sinkhornLayer(couplings,a_aug,b_aug,
-            #                             self.sinkhorn_iters,torch.exp(self.eplison) + 0.03)
-
+        if self.state  == LifeSpan.Born:
+            age = frame_idx - self.start_frame
+            if age >= self._cnt_to_active:
+                self.state = LifeSpan.Active
+                self.track_id = Tracker.get_track_id()
+                # del self._cnt_to_active
+        elif self.state == LifeSpan.Sleep:
+            self.track_len = 0
+            self.sleep_cnt = 0
+            self.state     = LifeSpan.Active
+        else:
+            self.state = LifeSpan.Active
             
-            # to original possibility space 
-            pred_mtx = self.sinkhornLayer(couplings,a_aug,b_aug,
-                                          lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
-            
-            pred_mtx_list.append(pred_mtx)
-            # if self.training:
-            #     return self.compute_loss(output,gt_matrix)
+        self.track_len += 1 
+        self.frame_idx = frame_idx
+        self.conf = conf
+        self.tlwh = tlwh
+        self.appearance_feats_list.append(appearance_feat)
 
-        return pred_mtx_list 
+        if len(self.appearance_feats_list) > self._feature_list_size:
+            expired_feat = self.appearance_feats_list.pop(0)
+            del expired_feat
+
+    def to_sleep(self):  
+        if self.state == LifeSpan.Born:
+            self.state = LifeSpan.Dead
+            return 
+        
+        if self.state == LifeSpan.Active:
+            self.state = LifeSpan.Sleep
+        
+        self.sleep_cnt += 1
+        if self.sleep_cnt >= self._max_cnt_to_dead:
+            self.state = LifeSpan.Dead
     
+    @property
+    def end_frame(self) -> int:
+        '''Returns the frame_idx of the object'''
+        return self.frame_idx
 
+    @property
+    def is_Born(self) -> bool:
+        '''Returns True if the object's state is Born'''
+        return self.state == LifeSpan.Born
+
+    @property
+    def is_Active(self) -> bool:
+        '''Returns True if the object's state is Active'''
+        return self.state == LifeSpan.Active
+
+    @property
+    def is_Sleep(self) -> bool:
+        '''Returns True if the object's state is Sleep'''
+        return self.state == LifeSpan.Sleep
+    
+    @property
+    def is_Dead(self) -> bool:
+        '''Returns True if the object's state is Dead'''
+        return self.state == LifeSpan.Dead
+    
+    @property
+    def tlbr(self):
+        """Convert bounding box to format `(min x, min y, max x, max y)`, i.e.,
+        `(top left, bottom right)`.
+        """
+        ret = self.tlwh.copy()
+        ret[2:] += ret[:2]
+        return ret
+    
+    @property
+    def location_info(self):
+        """Convert bounding box to format `(center x, center y, width, height)`"""
+        ret = self.tlwh.copy().astype(np.float32)
+        ret[:2] = ret[:2] + ret[2:] / 2
+        return ret
+    
+    @staticmethod
+    def get_track_id():
+        '''get a unique track id'''
+        Tracker._track_id += 1
+        return Tracker._track_id
+    
+    @staticmethod
+    def clean_cache():
+        Tracker._track_id = 0
+
+    def __repr__(self) -> str:
+        return f"Tracker(id - {self.track_id} || from {self.start_frame} to {self.end_frame})"
+
+class TrackManager:
+    def __init__(self,model :GraphModel,device :str,path_to_weights :str,
+                 resize_to_cnn :list =[224,224],match_thresh :float =0.1,det2tra_conf :float =0.7,
+                 cnt_to_active :int =3,max_cnt_to_dead :int =100,feature_list_size :int =10):
+        
+        self.device = device
+        self.model  = model.eval().to(device)
+
+        self.tracks_list:List[Tracker] = [] # store all the tracks including Born, Active, Sleep, Dead
+
+        self._resize_to_cnn   = resize_to_cnn
+        self._match_thresh    = match_thresh
+        # necessary attributes when initializing the single track
+        self._det2tra_conf    = det2tra_conf
+        self._cnt_to_active   = cnt_to_active
+        self._max_cnt_to_dead = max_cnt_to_dead
+        self._feature_list_size = feature_list_size 
+
+        if path_to_weights:
+            try:
+                self.model.load_state_dict(torch.load(path_to_weights,map_location='cpu')['model'])
+            except KeyError:
+                self.model.load_state_dict(torch.load(path_to_weights,map_location='cpu'))
+            finally:
+                logger.info(f"Load weights from {path_to_weights} successfully")
+                
+    @torch.no_grad()
+    def graph_matching(self,frame_idx:int,current_detections:np.ndarray,img_date:torch.Tensor) -> List[Tracker]:
+        '''
+        current_detections =np.ndarray(tlwh,conf)  and have already filtered by conf > 0.1 
+        '''
+        tra_graph = self.construct_tra_graph()
+        det_graph = self.construct_det_graph(current_detections,img_date)
+        pred_mtx_list = self.model(tra_graph,det_graph)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx_list[0],self._match_thresh)
+        # The input `det_graph` is modified inside `self.model`, 
+        # so its state changes after the function call.
+        if match_idx.size > 0:   # match tra and det 
+            tra_idx ,det_idx = match_idx
+            for tra_id, det_id in zip(tra_idx,det_idx):
+                self.tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
+                                current_detections[det_id][4],current_detections[det_id][:4])
+            
+        if unmatch_tra.size > 0: # unmatch tra
+            for tra_id in unmatch_tra:
+                self.tracks_list[tra_id].to_sleep()
+            self.remove_dead_tracks()
+        
+        if unmatch_det.size > 0: # unmatch det 
+            for det_id in unmatch_det:
+                if current_detections[det_id][4] >= self._det2tra_conf:
+                    self.tracks_list.append(
+                        Tracker(frame_idx,det_graph.x[det_id],
+                                current_detections[det_id][4],current_detections[det_id][:4],
+                                self._cnt_to_active,self._max_cnt_to_dead,self._feature_list_size)
+                        )
+
+        return [tracker for tracker in self.tracks_list if tracker.is_Active]
+
+    def construct_tra_graph(self) -> Data:
+        '''construct graph of tracks including BORN, ACTIVE, SLEEP'''
+        
+        if not self.tracks_list: # if no tracks
+            return Data(x=None)
+        
+        node_attr , location_info = [] , []
+        for track in self.tracks_list:
+            node_attr.append(track.appearance_feats_list[-1])
+            location_info.append(track.location_info)
+        node_attr = torch.stack(node_attr,dim=0).to(self.device)
+        location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
+        return Data(x=node_attr,location_info=location_info)
+    
+    def construct_det_graph(self,current_detections:np.ndarray,img_date:torch.Tensor) -> Data:
+        '''construct raw graph of detections'''
+        img_tensor  = img_date.to(self.device).to(torch.float32)
+        raw_node_attr , location_info = [] , []
+        im_tensor = F.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        for det in current_detections:
+            x,y , w,h = map(int,det[:4])
+            xc , yc   = x + w/2 , y + h/2
+            patch = F.crop(im_tensor,y,x,h,w)
+            patch = F.resize(patch,self._resize_to_cnn)
+            raw_node_attr.append(patch)
+            location_info.append([xc,yc,w,h])
+        raw_node_attr = torch.stack(raw_node_attr,dim=0).to(self.device)
+        location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
+        return Data(x=raw_node_attr,location_info=location_info)
+
+    def remove_dead_tracks(self):
+        """Remove all trackers whose state is Dead"""
+        self.tracks_list = [track for track in self.tracks_list if not track.is_Dead]
+    
+    def clean_cache(self):
+        '''clean cache of all tracks'''
+        self.tracks_list.clear()
+        Tracker.clean_cache()
+        gc.collect()
