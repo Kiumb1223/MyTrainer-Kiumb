@@ -77,7 +77,8 @@ def hungarian(affinity_mtx: torch.Tensor,match_thresh: float=0.1  ):
         num_det = affinity_mtx[1]
         return np.array([]),np.array([]),np.array([]),np.arange(num_det)
     
-    affinity_mtx = affinity_mtx[:-1,:-1].cpu().numpy()  # remove last row and column
+    # affinity_mtx = affinity_mtx[:-1,:-1].cpu().numpy()  # remove last row and column
+    affinity_mtx = affinity_mtx.cpu().numpy()  # remove last row and column
 
     num_rows , num_cols = affinity_mtx.shape
 

@@ -22,10 +22,10 @@ def get_config():
         EMABLE_AMP        = True,
         WORK_DIR          = "experiments",
 
-        LR                = 3e-4,
+        LR                = 3.5e-4,
         WEIGHT_DECAY      = 1e-4,
-        BATCH_SIZE        = 2,
-        MAXEPOCH          = 50,
+        BATCH_SIZE        = 32,
+        MAXEPOCH          = 120,
         
         # StepLR
         LR_DROP           = 40,
@@ -78,7 +78,7 @@ def get_config():
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,
         CNT_TO_ACTIVE     = 1,
-        MAX_CNT_TO_DEAD   = 100,  # Maximum age for tracking an object
+        MAX_CNT_TO_DEAD   = 30,  # Maximum age for tracking an object
         FEATURE_LIST_SIZE = 10,
     )
 

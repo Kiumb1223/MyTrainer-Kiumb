@@ -28,7 +28,7 @@ class GraphModel(nn.Module):
         # Graph Layer
         self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE)
         # Sinkhorn Layer 
-        self.alpha   = nn.Parameter(torch.ones(1))
+        # self.alpha   = nn.Parameter(torch.ones(1))
         self.eplison = nn.Parameter(torch.zeros(1))
 
         # Maybe occur some error when using :class:Sinkhorn
@@ -91,25 +91,27 @@ class GraphModel(nn.Module):
 
             # 2. Prepare the augmented cost matrix for Sinkhorn
             m , n = cost.shape
-            bins0 = self.alpha.expand(m, 1)
-            bins1 = self.alpha.expand(1, n)
-            alpha = self.alpha.expand(1, 1)
-            couplings = torch.cat([torch.cat([cost,bins0],dim=-1),
-                                   torch.cat([bins1,alpha],dim=-1)],dim=0)
+            # bins0 = self.alpha.expand(m, 1)
+            # bins1 = self.alpha.expand(1, n)
+            # alpha = self.alpha.expand(1, 1)
+            # couplings = torch.cat([torch.cat([cost,bins0],dim=-1),
+            #                        torch.cat([bins1,alpha],dim=-1)],dim=0)
             # norm  = 1 / (m+n)  
             # a_aug = torch.full((m+1,),norm,device=self.device,dtype=torch.float32) 
             # b_aug = torch.full((n+1,),norm,device=self.device,dtype=torch.float32) 
             # a_aug[-1] = norm * n
             # b_aug[-1] = norm * m
-            a_aug = torch.full((m+1,),1,device=self.device,dtype=torch.float32) 
-            b_aug = torch.full((n+1,),1,device=self.device,dtype=torch.float32) 
+            # a_aug = torch.full((m+1,),1,device=self.device,dtype=torch.float32) 
+            # b_aug = torch.full((n+1,),1,device=self.device,dtype=torch.float32) 
+            a = torch.full((m,),0.9,device=self.device,dtype=torch.float32) 
+            b = torch.full((n,),0.9,device=self.device,dtype=torch.float32) 
 
             # pred_mtx = self.sinkhornLayer(couplings,a_aug,b_aug,
             #                             self.sinkhorn_iters,torch.exp(self.eplison) + 0.03)
 
             
             # to original possibility space 
-            pred_mtx = self.sinkhornLayer(couplings,a_aug,b_aug,
+            pred_mtx = self.sinkhornLayer(cost,a,b,
                                         #   lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
                                           lambd_sink = torch.exp(self.eplison) + 0.03)
             

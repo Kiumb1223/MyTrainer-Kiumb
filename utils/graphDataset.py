@@ -22,10 +22,11 @@ import torchvision.transforms.functional as F
 __all__ = ['GraphDataset', 'graph_collate_fn']
 
 class GraphDataset(torch.utils.data.Dataset):
-    def __init__(self,cfg,mode:str):
+    def __init__(self,cfg,mode:str,bt_augmentation:bool = False):
         super(GraphDataset, self).__init__()
 
         self.mode             = mode
+        self.bt_augmentation  = bt_augmentation
         # self.device           = cfg.DEVICE
         self.resize_to_cnn    = cfg.RESIZE_TO_CNN
         self.trackback_window = cfg.TRACKBACK_WINDOW
@@ -96,7 +97,13 @@ class GraphDataset(torch.utils.data.Dataset):
         tracklets_dict     = {}
         current_detections = self.dets_dict[seq_name][current_frame]
         cut_from_frame = max(1,current_frame - self.trackback_window)
-        for frame_idx in range(cut_from_frame,current_frame):
+
+        if self.bt_augmentation:
+            cut_to_frame = max(1,current_frame -  np.random.randint(0,3))
+        else:
+            cut_to_frame = current_frame
+
+        for frame_idx in range(cut_from_frame,cut_to_frame):
             past_detections = self.dets_dict[seq_name][frame_idx]
             for past_det in past_detections: # past_det = [frame_idx,tracklet_id,x,y,w,h,xc,yc]
                 tracklet_id = past_det[1]

@@ -62,7 +62,7 @@ class DynamicGonv(MessagePassing):
         assert self.flow == 'source_to_target' 
 
         with torch.no_grad():
-            edge_index = knn(x,k,bt_cosine=False,bt_self_loop=True,bt_edge_index=True) 
+            edge_index = knn(x,k,bt_cosine=True,bt_self_loop=True,bt_edge_index=True) 
             
         return self.propagate(edge_index,x=x)
     

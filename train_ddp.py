@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from models.graphModel import GraphModel
 from utils.lr_scheduler import LRScheduler
 from utils.graphTrainer import GraphTrainer
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR,MultiStepLR
 from torch.nn.parallel import DistributedDataParallel
 from utils.distributed import get_rank,init_distributed
 from torch.utils.data.distributed import DistributedSampler
@@ -66,7 +66,8 @@ def main():
     #             warmup_epochs=cfg.WARMUP_EPOCHS,warmup_lr_start=cfg.WARM_LR,
     #             no_aug_epochs=cfg.NO_AUG_EPOCHS,min_lr_ratio=cfg.MIN_LR_RATIO,)
     
-    lr_scheduler = StepLR(optimizer,cfg.LR_DROP)
+    # lr_scheduler = StepLR(optimizer,cfg.LR_DROP)
+    lr_scheduler = MultiStepLR(optimizer,milestones=[40,70])
     loss_func = GraphLoss()
 
     graphTrainer = GraphTrainer(
