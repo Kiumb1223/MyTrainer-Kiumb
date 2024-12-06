@@ -7,6 +7,7 @@
 :Author     :Kiumb
 '''
 import torch
+import cProfile
 from loguru import logger
 from torch.optim import AdamW
 from configs.config import get_config
@@ -66,5 +67,5 @@ def main():
     graphTrainer.train()
 
 if __name__ == '__main__':
-    main()
-    # cProfile.run('main()',filename='TimeAnalysis.out')
+    # main()
+    cProfile.run('main()',filename='TimeAnalysis.out')

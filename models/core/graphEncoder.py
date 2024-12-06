@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
+import torchvision.transforms.functional as f
 from typing import Union,Optional
 from models.graphToolkit import knn
 from torch_geometric.data import Batch,Data
@@ -45,7 +46,7 @@ class NodeEncoder(nn.Module):
             param.requires_grad = True
 
     def forward(self, graph:Union[Batch,Data]) -> Union[Batch,Data]:
-
+        graph.x = f.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
         graph.x = self.backbone(graph.x)
         graph.x = self.head(graph.x)
         
