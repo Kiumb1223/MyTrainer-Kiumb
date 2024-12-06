@@ -36,13 +36,13 @@ def main():
     #  prepare training
     #---------------------------------#
     set_random_seed(cfg.RANDOM_SEED)
-    train_dataset = GraphDataset(cfg,'Train_split')  # Move tensor to the device specified in cfg.DEVICE
+    train_dataset = GraphDataset(cfg,'Train',True)  # Move tensor to the device specified in cfg.DEVICE
     test_dataset  = GraphDataset(cfg,'Validation')
 
     train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
 
-    test_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,pin_memory=True,
+    valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
     model = GraphModel(cfg).to(cfg.DEVICE)
@@ -57,7 +57,7 @@ def main():
 
     graphTrainer = GraphTrainer(
         model=model,optimizer=optimizer,lr_scheduler=lr_scheduler,loss_func=loss_func,
-        max_epoch=cfg.MAXEPOCH,train_loader=train_loader,enable_amp=cfg.EMABLE_AMP,
+        max_epoch=cfg.MAXEPOCH,train_loader=train_loader,val_loader=valid_loader,enable_amp=cfg.EMABLE_AMP,
         work_dir=cfg.WORK_DIR,log_period=cfg.LOG_PERIOD,checkpoint_period=cfg.CHECKPOINT_PERIOD,device=cfg.DEVICE
     )
     #---------------------------------#

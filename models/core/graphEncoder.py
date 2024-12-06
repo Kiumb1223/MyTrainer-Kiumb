@@ -36,8 +36,13 @@ class NodeEncoder(nn.Module):
             nn.ReLU(inplace=True),
         )
         # Optional freeze model weights
-        for param in self.backbone.parameters()[:-3]:
-            param.requires_grad = False # Freeze
+        params = list(self.backbone.parameters())
+
+        for param in params:
+            param.requires_grad = False
+
+        for param in params[-3:]:
+            param.requires_grad = True
 
     def forward(self, graph:Union[Batch,Data]) -> Union[Batch,Data]:
 

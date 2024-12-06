@@ -67,7 +67,7 @@ class DynamicGonv(MessagePassing):
         return self.propagate(edge_index,x=x)
     
     def message(self, x_i:torch.Tensor,x_j:torch.Tensor) -> torch.Tensor:
-        tmp_msg = torch.cat([x_j-x_i,x_i],dim=1)
+        tmp_msg = torch.cat([x_i,x_j-x_i],dim=1)
         return self.msgFunc(tmp_msg)
     
 class GraphConv(Module):

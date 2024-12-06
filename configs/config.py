@@ -40,7 +40,7 @@ def get_config():
         #  2. Model related
         #---------------------------------#
         K_NEIGHBOR        = 2,    # Excluding self-loop
-        RESIZE_TO_CNN     = [224, 224],
+        RESIZE_TO_CNN     = [256, 128],
         NODE_EMBED_SIZE   = 32,
         EDGE_EMBED_SIZE   = 18,
         SINKHORN_ITERS    = 8,
@@ -48,28 +48,10 @@ def get_config():
         #---------------------------------#
         #  3. Dataset related
         #---------------------------------#
-        DETECTOR          = 'FRCNN',
-        DATA_DIR          = 'datasets/MOT17/train',
-        ACCEPTABLE_OBJ_TYPE=[1, 2, 7],
-        MOT17_TRAIN_NAME  = [
-            'MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09',
-            'MOT17-10', 'MOT17-11', 'MOT17-13'
-        ],
-        MOT17_TRAIN_START = [2, 2, 2, 2, 2, 2, 2],
-        MOT17_VAL_NAME    = [
-            'MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09',
-            'MOT17-10', 'MOT17-11', 'MOT17-13'
-        ],
-        MOT17_VAL_START   = [501, 951, 738, 426, 555, 801, 651],
-        MOT17ALLFRAMENUM  = {
-            'MOT17-01': 450, 'MOT17-02': 600, 'MOT17-03': 1500,
-            'MOT17-04': 1050, 'MOT17-05': 837, 'MOT17-06': 1194,
-            'MOT17-07': 500, 'MOT17-08': 625, 'MOT17-09': 525,
-            'MOT17-10': 654, 'MOT17-11': 900, 'MOT17-12': 900,
-            'MOT17-13': 750, 'MOT17-14': 750
-        },
+        DATA_DIR          = 'datasets',
+        JSON_PATH         = 'configs\dataset.json',
         TRACKBACK_WINDOW  = 10,
-    
+        ACCEPTABLE_OBJ_TYPE= [1,2,7],
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#

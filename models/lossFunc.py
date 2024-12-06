@@ -34,7 +34,7 @@ class GraphLoss(nn.Module):
 
         loss = self.alpha * focal_weight * ce_loss
 
-        return loss.mean()
+        return loss.sum()
 
     def forward(self, pred_mtx_list: list, gt_mtx_list: list) -> Tensor:
         num_graphs = len(pred_mtx_list)
@@ -45,7 +45,7 @@ class GraphLoss(nn.Module):
         for i in range(num_graphs):
 
             gt_mtx = gt_mtx_list[i]
-            pred_mtx = pred_mtx_list[i][:-1, :-1]  # remove padding rows and columns 
+            pred_mtx = pred_mtx_list[i] 
 
             loss += self.focal_loss(pred_mtx, gt_mtx)
 

@@ -6,16 +6,17 @@
 :EditTime   :2024/11/25 14:34:14
 :Author     :Kiumb
 '''
-
 import os
 import time
 import torch
 import datetime
+import numpy as np
 import torch.nn as nn
 from loguru import logger
 from typing import  Optional,Union
 from utils.misc import get_model_info
 from torch.utils.data import DataLoader
+from models.graphToolkit import hungarian
 from utils.lr_scheduler import LRScheduler
 from torch.nn.utils import clip_grad_norm_
 from torch.cuda.amp import GradScaler, autocast
@@ -43,6 +44,7 @@ class GraphTrainer:
                  log_period:int=10,        # iteration interval
                  checkpoint_period:int=10, # epoch interval
                  device:str = None,
+                 ckpt_save_length = 10,    # checkpoint save length
                  ):
         model.train()
         self.model   = model
@@ -69,10 +71,15 @@ class GraphTrainer:
         self.device     = device if device is not None else 'cpu'
         self.rank       = get_rank()
         if self.rank == 0:
+            
+            self._ckpt_list= [] 
+            self._ckpt_save_length = ckpt_save_length
+            self.tbWritter = SummaryWriter(self.tb_log_dir)
+            self._best_f1_score = np.NINF
+            
             os.makedirs(self.work_dir, exist_ok=True)
             os.makedirs(self.ckpt_dir, exist_ok=True)
             os.makedirs(self.tb_log_dir, exist_ok=True)
-            self.tbWritter = SummaryWriter(self.tb_log_dir)
             
 
 
@@ -149,12 +156,18 @@ class GraphTrainer:
 
         self.save_checkpoint("latest.pth")
         if (self.cur_epoch + 1) % self.checkpoint_period == 0:
+            self.save_checkpoint(f"epoch_{self.cur_epoch}.pth")
+            self._ckpt_list.append(f"epoch_{self.cur_epoch}.pth")
+            
+            if len(self._ckpt_list) > self._ckpt_save_length:
+                os.remove(os.path.join(self.ckpt_dir,self._ckpt_list.pop(0)))
+            
             if self.val_loader is not None:
                 self.eval_save_model()
-            else:
-                self.save_checkpoint(f"epoch_{self.cur_epoch}.pth")
+
     def before_iter(self):
-        pass
+        torch.cuda.empty_cache()
+
     def train_one_iter(self):
 
         iter_start_time = time.perf_counter()
@@ -315,16 +328,50 @@ class GraphTrainer:
             logger.info(f"Saving checkpoint to {file_path}")
             torch.save(data, file_path)
 
+    @torch.no_grad()
     def eval_save_model(self):
         if self.rank == 0:
-
+            logger.info('start evalution...')
             self.model.eval()
             #---------------------------------#
             # eval and save the best model 
             # wait to implement
             #---------------------------------#
-            self.model.train()
-            self.tbWritter('wait to write')
+            try:
+                batch = next(self._valid_iter)
+            except StopIteration:
+                self._valid_iter = iter(self.val_loader)
+                batch = next(self._valid_iter)
+
+            with autocast(enabled=self._enable_amp):
+                tra,det,gt_mtx_list = batch
+                tra,det = tra.to(self.device),det.to(self.device)
+                gt_mtx_list   = [i.to(self.device) for i in gt_mtx_list]
+                pred_mtx_list = self.model(tra,det)
             
+            f1_score = []
+            for pred_mtx,gt_mtx in zip(pred_mtx_list,gt_mtx_list):
+                binary_pred_mtx,_,_,_ = hungarian(pred_mtx,0)
+                f1_score.append(self._compute_f1_score(binary_pred_mtx,gt_mtx.numpy()))
+            f1_score = np.mean(f1_score)
+            logger.info(f'Evalution -> f1_score: [{f1_score}]')
+            self.tbWritter.add_scalar('Evalution/f1_score',f1_score,self.cur_epoch)
+            if f1_score > self._best_f1_score:
+                self._best_f1_score = f1_score
+                self.save_checkpoint(f"best_{self.cur_epoch}_epoch_{self.cur_epoch}.pth")
+            self.model.train()
         synchronize()
-        
+    
+    def _compute_f1_score(self,pred_mtx:np.ndarray,gt_mtx:np.ndarray):
+        '''for evaluation phase'''
+        TP = np.sum(np.logical_and(pred_mtx == 1, gt_mtx == 1))
+        FP = np.sum(np.logical_and(pred_mtx == 1, gt_mtx == 0))
+        FN = np.sum(np.logical_and(pred_mtx == 0, gt_mtx == 1))
+
+
+        precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+        recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+
+        # F1-Score
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        return f1_score
