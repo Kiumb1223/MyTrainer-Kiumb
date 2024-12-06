@@ -218,11 +218,11 @@ class TrackManager:
         '''construct raw graph of detections'''
         img_tensor  = img_date.to(self.device).to(torch.float32)
         raw_node_attr , location_info = [] , []
-        im_tensor = F.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        # im_tensor = F.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         for det in current_detections:
             x,y , w,h = map(int,det[:4])
             xc , yc   = x + w/2 , y + h/2
-            patch = F.crop(im_tensor,y,x,h,w)
+            patch = F.crop(img_tensor,y,x,h,w)
             patch = F.resize(patch,self._resize_to_cnn)
             raw_node_attr.append(patch)
             location_info.append([xc,yc,w,h])
