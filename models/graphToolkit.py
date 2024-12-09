@@ -3,13 +3,12 @@
 
 import torch
 import numpy as np
-from torch import Tensor
 from loguru import logger
 import scipy.optimize as opt
 import torch.nn.functional as F
 from typing import Optional,Tuple
 
-__all__ = ['knn','hungarian','sinkhorn_unrolled','Sinkhorn']
+__all__ = ['knn','hungarian','box_iou','box_ciou','sinkhorn_unrolled','Sinkhorn','compute_f1_score']
 
 
 def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: Optional[bool]=False,
@@ -106,6 +105,82 @@ def hungarian(affinity_mtx: torch.Tensor,match_thresh: float=0.1  ):
 
 
 '''
+ref:https://www.cnblogs.com/yancx/p/16279572.html
+'''
+
+
+def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
+    ''' Return intersection-over-union (Jaccard index) of boxes. '''
+    # cal the box's area of boxes1 and boxess
+    boxes1Area = (boxes1[..., 2] - boxes1[..., 0]) * (boxes1[..., 3] - boxes1[..., 1])
+    boxes2Area = (boxes2[..., 2] - boxes2[..., 0]) * (boxes2[..., 3] - boxes2[..., 1])
+
+    # cal Intersection
+    lt = np.maximum(boxes1[..., :2], boxes2[..., :2])
+    rb = np.minimum(boxes1[..., 2:], boxes2[..., 2:])
+    inter = np.maximum(rb - lt, 0)
+    inter_area = inter[..., 0] * inter[..., 1]
+
+    # cal Union
+    union_area = boxes1Area + boxes2Area - inter_area
+
+    # cal IoU
+    iou = inter_area / union_area
+
+    return iou
+
+
+
+def box_ciou(boxes1:torch.Tensor, boxes2:torch.Tensor, GIOU=False, CIOU=True, DIOU=False) -> torch.Tensor:
+    """
+    Return complete IOU between two sets of boxes
+
+    Args:
+        b1 Tensor[M, 4]: first set of boxes
+        b2 Tensor[N, 4]: second set of boxes
+
+    Returns:
+        Tensor[M, N]:
+    """
+    # cal the box's area of boxes1 and boxess
+    boxes1Area = (boxes1[..., 2] - boxes1[..., 0]) * (boxes1[..., 3] - boxes1[..., 1])
+    boxes2Area = (boxes2[..., 2] - boxes2[..., 0]) * (boxes2[..., 3] - boxes2[..., 1])
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
+    wh = torch.clamp(rb - lt, min=0)  # [N,M,2]
+    inter_area = wh[:, :, 0] * wh[:, :, 1]  # [N,M]
+
+    union_area = boxes1Area[:, None] + boxes2Area - inter_area
+    iou = inter_area / union_area
+
+    w1, h1 = boxes1[:, 2] - boxes1[:, 0], boxes1[:, 3] - boxes1[:, 1]
+    w2, h2 = boxes2[:, 2] - boxes2[:, 0], boxes2[:, 3] - boxes2[:, 1]
+    center1 = (boxes1[:, 2:] + boxes1[:, :1]) / 2
+    center2 = (boxes2[:, 2:] + boxes2[:, :1]) / 2
+    out_max_xy = torch.max(boxes1[:, None, 2:], boxes2[:, 2:])
+    out_min_xy = torch.min(boxes1[:, None, :2], boxes2[:, :2])# [N, M, 2]
+    outer = torch.clamp((out_max_xy - out_min_xy), min=0)
+    if GIOU:
+        c_area = outer[:, :, 0] * outer[:, :, 1] + 1e-16
+        return iou - (c_area - union_area) / c_area
+    if DIOU or CIOU:
+        outer_diag = (outer[:, :, 0] ** 2) + (outer[:, :, 1] ** 2)
+        inter_diag = (center1[:, None, 0] - center2[:, 0]) ** 2 + (center1[:, None, 1] - center2[:, 1]) ** 2
+        if DIOU:
+            return iou - inter_diag / outer_diag
+        elif CIOU:
+            arctan = torch.atan(w2 / h2)[:] - torch.atan(w1 / h1)[:, None]
+            v = (4 / (torch.pi ** 2)) * torch.pow(arctan, 2)
+            S = 1 - iou
+            with torch.no_grad():
+                alpha = v / (S + v)
+                u = inter_diag / outer_diag
+                ciou = iou - (u + v * alpha)
+                ciou = torch.clamp(ciou, min=-1.0, max=1.0)
+            return ciou
+
+
+'''
 Extracted from https://github.com/marvin-eisenberger/implicit-sinkhorn, with minor modifications
 And much thanks to their brilliant work~ :)
 '''
@@ -170,3 +245,18 @@ class Sinkhorn(torch.autograd.Function):
         grad_b = -ctx.lambd_sink * grad_b.squeeze(dim=-1)
         return grad_p, grad_a, grad_b, None, None, None
 
+
+
+def compute_f1_score(pred_mtx:np.ndarray,gt_mtx:np.ndarray) -> int:
+    '''for evaluation phase'''
+    TP = np.sum(np.logical_and(pred_mtx == 1, gt_mtx == 1))
+    FP = np.sum(np.logical_and(pred_mtx == 1, gt_mtx == 0))
+    FN = np.sum(np.logical_and(pred_mtx == 0, gt_mtx == 1))
+
+
+    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+    recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+
+    # F1-Score
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    return f1_score

@@ -5,10 +5,10 @@ import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
-import torchvision.transforms.functional as f
 from typing import Union,Optional
 from models.graphToolkit import knn
 from torch_geometric.data import Batch,Data
+import torchvision.transforms.functional as f
 
 __all__ = ['NodeEncoder','EdgeEncoder']
 
@@ -91,7 +91,7 @@ class EdgeEncoder(nn.Module):
         """
 
         if not hasattr(batch,'num_graphs'): # Date Type
-            edge_index = knn(batch.location_info[:,:2],k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_edge_index=True)
+            edge_index = knn(batch.location_info[:,-2:],k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_edge_index=True)
             return edge_index
         
         # Batch Type
@@ -99,7 +99,7 @@ class EdgeEncoder(nn.Module):
         for i in range(batch.num_graphs):
             start, end = batch.ptr[i:i+2]
             
-            sub_positions = batch.location_info[start:end,:2]
+            sub_positions = batch.location_info[start:end,-2:]
             
             indices,k2 = knn(sub_positions, k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop, bt_edge_index=False)
             
@@ -137,11 +137,11 @@ class EdgeEncoder(nn.Module):
         source_info   = batch.location_info[source_indice]
         target_info   = batch.location_info[target_indice]
 
-        # location_info = [xc,yc,w,h]
-        feat1 = 2 * (source_info[:,-4] - target_info[:,-4]) / (source_info[:,-1] + target_info[:,-1] + 1e-8)
-        feat2 = 2 * (source_info[:,-3] - target_info[:,-3]) / (source_info[:,-1] + target_info[:,-1] + 1e-8)
-        feat3 = torch.log(source_info[:,-1] / (target_info[:,-1] + 1e-8) )
-        feat4 = torch.log(source_info[:,-2] / (target_info[:,-2] + 1e-8) )
+        # location_info = [x,y,x2,y2,w,h,xc,yc]
+        feat1 = 2 * (source_info[:,-2] - target_info[:,-2]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
+        feat2 = 2 * (source_info[:,-1] - target_info[:,-1]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
+        feat3 = torch.log(source_info[:,-3] / (target_info[:,-3] + 1e-8) )
+        feat4 = torch.log(source_info[:,-4] / (target_info[:,-4] + 1e-8) )
         feat5 = self._calculate_diou(source_info,target_info)
         feat6 = F.cosine_similarity(source_x,target_x,dim=1)
 
@@ -150,36 +150,25 @@ class EdgeEncoder(nn.Module):
         return edge_attr
 
     def _calculate_diou(self,source_info, target_info):
-        # source_info = [xc,yc,w,h]
-        # target_info = [xc,yc,w,h]
-        source_x1 = source_info[:, 0] - source_info[:, 2] / 2
-        source_y1 = source_info[:, 1] - source_info[:, 3] / 2
-        source_x2 = source_info[:, 0] + source_info[:, 2] / 2
-        source_y2 = source_info[:, 1] + source_info[:, 3] / 2
-
-        target_x1 = target_info[:, 0] - target_info[:, 2] / 2
-        target_y1 = target_info[:, 1] - target_info[:, 3] / 2
-        target_x2 = target_info[:, 0] + target_info[:, 2] / 2
-        target_y2 = target_info[:, 1] + target_info[:, 3] / 2
-
-        inter_x1 = torch.max(source_x1, target_x1)
-        inter_y1 = torch.max(source_y1, target_y1)
-        inter_x2 = torch.min(source_x2, target_x2)
-        inter_y2 = torch.min(source_y2, target_y2)
+        # location_info = [x,y,x2,y2,w,h,xc,yc]
+        inter_x1 = torch.max(source_info[:,0], target_info[:,0])
+        inter_y1 = torch.max(source_info[:,1], target_info[:,1])
+        inter_x2 = torch.min(source_info[:,2], target_info[:,2])
+        inter_y2 = torch.min(source_info[:,3], target_info[:,3])
 
         inter_area = torch.clamp(inter_x2 - inter_x1, min=0) * torch.clamp(inter_y2 - inter_y1, min=0)
 
-        source_area = source_info[:, 2] * source_info[:, 3]
-        target_area = target_info[:, 2] * target_info[:, 3]
+        source_area = source_info[:, 4] * source_info[:, 5]
+        target_area = target_info[:, 4] * target_info[:, 5]
         union_area = source_area + target_area - inter_area
 
         inter_xc = (inter_x1 + inter_x2) / 2
         inter_yc = (inter_y1 + inter_y2) / 2
 
-        source_xc = source_info[:, 0]
-        source_yc = source_info[:, 1]
-        target_xc = target_info[:, 0]
-        target_yc = target_info[:, 1]
+        source_xc = source_info[:, 6]
+        source_yc = source_info[:, 7]
+        target_xc = target_info[:, 6]
+        target_yc = target_info[:, 7]
         union_xc = (source_xc * source_area + target_xc * target_area) / (union_area + 1e-8)
         union_yc = (source_yc * source_area + target_yc * target_area) / (union_area + 1e-8)
 

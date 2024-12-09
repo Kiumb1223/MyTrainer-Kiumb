@@ -16,7 +16,6 @@ from loguru import logger
 from typing import  Optional,Union
 from utils.misc import get_model_info
 from torch.utils.data import DataLoader
-from models.graphToolkit import hungarian
 from utils.lr_scheduler import LRScheduler
 from torch.nn.utils import clip_grad_norm_
 from torch.cuda.amp import GradScaler, autocast
@@ -24,6 +23,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import _LRScheduler
 from utils.metric import MeterBuffer, gpu_mem_usage
 from torch.nn.parallel import DistributedDataParallel
+from models.graphToolkit import hungarian,compute_f1_score
 from utils.distributed import get_rank, get_local_rank,synchronize
 
 
@@ -52,7 +52,9 @@ class GraphTrainer:
         self.lr_scheduler = lr_scheduler
         self.loss_func = loss_func
         self.train_loader = train_loader
-        self.val_loader = val_loader
+        if val_loader:
+            self.val_loader  = val_loader
+            self._valid_iter = iter(self.val_loader)
         self.max_epoch  = max_epoch
         self._clip_grad_norm = clip_grad_norm
         self._enable_amp  = enable_amp
@@ -157,10 +159,10 @@ class GraphTrainer:
         self.save_checkpoint("latest.pth")
         if (self.cur_epoch + 1) % self.checkpoint_period == 0:
             self.save_checkpoint(f"epoch_{self.cur_epoch}.pth")
-            self._ckpt_list.append(f"epoch_{self.cur_epoch}.pth")
-            
-            if len(self._ckpt_list) > self._ckpt_save_length:
-                os.remove(os.path.join(self.ckpt_dir,self._ckpt_list.pop(0)))
+            if self.rank == 0:
+                self._ckpt_list.append(f"epoch_{self.cur_epoch}.pth")
+                if len(self._ckpt_list) > self._ckpt_save_length:
+                    os.remove(os.path.join(self.ckpt_dir,self._ckpt_list.pop(0)))
             
             if self.val_loader is not None:
                 self.eval_save_model()
@@ -248,7 +250,7 @@ class GraphTrainer:
             )
             if self.rank == 0:
                 # write to tensorboard
-                self.tbWritter.add_scalar('Train/loss',list(loss_meter.values())[-1].latest, self.cur_epoch + 1)
+                self.tbWritter.add_scalar('Train/loss',list(loss_meter.values())[-1].latest, self.cur_total_iter + 1)
             # empty the meters
             self.meter.clear_meters()
         
@@ -332,7 +334,7 @@ class GraphTrainer:
     def eval_save_model(self):
         if self.rank == 0:
             logger.info('start evalution...')
-            self.model.eval()
+            self.model_or_module.eval()
             #---------------------------------#
             # eval and save the best model 
             # wait to implement
@@ -347,19 +349,19 @@ class GraphTrainer:
                 tra,det,gt_mtx_list = batch
                 tra,det = tra.to(self.device),det.to(self.device)
                 gt_mtx_list   = [i.to(self.device) for i in gt_mtx_list]
-                pred_mtx_list = self.model(tra,det)
+                pred_mtx_list = self.model_or_module(tra,det)
             
             f1_score = []
             for pred_mtx,gt_mtx in zip(pred_mtx_list,gt_mtx_list):
                 binary_pred_mtx,_,_,_ = hungarian(pred_mtx,0)
-                f1_score.append(self._compute_f1_score(binary_pred_mtx,gt_mtx.numpy()))
+                f1_score.append(compute_f1_score(binary_pred_mtx,gt_mtx.cpu().numpy()))
             f1_score = np.mean(f1_score)
             logger.info(f'Evalution -> f1_score: [{f1_score}]')
             self.tbWritter.add_scalar('Evalution/f1_score',f1_score,self.cur_epoch)
             if f1_score > self._best_f1_score:
                 self._best_f1_score = f1_score
-                self.save_checkpoint(f"best_{self.cur_epoch}_epoch_{self.cur_epoch}.pth")
-            self.model.train()
+                self.save_checkpoint(f"best_f1{self._best_f1_score}_epoch_{self.cur_epoch}.pth")
+            self.model_or_module.train()
         synchronize()
     
     def _compute_f1_score(self,pred_mtx:np.ndarray,gt_mtx:np.ndarray):

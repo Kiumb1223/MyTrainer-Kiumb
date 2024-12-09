@@ -10,3 +10,4 @@ configs/__pycache__
 *.ipynb
 *.out
 testVideo/
+*.json

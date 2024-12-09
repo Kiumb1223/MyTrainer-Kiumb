@@ -16,7 +16,7 @@ def get_config():
         #---------------------------------#
         RANDOM_SEED       = 1,
         LOG_PERIOD        = 10,       # Iteration 
-        CHECKPOINT_PERIOD = 5,        # Epoch
+        CHECKPOINT_PERIOD = 1,        # Epoch
         DEVICE            = 'cuda',
         NUM_WORKS         = 0,
         EMABLE_AMP        = True,
@@ -24,7 +24,7 @@ def get_config():
 
         LR                = 3.5e-4,
         WEIGHT_DECAY      = 1e-4,
-        BATCH_SIZE        = 32,
+        BATCH_SIZE        = 2,
         MAXEPOCH          = 120,
         
         # StepLR

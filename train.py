@@ -55,7 +55,7 @@ def main():
     #             no_aug_epochs=cfg.NO_AUG_EPOCHS,min_lr_ratio=cfg.MIN_LR_RATIO,)
     lr_scheduler = StepLR(optimizer,cfg.LR_DROP)
     loss_func = GraphLoss()
-
+ 
     graphTrainer = GraphTrainer(
         model=model,optimizer=optimizer,lr_scheduler=lr_scheduler,loss_func=loss_func,
         max_epoch=cfg.MAXEPOCH,train_loader=train_loader,val_loader=valid_loader,enable_amp=cfg.EMABLE_AMP,
@@ -67,5 +67,5 @@ def main():
     graphTrainer.train()
 
 if __name__ == '__main__':
-    # main()
-    cProfile.run('main()',filename='TimeAnalysis.out')
+    main()
+    # cProfile.run('main()',filename='TimeAnalysis.out')

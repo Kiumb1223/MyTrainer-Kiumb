@@ -44,8 +44,8 @@ class GraphLoss(nn.Module):
 
         for i in range(num_graphs):
 
-            gt_mtx = gt_mtx_list[i]
-            pred_mtx = pred_mtx_list[i][:-1,:-1] 
+            gt_mtx = gt_mtx_list[i].float()
+            pred_mtx = pred_mtx_list[i][:-1,:-1].float() 
 
             loss += self.focal_loss(pred_mtx, gt_mtx)
 

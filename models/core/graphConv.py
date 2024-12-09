@@ -15,7 +15,7 @@ __all__ = ['GraphConv']
 
 class StaticConv(MessagePassing):
 
-    def __init__(self, in_channels:int, out_channels:int):
+    def __init__(self, in_channels:int, out_channels:int,node_embed_size:int):
 
         super().__init__(aggr='max') #  "Max" aggregation.
         if out_channels % 2 != 0:
@@ -24,52 +24,70 @@ class StaticConv(MessagePassing):
             mid_channels = (in_channels + out_channels) // 2  
         self.updateFunc = nn.Sequential(
             nn.Linear(in_channels,mid_channels,bias=False),
-            nn.BatchNorm1d(mid_channels),
+            # nn.BatchNorm1d(mid_channels),
             nn.LeakyReLU(0.1),
+            nn.Dropout(),
             nn.Linear(mid_channels,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
+            # nn.BatchNorm1d(out_channels),
             nn.LeakyReLU(0.1),
+            nn.Dropout(),
             nn.Linear(out_channels,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
+            # nn.BatchNorm1d(out_channels),
             nn.LeakyReLU(0.1),
+            nn.Dropout(),
         )
 
+        self.lin = nn.Sequential(
+            nn.Linear( node_embed_size ,out_channels,bias=False),
+            # nn.BatchNorm1d(out_channels),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(),
+        )
     def forward(self, x:torch.Tensor, edge_index:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
-        return self.propagate(edge_index,edge_attr=edge_attr,x=x)
+        return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
     
     def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
-        return torch.cat([x_i,x_j - x_i,edge_attr], dim=1)  
+        return torch.cat([x_j - x_i,edge_attr], dim=1)  
     
     def update(self, inputs:torch.Tensor) -> torch.Tensor:
         return self.updateFunc(inputs)
     
 
 class DynamicGonv(MessagePassing):
-    def __init__(self, in_channels:int, out_channels:int):
+    def __init__(self, in_channels:int, out_channels:int,node_embed_size:int):
 
         super().__init__(aggr='max')
 
         self.msgFunc = nn.Sequential(
             nn.Linear(in_channels,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
+            # nn.BatchNorm1d(out_channels),
             nn.LeakyReLU(0.2),
+            nn.Dropout(),
             nn.Linear(out_channels,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
+            # nn.BatchNorm1d(out_channels),
             nn.LeakyReLU(0.2),
+            nn.Dropout(),
         )
 
+        self.lin = nn.Sequential(
+            nn.Linear( node_embed_size ,out_channels,bias=False),
+            # nn.BatchNorm1d(out_channels),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(),
+        )
     def forward(self,x:torch.Tensor,k:int) -> torch.Tensor:
         assert self.flow == 'source_to_target' 
 
         with torch.no_grad():
             edge_index = knn(x,k,bt_cosine=True,bt_self_loop=True,bt_edge_index=True) 
-            
-        return self.propagate(edge_index,x=x)
+        out = self.propagate(edge_index,x=x)
+        return self.lin(x) + out
     
     def message(self, x_i:torch.Tensor,x_j:torch.Tensor) -> torch.Tensor:
         tmp_msg = torch.cat([x_i,x_j-x_i],dim=1)
         return self.msgFunc(tmp_msg)
     
+
 class GraphConv(Module):
     def __init__(self,node_embed_size:int,edge_embed_size:int):
         super().__init__()
@@ -77,12 +95,12 @@ class GraphConv(Module):
         self.nodeEncoder = NodeEncoder(node_embed_size)
         self.edgeEncoder = EdgeEncoder(edge_embed_size)
 
-        self.sg1Func  = StaticConv(2*node_embed_size + edge_embed_size,node_embed_size)
-        self.sg2Func  = StaticConv(2*node_embed_size + edge_embed_size,node_embed_size*2)
-        self.sg3Func  = StaticConv(2*(node_embed_size*2) + edge_embed_size,node_embed_size*3)
+        self.sg1Func  = StaticConv(node_embed_size + edge_embed_size,node_embed_size,node_embed_size)
+        self.sg2Func  = StaticConv(node_embed_size + edge_embed_size,node_embed_size*2,node_embed_size)
+        self.sg3Func  = StaticConv((node_embed_size*2) + edge_embed_size,node_embed_size*3,(node_embed_size*2))
 
-        self.dg1Func  = DynamicGonv(2*node_embed_size,node_embed_size*2)
-        self.dg2Func  = DynamicGonv(2*(node_embed_size*2),node_embed_size*3)
+        self.dg1Func  = DynamicGonv(2*node_embed_size,node_embed_size*2,node_embed_size)
+        self.dg2Func  = DynamicGonv(2*(node_embed_size*2),node_embed_size*3,(node_embed_size*2))
 
         self.fuse1Func = nn.Sequential(
             nn.Linear(node_embed_size*11,1024,bias=False),

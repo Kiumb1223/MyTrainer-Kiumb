@@ -34,6 +34,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
         self.frame_list       = [] # STORE the seq-name and frame-idx 
         self.dets_dict        = {} # STORE the dets info for each frame
+        self.start_frame_idx  = {} # STORE the start-frame-idx for each seq
         self.dataset_dir      = cfg.DATA_DIR
         self.acceptable_obj_type  = cfg.ACCEPTABLE_OBJ_TYPE
 
@@ -46,9 +47,11 @@ class GraphDataset(torch.utils.data.Dataset):
                 raise ValueError('![MODE ERROR]')
         
         for data_type in tqdm(data_json.keys(),desc=f"[{self.mode}] Data-preprocess",total=len(data_json.keys()),unit='dataset'):
+            
             seq_name_list    = data_json[data_type]['seq_name']
             start_frame_list = data_json[data_type]['start_frame']
             end_frame_list   = data_json[data_type]['end_frame']
+
             for seq_name,start_frame,end_frame in zip(seq_name_list,start_frame_list,end_frame_list):                
                 unique_frameidx_list = []
                 self.dets_dict[seq_name] = {} 
@@ -61,30 +64,36 @@ class GraphDataset(torch.utils.data.Dataset):
                 txt_path   = os.path.join(seq_path,'gt','gt.txt') 
                 detections = np.loadtxt(txt_path,delimiter=',')
                 valid_mask = (
-                    (detections[:, 2] >= 0) & (detections[:, 3] >= 0) &
-                    (detections[:, 4] >= 0) & (detections[:, 5] >= 0) &
+                    # (detections[:, 2] >= 0) & (detections[:, 3] >= 0) &
+                    # (detections[:, 4] >= 0) & (detections[:, 5] >= 0) &
                     (np.isin(detections[:, 7], [1, 2, 7])) &
                     (start_frame <= detections[:, 0]) & (detections[:, 0] <= end_frame)
                 )
                 sorted_detections = sorted(detections[valid_mask],key=lambda x:x[0])
                 for detection in sorted_detections:
                     x,y,w,h = map(float,detection[2:6])
-                    xc , yc = x + w/2 , y + h/2
+                    x2,y2,xc,yc = x + w , y + h, x + w/2 , y + h/2
                     frame_idx,tracklet_id = map(int,detection[:2])
                     if frame_idx not in unique_frameidx_list:
                         unique_frameidx_list.append(frame_idx)
                         self.frame_list.append(f"{data_type}*{seq_name}*{frame_idx}")
                         self.dets_dict[seq_name][frame_idx] = []
-                    self.dets_dict[seq_name][frame_idx].append([frame_idx,tracklet_id,x,y,w,h,xc,yc])
-                if self.mode !=  'Validation':
-                    self.frame_list.remove(f"{data_type}*{seq_name}*{1}")
+                    self.dets_dict[seq_name][frame_idx].append([frame_idx,tracklet_id,x,y,x2,y2,w,h,xc,yc])
+                # if self.mode !=  'Validation':
+                self.frame_list.remove(f"{data_type}*{seq_name}*{start_frame}")
+            
+            self.start_frame_idx[data_type] = {
+                seq_name: start_frame
+                for seq_name, start_frame in zip(seq_name_list, start_frame_list)
+            }
+            
         logger.info(f"[{self.mode}] Total frame number : {len(self.frame_list)}")
 
     def __len__(self):
         return len(self.frame_list)
 
     def __getitem__(self,idx:int):
-        print(self.frame_list[idx])
+        # print(self.frame_list[idx])
         data_type,seq_name , current_frame = self.frame_list[idx].split('*')[0],\
             self.frame_list[idx].split('*')[1], int(self.frame_list[idx].split('*')[2])
         if self.mode == 'Train' or data_type in ['MOT17','MOT20']:
@@ -94,13 +103,13 @@ class GraphDataset(torch.utils.data.Dataset):
 
         tracklets_dict     = {}
         current_detections = self.dets_dict[seq_name][current_frame]
-        cut_from_frame = max(1,current_frame - self.trackback_window)
+        cut_from_frame = max(self.start_frame_idx[data_type][seq_name],current_frame - self.trackback_window)
 
         if self.bt_augmentation:
-            cut_to_frame = max(cut_from_frame+1,current_frame -  np.random.randint(0,5))
+            cut_to_frame = max(cut_from_frame+1,current_frame -  np.random.randint(0,5)+1)
         else:
             cut_to_frame = current_frame
-        print(f"{cut_from_frame}->{cut_to_frame}")
+        # print(f"{cut_from_frame}->{cut_to_frame}")
         for frame_idx in range(cut_from_frame,cut_to_frame):
             past_detections = self.dets_dict[seq_name][frame_idx]
             for past_det in past_detections: # past_det = [frame_idx,tracklet_id,x,y,w,h,xc,yc]
@@ -121,19 +130,30 @@ class GraphDataset(torch.utils.data.Dataset):
         if is_tracklet:
             # fetch the last item of each tracklet
             detections = [item[-1] for item in list(detections.values())]         
-        for det in detections: # det = [frame_idx,tracklet_id,x,y,w,h,xc,yc]
-            frame_idx = int(det[0])
-            x,y , w,h = map(int,det[2:6])
-            xc , yc   = map(float,det[6:])
+        for det in detections: # det = [frame_idx,tracklet_id,x,y,x2,y2,w,h,xc,yc]
+            frame_idx   = int(det[0])
+            x,y,_,_,w,h = map(int,det[2:-2])
+            # xc , yc   = map(float,det[6:])
             if frame_idx != prev_frame_idx:
                 prev_frame_idx = frame_idx
                 im_path = os.path.join(imgs_dir, f"{frame_idx:06d}.jpg" if date_type in ['MOT17','MOT20'] else f"{frame_idx:08d}.jpg")
                 im_tensor = read_image(im_path).to(torch.float32)
-                im_tensor = F.normalize(im_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+                # im_tensor = F.normalize(im_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+            
+            if x < 0:
+                w = w + x  
+                x = 0 
+
+            if y < 0:
+                h = h + y  
+                y = 0  
+            w = min(w, im_tensor.shape[2] - x)  
+            h = min(h, im_tensor.shape[1] - y)
+            
             patch = F.crop(im_tensor,y,x,h,w)
             patch = F.resize(patch,self.resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append([xc,yc,w,h])   # STORE  xc yc  w h
+            location_info.append(det[2:])   # STORE x,y,x2,y2,w,h,xc,yc
         raw_node_attr = torch.stack(raw_node_attr,dim=0)
         location_info = torch.as_tensor(location_info,dtype=torch.float32)
         return Data(x=raw_node_attr,location_info=location_info)

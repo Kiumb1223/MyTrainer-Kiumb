@@ -32,12 +32,13 @@ class Tracker:
 
     _track_id = 0
 
-    def __init__(self,start_frame,appearance_feat,conf,tlwh,cnt_to_active,max_cnt_to_dead,feature_list_size):
+    def __init__(self,start_frame,appearance_feat,conf,tlwh,cnt_to_active,cnt_to_sleep,max_cnt_to_dead,feature_list_size):
         
-        self.track_id  = None # when state: Born to Active, this will be assigned
-        self.track_len = 0
-        self.sleep_cnt = 0 
-        self.state     = LifeSpan.Born
+        self.track_id   = None # when state: Born to Active, this will be assigned
+        self.track_len  = 0
+        self.sleep_cnt  = 0 
+        self.active_cnt = 0 
+        self.state      = LifeSpan.Born
 
         self.start_frame   = start_frame 
 
@@ -47,6 +48,7 @@ class Tracker:
         self.appearance_feats_list.append(appearance_feat) 
         
         self._cnt_to_active     = cnt_to_active
+        self._cnt_to_sleep      = cnt_to_sleep
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
@@ -64,7 +66,8 @@ class Tracker:
             self.state     = LifeSpan.Active
         else:
             self.state = LifeSpan.Active
-            
+        
+        self.active_cnt = 0
         self.track_len += 1 
         self.frame_idx = frame_idx
         self.conf = conf
@@ -81,7 +84,10 @@ class Tracker:
             return 
         
         if self.state == LifeSpan.Active:
-            self.state = LifeSpan.Sleep
+            self.active_cnt += 1
+            if self.active_cnt >= self._cnt_to_sleep:
+                self.state = LifeSpan.Sleep
+            return
         
         self.sleep_cnt += 1
         if self.sleep_cnt >= self._max_cnt_to_dead:
@@ -123,9 +129,12 @@ class Tracker:
     
     @property
     def location_info(self):
-        """Convert bounding box to format `(center x, center y, width, height)`"""
+        """Convert bounding box to format `(min x, min y, max x, max y, width, height,center x, center y,)`"""
         ret = self.tlwh.copy().astype(np.float32)
-        ret[:2] = ret[:2] + ret[2:] / 2
+        ret = np.append(ret,self.tlwh[-2:])
+        ret = np.append(ret,self.tlwh[-2:])
+        ret[2:4] = ret[2:4] + ret[:2]
+        ret[-2:] = ret[-2:] / 2+ ret[:2]
         return ret
     
     @staticmethod
@@ -144,7 +153,7 @@ class Tracker:
 class TrackManager:
     def __init__(self,model :GraphModel,device :str,path_to_weights :str,
                  resize_to_cnn :list =[224,224],match_thresh :float =0.1,det2tra_conf :float =0.7,
-                 cnt_to_active :int =3,max_cnt_to_dead :int =100,feature_list_size :int =10):
+                 cnt_to_active :int =3,cnt_to_sleep :int=10,max_cnt_to_dead :int =100,feature_list_size :int =10):
         
         self.device = device
         self.model  = model.eval().to(device)
@@ -156,6 +165,7 @@ class TrackManager:
         # necessary attributes when initializing the single track
         self._det2tra_conf    = det2tra_conf
         self._cnt_to_active   = cnt_to_active
+        self._cnt_to_sleep    = cnt_to_sleep
         self._max_cnt_to_dead = max_cnt_to_dead
         self._feature_list_size = feature_list_size 
 
@@ -168,11 +178,11 @@ class TrackManager:
                 logger.info(f"Load weights from {path_to_weights} successfully")
                 
     @torch.no_grad()
-    def graph_matching(self,frame_idx:int,current_detections:np.ndarray,img_date:torch.Tensor) -> List[Tracker]:
+    def update(self,frame_idx:int,current_detections:np.ndarray,img_date:torch.Tensor) -> List[Tracker]:
         '''
         current_detections =np.ndarray(tlwh,conf)  and have already filtered by conf > 0.1 
         '''
-        tra_graph = self.construct_tra_graph()
+        tra_graph = self.construct_tra_graph(state=LifeSpan.Active)
         det_graph = self.construct_det_graph(current_detections,img_date)
         pred_mtx_list = self.model(tra_graph,det_graph)
         match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx_list[0],self._match_thresh)
@@ -195,19 +205,21 @@ class TrackManager:
                     self.tracks_list.append(
                         Tracker(frame_idx,det_graph.x[det_id],
                                 current_detections[det_id][4],current_detections[det_id][:4],
-                                self._cnt_to_active,self._max_cnt_to_dead,self._feature_list_size)
+                                self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
                         )
 
         return [tracker for tracker in self.tracks_list if tracker.is_Active]
 
-    def construct_tra_graph(self) -> Data:
-        '''construct graph of tracks including BORN, ACTIVE, SLEEP'''
+    def construct_tra_graph(self,state:LifeSpan =LifeSpan.ACTIVE) -> Data:
+        '''construct graph of tracks including ACTIVE'''
         
-        if not self.tracks_list: # if no tracks
+        if not self.tracks_list: # if no tracks 
             return Data(x=None)
         
         node_attr , location_info = [] , []
         for track in self.tracks_list:
+            if track.state != state :
+                continue
             node_attr.append(track.appearance_feats_list[-1])
             location_info.append(track.location_info)
         node_attr = torch.stack(node_attr,dim=0).to(self.device)
@@ -229,6 +241,15 @@ class TrackManager:
         raw_node_attr = torch.stack(raw_node_attr,dim=0).to(self.device)
         location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
         return Data(x=raw_node_attr,location_info=location_info)
+
+    def _graph_match(self):
+        pass
+
+
+    def _iou_match(self,tra_graph:Data,det_graph:Data) -> torch.Tensor:
+        pass 
+
+
 
     def remove_dead_tracks(self):
         """Remove all trackers whose state is Dead"""
