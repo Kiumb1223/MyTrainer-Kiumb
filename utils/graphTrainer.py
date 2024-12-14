@@ -16,7 +16,6 @@ from loguru import logger
 from typing import  Optional,Union
 from utils.misc import get_model_info
 from torch.utils.data import DataLoader
-from utils.lr_scheduler import LRScheduler
 from torch.nn.utils import clip_grad_norm_
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
@@ -25,52 +24,65 @@ from utils.metric import MeterBuffer, gpu_mem_usage
 from torch.nn.parallel import DistributedDataParallel
 from models.graphToolkit import hungarian,compute_f1_score
 from utils.distributed import get_rank, get_local_rank,synchronize
-
+from utils.lr_scheduler import LRWarmupScheduler
 
 __all__ = ['GraphTrainer']
 
 class GraphTrainer:
     def __init__(self,
-                 model: nn.Module, 
-                 optimizer: torch.optim.Optimizer, 
-                 lr_scheduler:Union[LRScheduler,_LRScheduler], 
-                 loss_func: nn.Module,
-                 max_epoch:int,
-                 train_loader:DataLoader, 
-                 val_loader:DataLoader=None, 
-                 enable_amp:bool=False,
-                 clip_grad_norm:float=0.0, 
-                 work_dir:str='work_dir',
-                 log_period:int=10,        # iteration interval
-                 checkpoint_period:int=10, # epoch interval
-                 device:str = None,
-                 ckpt_save_length = 10,    # checkpoint save length
-                 ):
+        model : nn.Module, 
+        optimizer : torch.optim.Optimizer, 
+        lr_scheduler :_LRScheduler, 
+        loss_func : nn.Module,
+        max_epoch :int,
+        train_loader :DataLoader, 
+        val_loader :DataLoader=None, 
+        enable_amp :bool=False,
+        clip_grad_norm :float=0.0, 
+        work_dir :str='work_dir',
+        log_period :int=10,        # iteration interval
+        checkpoint_period :int=10, # epoch interval
+        device :str = None,
+        ckpt_save_length :int = 10,    # checkpoint save length
+        fast_reid_weight_path : str = None,
+                
+        # the following settings are related to lr warmup
+        by_epoch : bool = True,
+        warmup_t : int = 0,
+        warmup_by_epoch : bool = False,
+        warmup_mode : str = "auto",
+        warmup_init_lr : float = 0.0,
+        warmup_factor : float = 0.0,
+            
+):
         model.train()
-        self.model   = model
-        self.optimizer  = optimizer
-        self.lr_scheduler = lr_scheduler
-        self.loss_func = loss_func
+        self.model        = model
+        self.optimizer    = optimizer
+        self.loss_func    = loss_func
         self.train_loader = train_loader
         if val_loader:
             self.val_loader  = val_loader
             self._valid_iter = iter(self.val_loader)
-        self.max_epoch  = max_epoch
+        self.max_epoch       = max_epoch
         self._clip_grad_norm = clip_grad_norm
-        self._enable_amp  = enable_amp
+        self._enable_amp     = enable_amp
 
-        self.work_dir   = work_dir
-        self.log_period = log_period
+        self.work_dir     = work_dir
+        self.log_period   = log_period
         self.checkpoint_period = checkpoint_period
         
-
-        self._train_iter = iter(self.train_loader)
-        self.meter  = MeterBuffer(window_size=10)
-        self.epoch_len  = len(self.train_loader)
+        self._train_iter  = iter(self.train_loader)
+        self.meter        = MeterBuffer(window_size=10)
+        self.epoch_len    = len(self.train_loader)
+        self.lr_scheduler = LRWarmupScheduler(lr_scheduler, by_epoch, self.epoch_len, warmup_t,
+                            warmup_by_epoch, warmup_mode, warmup_init_lr, warmup_factor)
+        
+        
         self.ckpt_dir   = os.path.join(self.work_dir, 'checkpoints')
         self.tb_log_dir = os.path.join(self.work_dir, 'tb_logs')
 
         self.device     = device if device is not None else 'cpu'
+        self._fast_reid_weight_path = fast_reid_weight_path
         self.rank       = get_rank()
         if self.rank == 0:
             
@@ -154,7 +166,7 @@ class GraphTrainer:
     def after_epoch(self):
         '''save latest checkpoint and eval model'''
 
-        self.lr_scheduler.step()
+        self.lr_scheduler.epoch_update()
 
         self.save_checkpoint("latest.pth")
         if (self.cur_epoch + 1) % self.checkpoint_period == 0:
@@ -191,6 +203,7 @@ class GraphTrainer:
             tra,det,gt_mtx_list = batch
             tra,det = tra.to(self.device),det.to(self.device)
             gt_mtx_list   = [i.to(self.device) for i in gt_mtx_list]
+            move_time = time.perf_counter()
             pred_mtx_list = self.model(tra,det)
         # RuntimeError: torch.nn.functional.binary_cross_entropy and torch.nn.BCELoss are unsafe to autocast.
         # Tackle this error by disabling the  Mixed Precision Training 
@@ -213,14 +226,13 @@ class GraphTrainer:
         self._grad_scaler.update()
 
         lr = self.optimizer.param_groups[0]['lr']
-        # lr = self.lr_scheduler.update_lr(self.cur_total_iter + 1)
-        # for param_group in self.optimizer.param_groups:
-        #     param_group["lr"] = lr
-        
+        self.lr_scheduler.iter_update()
+
         iter_end_time = time.perf_counter()
 
         self.meter.update(
-            iter_time=iter_end_time - iter_start_time,
+            forward_time=iter_end_time - move_time,
+            move_time=move_time - data_end_time,
             data_time=data_end_time - iter_start_time,
             lr=lr,
             loss=losses,
@@ -230,8 +242,8 @@ class GraphTrainer:
         if (self.cur_iter + 1) % self.log_period == 0:
             # write to console 
             left_iters = self.epoch_len * self.max_epoch - (self.cur_total_iter + 1)
-            eta_seconds = self.meter["iter_time"].global_avg * left_iters
-            eta_str = f"ETA: {str(datetime.timedelta(seconds=int(eta_seconds)))}"
+            eta_seconds = (self.meter["forward_time"].global_avg + self.meter["move_time"].global_avg + self.meter["data_time"].global_avg) * left_iters
+            eta_str = f"ETA: [{str(datetime.timedelta(seconds=int(eta_seconds)))}]"
 
             progress_str = f"Epoch: [{self.cur_epoch + 1}][{self.cur_iter + 1}/{self.epoch_len}]"
             loss_meter = self.meter.get_filtered_meter("loss")
@@ -245,8 +257,8 @@ class GraphTrainer:
             )
 
             logger.info(
-                f"{progress_str} {eta_str} {loss_str} {time_str} max_mem: {gpu_mem_usage():.0f}M " 
-                +f"lr: {self.meter['lr'].latest:.3e}"
+                f"{progress_str} {eta_str} {loss_str} {time_str} max_mem: {gpu_mem_usage():.0f}M " +
+                f"lr: {self.meter['lr'].latest:.3e}"
             )
             if self.rank == 0:
                 # write to tensorboard
@@ -273,7 +285,9 @@ class GraphTrainer:
             logger.info(f"Loading checkpoint from {path} ...")
             checkpoint = torch.load(path, map_location="cpu")
         else:
-            logger.info("Skip loading checkpoint.")
+            logger.info("Skip loading checkpoint and Loading pretrained weights of FASTREID")
+            
+            
             self.start_epoch = 0
             return
 
@@ -303,8 +317,8 @@ class GraphTrainer:
         # 4. load optimizer
         self.optimizer.load_state_dict(checkpoint["optimizer"])
 
-        # # 5. load lr_scheduler
-        # self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        # 5. load lr_scheduler
+        self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
 
         # 6. load grad scaler
         consistent_amp = not (self._enable_amp ^ ("grad_scaler" in checkpoint))
@@ -322,6 +336,7 @@ class GraphTrainer:
                 "start_epoch": self.cur_epoch + 1,
                 "model": self.model_or_module.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
+                "lr_scheduler": self.lr_scheduler.state_dict(),
             }
             if self._enable_amp:
                 data["grad_scaler"] = self._grad_scaler.state_dict()
@@ -333,7 +348,7 @@ class GraphTrainer:
     @torch.no_grad()
     def eval_save_model(self):
         if self.rank == 0:
-            logger.info('start evalution...')
+            logger.info('Start evalution...')
             self.model_or_module.eval()
             #---------------------------------#
             # eval and save the best model 
@@ -353,14 +368,14 @@ class GraphTrainer:
             
             f1_score = []
             for pred_mtx,gt_mtx in zip(pred_mtx_list,gt_mtx_list):
-                binary_pred_mtx,_,_,_ = hungarian(pred_mtx,0)
+                binary_pred_mtx,_,_,_ = hungarian(pred_mtx[:-1,:-1].cpu().numpy(),0)
                 f1_score.append(compute_f1_score(binary_pred_mtx,gt_mtx.cpu().numpy()))
             f1_score = np.mean(f1_score)
             logger.info(f'Evalution -> f1_score: [{f1_score}]')
             self.tbWritter.add_scalar('Evalution/f1_score',f1_score,self.cur_epoch)
-            if f1_score > self._best_f1_score:
+            if f1_score >= self._best_f1_score:
                 self._best_f1_score = f1_score
-                self.save_checkpoint(f"best_f1{self._best_f1_score}_epoch_{self.cur_epoch}.pth")
+                self.save_checkpoint(f"bestScore({self._best_f1_score})_epoch{self.cur_epoch}.pth")
             self.model_or_module.train()
         synchronize()
     
@@ -377,3 +392,4 @@ class GraphTrainer:
         # F1-Score
         f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
         return f1_score
+    

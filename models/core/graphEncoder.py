@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
+import os
+import sys
+from pathlib import Path
 import torch
 import torch.nn as nn
 from torchvision import models
@@ -8,13 +11,45 @@ import torch.nn.functional as F
 from typing import Union,Optional
 from models.graphToolkit import knn
 from torch_geometric.data import Batch,Data
-import torchvision.transforms.functional as f
+import torchvision.transforms.functional as T
+from models.core.fastReid import load_fastreid_model
+
+
 
 __all__ = ['NodeEncoder','EdgeEncoder']
 
+# class NodeEncoder(nn.Module):
+    
+#     def __init__(self, fastreid_model:str,node_embed_size:int):
+#         super(NodeEncoder, self).__init__()
+#         # get the pretrained densenet model
+#         self.backbone  = load_fastreid_model(fastreid_model)
+        
+#         self.head      = nn.Sequential(
+#             nn.Linear(2048,512),
+#             nn.BatchNorm1d(512),
+#             nn.ReLU(inplace=True),
+#             nn.Linear(512,128),
+#             nn.BatchNorm1d(128),
+#             nn.ReLU(inplace=True),
+#             nn.Linear(128,node_embed_size),
+#             nn.ReLU(inplace=True),
+#         )
+#         # freeze model weights
+#         for param in self.backbone.parameters():
+#             param.requires_grad = False # Freeze
+
+#     def forward(self, graph:Union[Batch,Data]) -> Union[Batch,Data]:
+#         with torch.no_grad():
+#             graph.x = T.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+#             self.backbone.eval()
+#             graph.x = self.backbone(graph.x)
+#         graph.x = self.head(graph.x)
+        
+#         return graph
 class NodeEncoder(nn.Module):
     
-    def __init__(self, node_embed_size:int):
+    def __init__(self, fastreid_model:str,node_embed_size:int):
         super(NodeEncoder, self).__init__()
         # get the pretrained densenet model
         backbone = models.densenet121(pretrained=True)
@@ -46,12 +81,11 @@ class NodeEncoder(nn.Module):
             param.requires_grad = True
 
     def forward(self, graph:Union[Batch,Data]) -> Union[Batch,Data]:
-        graph.x = f.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+        graph.x = T.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
         graph.x = self.backbone(graph.x)
         graph.x = self.head(graph.x)
         
-        return graph
-    
+        return graph       
 class EdgeEncoder(nn.Module):
 
     def __init__(self, edge_embed_size:int):
@@ -142,8 +176,8 @@ class EdgeEncoder(nn.Module):
         feat2 = 2 * (source_info[:,-1] - target_info[:,-1]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
         feat3 = torch.log(source_info[:,-3] / (target_info[:,-3] + 1e-8) )
         feat4 = torch.log(source_info[:,-4] / (target_info[:,-4] + 1e-8) )
-        feat5 = self._calculate_diou(source_info,target_info)
-        feat6 = F.cosine_similarity(source_x,target_x,dim=1)
+        feat5 = 1 - self._calculate_diou(source_info,target_info)
+        feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
 
         edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim=1)
 

@@ -2,13 +2,37 @@
 # class_name_to_class_id = {'pedestrian': 1, 'person_on_vehicle': 2, 'car': 3, 'bicycle': 4, 'motorbike': 5,
 #                           'non_mot_vehicle': 6, 'static_person': 7, 'distractor': 8, 'occluder': 9,
 #                           'occluder_on_ground': 10, 'occluder_full': 11, 'reflection': 12, 'crowd': 13}
-#---------------------------------#
-
+#---------------------------------#clear
+import os
+import sys
+import json
+from configs.config import get_config 
+sys.path.append(os.path.join('thirdparty','Trackeval'))
 import trackeval # env - py3.8
+
 from multiprocessing import freeze_support
 
 
+# def main():
+#     dataset_name = 'MOT17'
+#     cfg   = get_config()
+#     with open(cfg.JSON_PATH,'r') as f:
+#         data_json = json.load(f)
+
+#     # os.system(f"python3 thirdparty/TrackEval/scripts/run_mot_challenge.py --SPLIT_TO_EVAL {data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}  "
+#     os.system(f"python3 thirdparty\\TrackEval\\scripts\\run_mot_challenge.py --SPLIT_TO_EVAL {data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}  "
+#             f"--METRICS HOTA CLEAR Identity  --GT_FOLDER {data_json['Trackeval']['GT_FOLDER']} "
+#             f"--SKIP_SPLIT_FOL True --TRACKERS_TO_EVAL '' --TRACKER_SUB_FOLDER ''  --USE_PARALLEL True "
+#             f"--NUM_PARALLEL_CORES 8 --PLOT_CURVES False --BENCHMARK {dataset_name}"
+#             f"--TRACKERS_FOLDER {data_json['Trackeval']['TRACKERS_FOLDER']}")
+    
+# if __name__ == '__main__':
+#     main()
 if __name__ == '__main__':
+    dataset_name = 'MOT17'
+    cfg   = get_config()
+    with open(cfg.JSON_PATH,'r') as f:
+        data_json = json.load(f)
     freeze_support()
     #---------------------------------#
     # 配置评估器
@@ -42,27 +66,15 @@ if __name__ == '__main__':
     dataset_config = {
 
         # 真值文件路径设置
-        'GT_FOLDER':r'testVideo',  
-        'SEQ_INFO':{             # 填写 自搭数据的文件名及总帧数
-            '2024_0909_160937':1897, 
-            # 'MOT17-02-FRCNN':101, 
-            # 'MOT17-04-FRCNN':151, 
-            # 'MOT17-05-FRCNN':58, 
-            # 'MOT17-09-FRCNN':76, 
-            # 'MOT17-10-FRCNN':105, 
-            # 'MOT17-11-FRCNN':101, 
-            # 'MOT17-13-FRCNN':101, 
-        },
-
+        'GT_FOLDER':data_json['Trackeval']['GT_FOLDER'],
         # 跟踪器输出结果文件路径设置
-        'TRACKERS_FOLDER':r'testVideo\trackResult',
-        'TRACKERS_TO_EVAL':[ 'Mytrainer'
-                             ],
-        'TRACKER_SUB_FOLDER':r'',
-        'SKIP_SPLIT_FOL': True,  # 自用数据所需设置为True
+        'TRACKERS_FOLDER':data_json['Trackeval']['TRACKERS_FOLDER'],
+        'SKIP_SPLIT_FOL': False,  # 自用数据所需设置为True
+        'BENCHMARK':dataset_name,
+        'SPLIT_TO_EVAL':data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL'],
     }
     dataset_list = [trackeval.datasets.MotChallenge2DBox(dataset_config)]
 
 
     raw_results , messages = evaluator.evaluate(dataset_list,metrics_list)
-    
+    # print(raw_results['HOTA'])

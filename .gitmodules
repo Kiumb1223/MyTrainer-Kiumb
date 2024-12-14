@@ -1,0 +1,6 @@
+[submodule "thirdparty/TrackEval"]
+	path = thirdparty/TrackEval
+	url = https://github.com/JonathonLuiten/TrackEval
+[submodule "thirdparty/fast-reid"]
+	path = thirdparty/fast-reid
+	url = https://github.com/JDAI-CV/fast-reid.git

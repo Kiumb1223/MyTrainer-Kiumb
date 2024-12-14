@@ -51,7 +51,7 @@ def get_color(idx):
 
 def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=None):
     im = np.ascontiguousarray(np.copy(image))
-    im_h, im_w = im.shape[:2]
+    # im_h, im_w = im.shape[:2]
 
     # top_view = np.zeros([im_w, im_w, 3], dtype=np.uint8) + 255
 

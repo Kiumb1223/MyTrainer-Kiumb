@@ -8,47 +8,59 @@
 '''
 import os 
 import cv2
-import numpy as np
 import time
+import json 
+import shutil
 import datetime
+import numpy as np
 from tqdm import tqdm
 from loguru import logger
+import torchvision.io.image as I
 from configs.config import get_config
 from models.graphModel import GraphModel
 from utils.visualize import plot_tracking
 from models.graphTracker import TrackManager
-from torchvision.io.image import read_image
 
 @logger.catch
 def main():
+    
+    # input you wanna test
+    dataset_name   = 'MOT17'
+
+
     cfg   = get_config()
     model = GraphModel(cfg)
     trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,
                     cfg.RESIZE_TO_CNN,cfg.MATCH_THRESH,cfg.Det2Tra_CONF,
-                    cfg.CNT_TO_ACTIVE,cfg.MAX_CNT_TO_DEAD,cfg.FEATURE_LIST_SIZE)
+                    cfg.CNT_TO_ACTIVE,cfg.CNT_TO_SLEEP,cfg.MAX_CNT_TO_DEAD,cfg.FEATURE_LIST_SIZE)
     
+    with open(cfg.JSON_PATH,'r') as f:
+        data_json = json.load(f)
     #---------------------------------#
     #  prepare data 
     #  and only support MOT-format input data , i.e. /img1 and /det -> [<frame_id>, <id>, <x>, <y>, <w>, <h>, <score>]
     #  and output the video annotated with the tracking result and text file for evaluation
     #---------------------------------#
-    test_root_dir  = r'testVideo'
-    output_dir     = os.path.join(test_root_dir,'trackResult')
-    seq_name = ['2024_0909_160937']
-                # 'MOT17-05-FRCNN','MOT17-09-FRCNN','MOT17-10-FRCNN',
-                # 'MOT17-11-FRCNN','MOT17-13-FRCNN',]
-    # seq_name = ['2024_0909_160937','MOT17-02-FRCNN','MOT17-04-FRCNN',
-    #             'MOT17-05-FRCNN','MOT17-09-FRCNN','MOT17-10-FRCNN',
-    #             'MOT17-11-FRCNN','MOT17-13-FRCNN',]
-    for seq in seq_name:
-        seq_det_path  = os.path.join(test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
-        seq_img_dir   = os.path.join(test_root_dir,seq,'img1')
-        output_txt    = os.path.join(output_dir,seq)
-        output_video  = os.path.join(output_dir,seq,'video')
+
+    output_dir     = 'trackResult'
+    tracker_name   = 'myTracker'
+    # move_to_path   = os.path.join(data_json['Trackeval']['TRACKERS_FOLDER'],tracker_name)
+    os.makedirs(output_dir,exist_ok=True)
+
+
+    seq_name_list    = data_json['valid_seq'][dataset_name]['seq_name']
+    for seq in seq_name_list:
+        # seq_det_path  = os.path.join(test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
+        if dataset_name in ['MOT17','MOT20']:
+            test_root_dir = data_json['Trackeval']['GT_FOLDER']+os.sep+f"{dataset_name}-{data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}"
+        seq_det_path  = os.path.join( test_root_dir,seq,'det','det.txt')
+        seq_img_dir   = os.path.join( test_root_dir,seq,'img1')
+        seq_info_path = os.path.join( test_root_dir,seq,'seqinfo.ini')   
+        output_txt    = os.path.join(output_dir,tracker_name,dataset_name,seq)
+        output_video  = os.path.join(output_dir,tracker_name,dataset_name,seq,'video')
         os.makedirs(output_txt,exist_ok=True)
         os.makedirs(output_video,exist_ok=True)
 
-        seq_info_path = os.path.join(test_root_dir,seq,'seqinfo.ini')
         with open(seq_info_path,'r') as f:
             lines_split = [ l.split('=') for l in f.read().splitlines()[1:]]
             info_dict  = dict(s for s in lines_split if isinstance(s,list) and len(s) == 2)
@@ -57,20 +69,20 @@ def main():
                         int(info_dict['frameRate']), (int(info_dict['imWidth']),int(info_dict['imHeight'])))
         txt_res = []
         detections = np.loadtxt(seq_det_path,delimiter=',')
-        total_frame = np.max(detections[:,0]).astype(int)
+        min_frame = np.min(detections[:,0]).astype(int)
+        max_frame = np.max(detections[:,0]).astype(int)
         # BUG WHEN no dets 
         elapsed_times = []
-        for frame_id in tqdm(range(1,total_frame+1),total=total_frame,desc=f'processing seq - {seq} ',unit='frame'):
-            frame_det = detections[(detections[:,0] == frame_id) 
-                                   &(detections[:,2] >= 0 )&(detections[:,3] >= 0 )
-                                   &(detections[:,6] > cfg.MIN_DET_CONF)]
+        for frame_id in tqdm(range(min_frame,max_frame+1),total=max_frame,desc=f'processing seq - {seq} ',unit='frame'):
+            frame_det = detections[(detections[:,0] == frame_id) & 
+                                   (detections[:,6] > cfg.MIN_DET_CONF)]
             if frame_det.size == 0 :
                 logger.info(f"no dets in {frame_id}-th frame")
                 continue
             start = time.perf_counter()
-            img_data  = read_image(os.path.join(seq_img_dir,f'{frame_id:06d}.jpg'))
-            img_cv    = cv2.imread(os.path.join(seq_img_dir,f'{frame_id:06d}.jpg'))
-            trackers_list = trackManager.graph_matching(frame_id,frame_det[:,2:],img_data) # need to be careful with the input format
+            img_data  = I.read_image(os.path.join(seq_img_dir,f'{frame_id:06d}.jpg'))
+            img_cv    = img_data.clone().permute(1,2,0).numpy()[...,::-1].astype(np.uint8)
+            trackers_list = trackManager.update(frame_id,frame_det[:,2:],img_data) # need to be careful with the input format
             end = time.perf_counter()
             elapsed_times.append(end-start)
             # print(datetime.timedelta(seconds=end-start))
@@ -91,7 +103,10 @@ def main():
             vid_writer.write(online_im)
         with open(os.path.join(output_txt,f'{seq}.txt'),'w') as f:
             f.writelines(txt_res)
-        
+
+        move_to_folder = os.path.join(data_json['Trackeval']['TRACKERS_FOLDER'],f"{dataset_name}-{data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}",tracker_name,'data')
+        os.makedirs(move_to_folder,exist_ok=True)
+        shutil.copy(output_txt+os.sep+f'{seq}.txt',move_to_folder)
         trackManager.clean_cache()
         vid_writer.release()
         logger.info(f'{seq} is done and saved to {output_txt} and {output_video}')

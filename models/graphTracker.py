@@ -14,8 +14,8 @@ from typing import Tuple,List
 from enum import Enum,unique,auto
 from torch_geometric.data import Data
 from models.graphModel import GraphModel
-from models.graphToolkit import hungarian
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as T
+from models.graphToolkit import hungarian,box_iou
 
 __all__ = ['TrackManager']
 
@@ -182,44 +182,60 @@ class TrackManager:
         '''
         current_detections =np.ndarray(tlwh,conf)  and have already filtered by conf > 0.1 
         '''
-        tra_graph = self.construct_tra_graph(state=LifeSpan.Active)
-        det_graph = self.construct_det_graph(current_detections,img_date)
-        pred_mtx_list = self.model(tra_graph,det_graph)
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx_list[0],self._match_thresh)
+        output_track_list = []
+        first_tracks_list = [track for track in self.tracks_list if track.is_Active ]
+        # first_tracks_list = [track for track in self.tracks_list if track.is_Active or track.is_Sleep]
+        tra_graph  = self.construct_tra_graph(first_tracks_list)
+        det_graph  = self.construct_det_graph(current_detections,img_date)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph)
+
         # The input `det_graph` is modified inside `self.model`, 
         # so its state changes after the function call.
-        if match_idx.size > 0:   # match tra and det 
+        if match_idx != []:   # matched tras and dets 
             tra_idx ,det_idx = match_idx
             for tra_id, det_id in zip(tra_idx,det_idx):
-                self.tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
+                first_tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
                                 current_detections[det_id][4],current_detections[det_id][:4])
-            
-        if unmatch_tra.size > 0: # unmatch tra
-            for tra_id in unmatch_tra:
-                self.tracks_list[tra_id].to_sleep()
-            self.remove_dead_tracks()
+                if not first_tracks_list[tra_id].is_Born:
+                    output_track_list.append(first_tracks_list[tra_id])        
+        for tra_id in unmatch_tra:# unmatched tras 
+            first_tracks_list[tra_id].to_sleep()
+        first_tracks_list = self.remove_dead_tracks(first_tracks_list)
+
+        second_tracks_list = [track for track in self.tracks_list if track.is_Born]
+        highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
+        highconf_to_global_det_idx = {i: unmatch_det[i] for i in range(len(highconf_unmatch_dets))}
+
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(second_tracks_list,highconf_unmatch_dets.copy())
+        if match_idx != []:   # matched tras and dets 
+            tra_idx ,det_idx = match_idx
+            for tra_id, det_id in zip(tra_idx,det_idx):
+                global_id = highconf_to_global_det_idx[det_id]
+                second_tracks_list[tra_id].to_active(frame_idx,det_graph.x[global_id],
+                                highconf_unmatch_dets[det_id][4],highconf_unmatch_dets[det_id][:4])
+                if not second_tracks_list[tra_id].is_Born:
+                    output_track_list.append(second_tracks_list[tra_id])
+        for tra_id in unmatch_tra:# unmatched tras 
+            second_tracks_list[tra_id].to_sleep()
+        second_tracks_list = self.remove_dead_tracks(second_tracks_list)
+        for det_id in unmatch_det:
+            global_id = highconf_to_global_det_idx[det_id]
+            second_tracks_list.append(
+                Tracker(frame_idx,det_graph.x[global_id],
+                        highconf_unmatch_dets[det_id][4],highconf_unmatch_dets[det_id][:4],
+                        self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
+            )
         
-        if unmatch_det.size > 0: # unmatch det 
-            for det_id in unmatch_det:
-                if current_detections[det_id][4] >= self._det2tra_conf:
-                    self.tracks_list.append(
-                        Tracker(frame_idx,det_graph.x[det_id],
-                                current_detections[det_id][4],current_detections[det_id][:4],
-                                self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
-                        )
+        self.tracks_list = first_tracks_list + second_tracks_list
+        return output_track_list
 
-        return [tracker for tracker in self.tracks_list if tracker.is_Active]
-
-    def construct_tra_graph(self,state:LifeSpan =LifeSpan.ACTIVE) -> Data:
+    def construct_tra_graph(self,tracks_list:List[Tracker]) -> Data:
         '''construct graph of tracks including ACTIVE'''
-        
-        if not self.tracks_list: # if no tracks 
-            return Data(x=None)
+        if not tracks_list: # if no tracks 
+            return Data(num_nodes=0)
         
         node_attr , location_info = [] , []
-        for track in self.tracks_list:
-            if track.state != state :
-                continue
+        for track in tracks_list:
             node_attr.append(track.appearance_feats_list[-1])
             location_info.append(track.location_info)
         node_attr = torch.stack(node_attr,dim=0).to(self.device)
@@ -228,33 +244,59 @@ class TrackManager:
     
     def construct_det_graph(self,current_detections:np.ndarray,img_date:torch.Tensor) -> Data:
         '''construct raw graph of detections'''
-        img_tensor  = img_date.to(self.device).to(torch.float32)
+        img_tensor  = img_date.to(self.device).to(torch.float32) / 255.0
         raw_node_attr , location_info = [] , []
-        # im_tensor = F.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        im_tensor = T.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         for det in current_detections:
             x,y , w,h = map(int,det[:4])
             xc , yc   = x + w/2 , y + h/2
-            patch = F.crop(img_tensor,y,x,h,w)
-            patch = F.resize(patch,self._resize_to_cnn)
+            x2 , y2   = x + w   , y + h
+            if x < 0:
+                w = w + x  
+                x = 0 
+
+            if y < 0:
+                h = h + y  
+                y = 0  
+                
+            w = min(w, im_tensor.shape[2] - x)  
+            h = min(h, im_tensor.shape[1] - y)
+
+            patch = T.crop(im_tensor,y,x,h,w)
+            patch = T.resize(patch,self._resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append([xc,yc,w,h])
+            location_info.append([x,y,x2,y2,w,h,xc,yc,])  # STORE x,y,x2,y2,w,h,xc,yc
         raw_node_attr = torch.stack(raw_node_attr,dim=0).to(self.device)
         location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
         return Data(x=raw_node_attr,location_info=location_info)
 
-    def _graph_match(self):
-        pass
+    def _graph_match(self,tra_graph:Data,det_graph:Data):
+        ''' first phase to match via graph model'''
+        pred_mtx_list = self.model(tra_graph,det_graph)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx_list[0][:-1,:-1].cpu().numpy(),self._match_thresh)
+        return match_mtx,match_idx,unmatch_tra,unmatch_det
 
+    def _iou_match(self,tracks_list,highconf_unmatch_dets:np.ndarray):      
+        ''' second phase to match via IOU'''
+        if tracks_list == []:
+            tras_tlbr = np.array([])
+        else:
+            tras_tlbr = np.vstack([
+                track.tlbr for track in tracks_list 
+            ],dtype=np.float32)
 
-    def _iou_match(self,tra_graph:Data,det_graph:Data) -> torch.Tensor:
-        pass 
+        dets_tlbr = highconf_unmatch_dets[:,:4]
+        dets_tlbr[:,2:] = dets_tlbr[:,2:] + dets_tlbr[:,:2]
 
+        iou  = box_iou(tras_tlbr,dets_tlbr)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(iou,0.1)
 
+        return match_mtx,match_idx,unmatch_tra,unmatch_det
 
-    def remove_dead_tracks(self):
+    def remove_dead_tracks(self,tracks_list):
         """Remove all trackers whose state is Dead"""
-        self.tracks_list = [track for track in self.tracks_list if not track.is_Dead]
-    
+        return [track for track in tracks_list if not track.is_Dead]
+
     def clean_cache(self):
         '''clean cache of all tracks'''
         self.tracks_list.clear()

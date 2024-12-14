@@ -60,32 +60,30 @@ def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: O
     else:
         return torch.stack([indices2, indices1.flatten()], dim=0)
 
-def hungarian(affinity_mtx: torch.Tensor,match_thresh: float=0.1  ):
+def hungarian(affinity_mtx: np.ndarray,match_thresh: float=0.1,is_iou_match:Optional[bool]=False):
     r"""
     Solve optimal LAP permutation by hungarian algorithm. The time cost is :math:`O(n^3)`.
 
-    :param affinity_mtx: size - :math:`( n_tra \times n_det)`
+    :param affinity_mtx: size - :math:`( n_tra \times n_det )`
     :param match_thresh: threshold for valid match
+    :param is_iou_match: flag to switch between affinity and IOU-based matching
 
-    :return  match_mtx: size - :math:`( n_tra \times n_det)`, match matrix
-    :return  match_idx: size - :math:`( 2 \times n_match)`, match index
-    :return  unmatch_tra: size - :math:`( n_unmatch_tra)`, unmatched trajectory index
-    :return  unmatch_det: size - :math:`( n_unmatch_det)`, unmatched detection index
+    :return  match_mtx: size - :math:`( n_tra \times n_det )`, match matrix
+    :return  match_idx: size - :math:`( 2 \times n_match )`, match index
+    :return  unmatch_tra: size - :math:`( n_unmatch_tra )`, unmatched trajectory index
+    :return  unmatch_det: size - :math:`( n_unmatch_det )`, unmatched detection index
     """
-    if affinity_mtx[0] is None: # frame_idx == 1 
-        num_det = affinity_mtx[1]
-        return np.array([]),np.array([]),np.array([]),np.arange(num_det)
+    if affinity_mtx.size == 0 : # frame_idx == 1 
+        return np.array([]),[],list(range(affinity_mtx.shape[0])),list(range(affinity_mtx.shape[1]))
     
-    affinity_mtx = affinity_mtx[:-1,:-1].cpu().numpy()  # remove last row and column
-    # affinity_mtx = affinity_mtx.cpu().numpy()  # remove last row and column
-
     num_rows , num_cols = affinity_mtx.shape
 
     all_rows = np.arange(num_rows)
     all_cols = np.arange(num_cols)
     hungarian_mtx = np.zeros_like(affinity_mtx)
 
-    cost_mtx  = affinity_mtx * -1
+    cost_mtx = 1 - affinity_mtx
+    
     row, col = opt.linear_sum_assignment(cost_mtx)
     
     hungarian_mtx[row, col] = 1
@@ -97,32 +95,38 @@ def hungarian(affinity_mtx: torch.Tensor,match_thresh: float=0.1  ):
     match_mtx   = np.where(valid_mask,hungarian_mtx,0)
     valid_row,valid_col = np.where(valid_mask)
 
-    match_idx   = np.vstack([valid_row,valid_col])
-    unmatch_tra = np.setdiff1d(all_rows, valid_row,assume_unique=True)
-    unmatch_det = np.setdiff1d(all_cols, valid_col,assume_unique=True)
+    match_idx   = np.vstack([valid_row,valid_col]).tolist()
+    unmatch_tra = np.setdiff1d(all_rows, valid_row,assume_unique=True).tolist()
+    unmatch_det = np.setdiff1d(all_cols, valid_col,assume_unique=True).tolist()
 
     return match_mtx,match_idx,unmatch_tra,unmatch_det
 
 
-'''
-ref:https://www.cnblogs.com/yancx/p/16279572.html
-'''
-
 
 def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
-    ''' Return intersection-over-union (Jaccard index) of boxes. '''
+    ''' Return intersection-over-union (Jaccard index) of boxes.
+     
+    Args:
+        boxes1 (np.ndarray): shape (n1, 4)  || (min x, min y, max x, max y)  
+        boxes2 (np.ndarray): shape (n2, 4)  || (min x, min y, max x, max y)
+    Returns:
+        iou (np.ndarray): shape (n1, n2)
+    '''
+    iou = np.zeros((len(boxes1),len(boxes2)),dtype=np.float32)
+    if iou.size == 0 :
+        return iou
     # cal the box's area of boxes1 and boxess
     boxes1Area = (boxes1[..., 2] - boxes1[..., 0]) * (boxes1[..., 3] - boxes1[..., 1])
     boxes2Area = (boxes2[..., 2] - boxes2[..., 0]) * (boxes2[..., 3] - boxes2[..., 1])
 
     # cal Intersection
-    lt = np.maximum(boxes1[..., :2], boxes2[..., :2])
-    rb = np.minimum(boxes1[..., 2:], boxes2[..., 2:])
+    lt = np.maximum(boxes1[:,None, :2], boxes2[..., :2])
+    rb = np.minimum(boxes1[:,None, 2:], boxes2[..., 2:])
     inter = np.maximum(rb - lt, 0)
-    inter_area = inter[..., 0] * inter[..., 1]
+    inter_area = inter[:,:, 0] * inter[:,:, 1]
 
     # cal Union
-    union_area = boxes1Area + boxes2Area - inter_area
+    union_area = boxes1Area[:,None] + boxes2Area - inter_area
 
     # cal IoU
     iou = inter_area / union_area

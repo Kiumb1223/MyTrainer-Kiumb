@@ -25,7 +25,7 @@ from torch_geometric.utils import remove_self_loops
 from torchvision.transforms import Compose,Resize,ToTensor,Normalize
 from torchvision.io import read_image
 from torchvision.io.image import ImageReadMode
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as T
 
 __all__ = ['MOTGraph','graph_collate_fn']
 
@@ -168,9 +168,9 @@ class MOTGraph(Dataset):
                 if prev_frame_idx != frame_id:
                     image_name = os.path.join(image_dir, f"{int(item[0]):06d}" + '.jpg')
                     image_tensor = read_image(image_name).to(torch.float32).to(self.device)
-                    image_tensor = F.normalize(image_tensor,mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
-                patch = F.crop(image_tensor,y,x,h,w)
-                patch = F.resize(patch,size=self.resize_to_cnn)
+                    image_tensor = T.normalize(image_tensor,mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
+                patch = T.crop(image_tensor,y,x,h,w)
+                patch = T.resize(patch,size=self.resize_to_cnn)
                 positions.append([xc,yc])
                 node_attr.append(patch)
             

@@ -4,12 +4,9 @@
 '''
 import torch
 import torch.nn as nn
-from typing import Union
 from torch.nn import Module
 from models.graphToolkit import knn
-from torch_geometric.data import Batch,Data
 from torch_geometric.nn import MessagePassing
-from models.core.graphEncoder import NodeEncoder,EdgeEncoder
 
 __all__ = ['GraphConv']
 
@@ -92,9 +89,6 @@ class GraphConv(Module):
     def __init__(self,node_embed_size:int,edge_embed_size:int):
         super().__init__()
 
-        self.nodeEncoder = NodeEncoder(node_embed_size)
-        self.edgeEncoder = EdgeEncoder(edge_embed_size)
-
         self.sg1Func  = StaticConv(node_embed_size + edge_embed_size,node_embed_size,node_embed_size)
         self.sg2Func  = StaticConv(node_embed_size + edge_embed_size,node_embed_size*2,node_embed_size)
         self.sg3Func  = StaticConv((node_embed_size*2) + edge_embed_size,node_embed_size*3,(node_embed_size*2))
@@ -116,20 +110,7 @@ class GraphConv(Module):
             nn.LeakyReLU(0.2),
             nn.Linear(256,128,bias=False),
         )
-    def forward(self,graph:Union[Batch,Data],k:int) -> torch.Tensor:
-        #---------------------------------#
-        # Initialize the Node and edge embeddings
-        #---------------------------------#
-        
-        if len(graph.x.shape) != 2  :   # [N, node_embed_size] or [N,3,224,224]
-            graph = self.nodeEncoder(graph)
-        
-        graph = self.edgeEncoder(graph,k)
-
-        node_embedding = graph.x
-        edge_embedding = graph.edge_attr
-        edge_index     = graph.edge_index
-        
+    def forward(self,node_embedding:torch.Tensor,edge_embedding:torch.Tensor,edge_index:torch.Tensor,k:int) -> torch.Tensor:
 
         node_embedding_sg1 = self.sg1Func(node_embedding,edge_index,edge_embedding)      # torch.Size([32, 32])
         node_embedding_sg2 = self.sg2Func(node_embedding_sg1,edge_index,edge_embedding)  # torch.Size([32, 64])
