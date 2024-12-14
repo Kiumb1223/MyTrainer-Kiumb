@@ -11,7 +11,6 @@ configs/__pycache__
 *.out
 testVideo/
 *.json
-thirdparty/
 trackResult/
 model_weights/
 *.avi
