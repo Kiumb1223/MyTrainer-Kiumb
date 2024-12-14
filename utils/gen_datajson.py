@@ -24,8 +24,9 @@ def main():
         }
     }
 
-    which_to_train_list = ['MOT17','MOT20','DanceTrack']
-    save_json_path      = r'configs\train_mix.json'
+    which_to_train_list = ['MOT20']
+    # which_to_train_list = ['MOT17','MOT20','DanceTrack']
+    save_json_path      = r'configs\train_MOT20.json'
     for dataset_name in which_to_train_list:
 
         save_json['train_seq'][dataset_name] = {'seq_name':[],'start_frame':[],'end_frame':[],}
@@ -114,7 +115,7 @@ def main():
                             f.write(new_line)
                 
                 #---------------------------------#
-                #  复制图片到指定文件夹，并重命名
+                #  copy files to specified folder and rename them 
                 #---------------------------------#
                 cnt = 1 
                 for i in range(int(info_dict['seqLength'])//2+ 1,int(info_dict['seqLength'])+1 ):

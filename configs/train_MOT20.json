@@ -1,0 +1,54 @@
+{
+    "train_seq": {
+        "MOT20": {
+            "seq_name": [
+                "MOT20-01",
+                "MOT20-02",
+                "MOT20-03",
+                "MOT20-05"
+            ],
+            "start_frame": [
+                1,
+                1,
+                1,
+                1
+            ],
+            "end_frame": [
+                214,
+                1391,
+                1202,
+                1657
+            ]
+        }
+    },
+    "valid_seq": {
+        "MOT20": {
+            "seq_name": [
+                "MOT20-01",
+                "MOT20-02",
+                "MOT20-03",
+                "MOT20-05"
+            ],
+            "start_frame": [
+                215,
+                1392,
+                1203,
+                1658
+            ],
+            "end_frame": [
+                429,
+                2782,
+                2405,
+                3315
+            ],
+            "Trackeval": {
+                "SPLIT_TO_EVAL": "half"
+            }
+        }
+    },
+    "Trackeval": {
+        "GT_FOLDER": "datasets\\eval_datasets\\gt\\mot_challenge",
+        "TRACKERS_FOLDER": "datasets\\eval_datasets\\trackers\\mot_challenge",
+        "SKIP_SPLIT_FOL": true
+    }
+}

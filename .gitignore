@@ -10,7 +10,6 @@ configs/__pycache__
 *.ipynb
 *.out
 testVideo/
-*.json
 trackResult/
 model_weights/
 *.avi
