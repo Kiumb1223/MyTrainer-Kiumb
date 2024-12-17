@@ -47,13 +47,14 @@ def get_config():
         RESIZE_TO_CNN     = [256, 128],
         NODE_EMBED_SIZE   = 32,
         EDGE_EMBED_SIZE   = 16,
+        DIST_THRESH       = 350,    # pixel dist
         SINKHORN_ITERS    = 8,
 
         #---------------------------------#
         #  3. Dataset related
         #---------------------------------#
         DATA_DIR          = 'datasets',
-        JSON_PATH         = 'configs/train_mix.json',
+        JSON_PATH         = 'configs/train_MOT17.json',
         TRACKBACK_WINDOW  = 10,
         ACCEPTABLE_OBJ_TYPE = [1,2,7],
         #---------------------------------#

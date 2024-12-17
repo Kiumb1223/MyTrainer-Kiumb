@@ -54,6 +54,7 @@ class Tracker:
 
     def to_active(self,frame_idx,appearance_feat,conf,tlwh):
         
+        assert appearance_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {appearance_feat.shape}'
         if self.state  == LifeSpan.Born:
             age = frame_idx - self.start_frame
             if age >= self._cnt_to_active:
@@ -191,14 +192,14 @@ class TrackManager:
 
         # The input `det_graph` is modified inside `self.model`, 
         # so its state changes after the function call.
-        if match_idx != []:   # matched tras and dets 
+        if match_idx != []:         # matched tras and dets 
             tra_idx ,det_idx = match_idx
             for tra_id, det_id in zip(tra_idx,det_idx):
                 first_tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
                                 current_detections[det_id][4],current_detections[det_id][:4])
                 if not first_tracks_list[tra_id].is_Born:
                     output_track_list.append(first_tracks_list[tra_id])        
-        for tra_id in unmatch_tra:# unmatched tras 
+        for tra_id in unmatch_tra:   # unmatched tras 
             first_tracks_list[tra_id].to_sleep()
         first_tracks_list = self.remove_dead_tracks(first_tracks_list)
 
@@ -207,7 +208,7 @@ class TrackManager:
         highconf_to_global_det_idx = {i: unmatch_det[i] for i in range(len(highconf_unmatch_dets))}
 
         match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(second_tracks_list,highconf_unmatch_dets.copy())
-        if match_idx != []:   # matched tras and dets 
+        if match_idx != []:         # matched tras and dets 
             tra_idx ,det_idx = match_idx
             for tra_id, det_id in zip(tra_idx,det_idx):
                 global_id = highconf_to_global_det_idx[det_id]
@@ -265,15 +266,15 @@ class TrackManager:
             patch = T.crop(im_tensor,y,x,h,w)
             patch = T.resize(patch,self._resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append([x,y,x2,y2,w,h,xc,yc,])  # STORE x,y,x2,y2,w,h,xc,yc
+            location_info.append([x,y,x2,y2,w,h,xc,yc])  # STORE x,y,x2,y2,w,h,xc,yc
         raw_node_attr = torch.stack(raw_node_attr,dim=0).to(self.device)
         location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
         return Data(x=raw_node_attr,location_info=location_info)
 
     def _graph_match(self,tra_graph:Data,det_graph:Data):
         ''' first phase to match via graph model'''
-        pred_mtx_list = self.model(tra_graph,det_graph)
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx_list[0][:-1,:-1].cpu().numpy(),self._match_thresh)
+        pred_mtx = self.model(tra_graph.to(self.device),det_graph.to(self.device))
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx[:-1,:-1].cpu().numpy(),self._match_thresh)
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
     def _iou_match(self,tracks_list,highconf_unmatch_dets:np.ndarray):      

@@ -60,13 +60,13 @@ def main():
         output_video  = os.path.join(output_dir,tracker_name,dataset_name,seq,'video')
         os.makedirs(output_txt,exist_ok=True)
         os.makedirs(output_video,exist_ok=True)
-
         with open(seq_info_path,'r') as f:
             lines_split = [ l.split('=') for l in f.read().splitlines()[1:]]
             info_dict  = dict(s for s in lines_split if isinstance(s,list) and len(s) == 2)
 
         vid_writer = cv2.VideoWriter(output_video + os.sep + f'{seq}.avi', cv2.VideoWriter_fourcc(*'XVID'),
                         int(info_dict['frameRate']), (int(info_dict['imWidth']),int(info_dict['imHeight'])))
+        logger.info(f'Seq {seq} info : [Height - {info_dict["imHeight"]};Width - {info_dict["imWidth"]};FrameRate - {info_dict["frameRate"]}] ')
         txt_res = []
         detections = np.loadtxt(seq_det_path,delimiter=',')
         min_frame = np.min(detections[:,0]).astype(int)
