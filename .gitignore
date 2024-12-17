@@ -7,7 +7,6 @@ utils/__pycache__
 models/__pycache__
 models/core/__pycache__
 configs/__pycache__
-*.ipynb
 *.out
 testVideo/
 trackResult/
