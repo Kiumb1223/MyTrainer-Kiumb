@@ -80,6 +80,18 @@ class NodeEncoder(nn.Module):
         for param in params[-3:]:
             param.requires_grad = True
 
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        for m in self.head:
+            if isinstance(m,nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
     def forward(self, graph:Union[Batch,Data]) -> Union[Batch,Data]:
         graph.x = T.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
         graph.x = self.backbone(graph.x)
@@ -91,26 +103,39 @@ class EdgeEncoder(nn.Module):
     def __init__(self, edge_embed_size:int):
         super(EdgeEncoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(6,18),
-            nn.BatchNorm1d(18),
+            nn.Linear(5,edge_embed_size),
+            nn.BatchNorm1d(edge_embed_size),
             nn.ReLU(inplace=True),
-            nn.Linear(18,edge_embed_size),
+            nn.Linear(edge_embed_size,edge_embed_size),
             nn.BatchNorm1d(edge_embed_size),
             nn.ReLU(inplace=True),
         )
+
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        for m in self.encoder:
+            if isinstance(m,nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)    
+
     def forward(self,graph:Union[Batch,Data],k:int) -> Union[Batch,Data]:
         
         assert len(graph.x.shape) == 2 , 'Encode node attribute first!'
         
         with torch.no_grad():
-            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=False,bt_self_loop=True)
+            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=False,bt_self_loop=True,bt_directed=False)
             raw_edge_attr    = self.compute_edge_attr(graph)
         
         graph.edge_attr = self.encoder(raw_edge_attr)
         
         return graph 
 
-    def construct_edge_index(self,batch: Union[Batch,Data], k ,bt_cosine: Optional[bool]=False, bt_self_loop: Optional[bool]=True) -> torch.Tensor:
+    def construct_edge_index(self,batch: Union[Batch,Data], k ,bt_cosine: Optional[bool]=False, bt_self_loop: Optional[bool]=True,bt_directed :Optional[bool]=False) -> torch.Tensor:
         """
         Construct edge_index in either the Batch or Data.
         > construct KNN for each subgraph in the Batch
@@ -119,13 +144,15 @@ class EdgeEncoder(nn.Module):
             batch (Batch): Batch object containing multiple graphs.
             bt_cosine (bool): Whether to use cosine distance.
             bt_self_loop (bool): Whether to include self-loop.
+            bt_directed (bool): return the directed graph or the undirected one.
+
             
         Returns:
             edge_index (Tensor): Edge indices of KNN for all graphs. 'soure_to_target'
         """
 
         if not hasattr(batch,'num_graphs'): # Date Type
-            edge_index = knn(batch.location_info[:,-2:],k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_edge_index=True)
+            edge_index = knn(batch.location_info[:,-2:],k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_directed=bt_directed)
             return edge_index
         
         # Batch Type
@@ -135,14 +162,9 @@ class EdgeEncoder(nn.Module):
             
             sub_positions = batch.location_info[start:end,-2:]
             
-            indices,k2 = knn(sub_positions, k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop, bt_edge_index=False)
+            edge_index = knn(sub_positions, k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_directed=bt_directed)
             
-            source_indices = indices + start
-            target_indices = torch.arange(start, end, device=batch.location_info.device).repeat_interleave(k2)
-            
-            edge_index = torch.stack([source_indices.flatten(), target_indices], dim=0)
-            
-            all_edge_index.append(edge_index)
+            all_edge_index.append(edge_index + start)
         
         edge_index = torch.cat(all_edge_index, dim=1)
         
@@ -172,14 +194,14 @@ class EdgeEncoder(nn.Module):
         target_info   = batch.location_info[target_indice]
 
         # location_info = [x,y,x2,y2,w,h,xc,yc]
-        feat1 = 2 * (source_info[:,-2] - target_info[:,-2]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
-        feat2 = 2 * (source_info[:,-1] - target_info[:,-1]) / (source_info[:,-3] + target_info[:,-3] + 1e-8)
-        feat3 = torch.log(source_info[:,-3] / (target_info[:,-3] + 1e-8) )
-        feat4 = torch.log(source_info[:,-4] / (target_info[:,-4] + 1e-8) )
+        feat1 = 2 * (source_info[:,-2] - target_info[:,-2]) / (source_info[:,-3] + target_info[:,-3])
+        feat2 = 2 * (source_info[:,-1] - target_info[:,-1]) / (source_info[:,-3] + target_info[:,-3])
+        feat3 = torch.log(source_info[:,-3] / (target_info[:,-3]) )
+        feat4 = torch.log(source_info[:,-4] / (target_info[:,-4]) )
         feat5 = 1 - self._calculate_diou(source_info,target_info)
-        feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
+        # feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
 
-        edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim=1)
+        edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5],dim=1)
 
         return edge_attr
 

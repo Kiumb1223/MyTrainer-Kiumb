@@ -32,7 +32,7 @@ def get_config():
         # warmup settings
         # see: https://core-pytorch-utils.readthedocs.io/en/latest/
         BY_EPOCH          = True,
-        WARMUP_T          = 5000,
+        WARMUP_T          = 500,
         WARMUP_BY_EPOCH   = False,
         WARMUP_MODE       = "auto",
         WARMUP_INIT_LR    = 0.0,
@@ -56,11 +56,18 @@ def get_config():
         DATA_DIR          = 'datasets',
         JSON_PATH         = 'configs/train_MOT17.json',
         TRACKBACK_WINDOW  = 10,
-        ACCEPTABLE_OBJ_TYPE = [1,2,7],
+        ACCEPTABLE_OBJ_TYPE   = [1,2,7],
+
+        # data augumentation
+        MIN_IDS_TO_DROP_PERC  = 0,     # Minimum percentage of ids s.t. all of its detections will be dropped
+        MAX_IDS_TO_DROP_PERC  = 0.1,   # Maximum percentage of ids s.t. all of its detections will be dropped
+        MIN_DETS_TO_DROP_PERC = 0,     # Minimum Percentage of detections that might be randomly dropped 
+        MAX_DETS_TO_DROP_PERC = 0.2,   # Maximum Percentage of detections that might be randomly dropped
+
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\bestScore(1.0)_epoch40.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\epoch_40_undirected.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

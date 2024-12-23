@@ -6,7 +6,7 @@
 @Author   :     Louis Swift
 @Desc     :     
 
-Extracted from 
+Extracted from https://github.com/serend1p1ty/core-pytorch-utils
 and thanks for their brilliant works
 
 '''

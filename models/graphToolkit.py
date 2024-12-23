@@ -11,8 +11,8 @@ from typing import Optional,Tuple
 __all__ = ['knn','hungarian','box_iou','box_ciou','sinkhorn_unrolled','Sinkhorn','compute_f1_score']
 
 
-def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: Optional[bool]=False,
-        bt_edge_index:Optional[bool]=False, flow:Optional[str]='source_to_target') -> torch.Tensor:
+def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,
+        bt_self_loop: Optional[bool]=False,bt_directed: Optional[bool]=True) -> torch.Tensor:
     """
     Calculate K nearest neighbors, supporting Euclidean distance and cosine distance.
     
@@ -21,14 +21,12 @@ def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: O
         k (int): Number of neighbors.
         bt_cosine (bool): Whether to use cosine distance.
         bt_self_loop (bool): Whether to include self-loop (i.e., whether to consider itself as its own neighbor).
-        bt_edge_index (bool): Whether to return the indices of neighbors, or the edge index of the graph.
-        flow (str): the direction of the edge index ( reference pytorch-geometric docs) 
-        
+        bt_directed (bool): return the directed graph or the undirected one. 
+
     Returns:
-        Tensor: Indices of neighbors, shape of (2, n * k).
+        edge_index (tensor): the edge index of the graph, shape of (2, n * k).
     """
     
-    assert flow in ['source_to_target', 'target_to_source']
     num_node = x.shape[0]
 
     if num_node <= k :
@@ -36,29 +34,44 @@ def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,bt_self_loop: O
         logger.warning(f"SPECIAL SITUATIONS: The number of points is less than k, set k to {x.shape[0] -1}")
         k = num_node - 1
     
-    if bt_cosine:   # cosine distance
-        x_normalized = F.normalize(x, p=2, dim=1)
-        cosine_similarity_matrix = torch.mm(x_normalized, x_normalized.T)
-        dist_matrix = 1 - cosine_similarity_matrix  
-    else:           # Euclidean distance
-        assert len(x.shape) == 2  
-        dist_matrix = torch.cdist(x, x) 
-        
-    if not bt_self_loop:
-        dist_matrix.fill_diagonal_(float('inf'))  # Remove self loop by setting diagonal to infinity
+    if k > 0:
+        if bt_cosine:   # cosine distance
+            x_normalized = F.normalize(x, p=2, dim=1)
+            cosine_similarity_matrix = torch.mm(x_normalized, x_normalized.T)
+            dist_matrix  = 1 - cosine_similarity_matrix  
+        else:           # Euclidean distance
+            assert len(x.shape) == 2  
+            dist_matrix = torch.cdist(x, x) 
+            
+        dist_matrix.fill_diagonal_(float('inf'))  
+    
+        _, indices1 = torch.topk(dist_matrix, k, largest=False, dim=1)
+        indices2 = torch.arange(0, num_node, device=x.device).repeat_interleave(k)
     else:
-        k += 1 # Include self-loop
+        indices1 = torch.tensor([],device=x.device)
+        indices2 = torch.tensor([],device=x.device)
     
-    _, indices1 = torch.topk(dist_matrix, k, largest=False, dim=1)
-    
-    if not bt_edge_index:
-        return indices1 , k
-    
-    indices2 = torch.arange(0, num_node, device=x.device).repeat_interleave(k)
-    if flow == 'source_to_target':
-        return torch.stack([indices1.flatten(), indices2], dim=0)
+    if bt_self_loop:
+        indices_self = torch.arange(0,num_node,device=x.device)
+        if bt_directed:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices1.flatten(),indices_self],dim=-1),
+                torch.cat([indices2,indices_self],dim=-1),
+            ]).to(x.device).to(torch.long)
+        else:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices1.flatten(),indices_self,indices2],dim=-1),
+                torch.cat([indices2,indices_self,indices1.flatten()],dim=-1),
+            ]).to(x.device).to(torch.long)
     else:
-        return torch.stack([indices2, indices1.flatten()], dim=0)
+        if bt_directed:
+            return torch.stack([indices1.flatten(),indices2]).to(x.device).to(torch.long)  # flow: from source node to target node 
+        else:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices1.flatten(),indices2],dim=-1),
+                torch.cat([indices2,indices1.flatten()],dim=-1),
+            ]).to(x.device).to(torch.long)
+
 
 def hungarian(affinity_mtx: np.ndarray,match_thresh: float=0.1,is_iou_match:Optional[bool]=False):
     r"""

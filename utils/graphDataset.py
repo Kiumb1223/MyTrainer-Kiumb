@@ -15,9 +15,9 @@ import numpy as np
 from tqdm import tqdm
 from loguru import logger 
 import torchvision.io.image as I
-from typing import Union,List,Dict
 from torch_geometric.data import Data
 from torch_geometric.data import Batch
+from typing import Union,List,Dict,Tuple
 import torchvision.transforms.functional as T
 
 __all__ = ['GraphDataset', 'graph_collate_fn']
@@ -27,7 +27,6 @@ class GraphDataset(torch.utils.data.Dataset):
         super(GraphDataset, self).__init__()
 
         self.mode             = mode
-        self.bt_augmentation  = bt_augmentation
         # self.device           = cfg.DEVICE
         self.resize_to_cnn    = cfg.RESIZE_TO_CNN
         self.trackback_window = cfg.TRACKBACK_WINDOW
@@ -37,6 +36,13 @@ class GraphDataset(torch.utils.data.Dataset):
         self.start_frame_idx  = {} # STORE the start-frame-idx for each seq
         self.dataset_dir      = cfg.DATA_DIR
         self.acceptable_obj_type  = cfg.ACCEPTABLE_OBJ_TYPE
+
+        # data augmentation settings
+        self.bt_augmentation  = bt_augmentation
+        self.min_ids_to_drop_perc  = cfg.MIN_IDS_TO_DROP_PERC
+        self.max_ids_to_drop_perc  = cfg.MAX_IDS_TO_DROP_PERC
+        self.min_dets_to_drop_perc = cfg.MIN_DETS_TO_DROP_PERC
+        self.max_dets_to_drop_perc = cfg.MAX_DETS_TO_DROP_PERC
 
         with open(cfg.JSON_PATH,'r') as f:
             if self.mode == 'Train':
@@ -101,22 +107,7 @@ class GraphDataset(torch.utils.data.Dataset):
         elif self.mode == 'Validation' and dataset_name in 'DanceTrack':
             imgs_dir = os.path.join(self.dataset_dir,dataset_name,'val',seq_name,'img1')
 
-        tracklets_dict     = {}
-        current_detections = self.dets_dict[seq_name][current_frame]
-        cut_from_frame = max(self.start_frame_idx[dataset_name][seq_name],current_frame - self.trackback_window)
-
-        if self.bt_augmentation:
-            cut_to_frame = max(cut_from_frame+1,current_frame -  np.random.randint(0,5)+1)
-        else:
-            cut_to_frame = current_frame
-        # print(f"{cut_from_frame}->{cut_to_frame}")
-        for frame_idx in range(cut_from_frame,cut_to_frame):
-            past_detections = self.dets_dict[seq_name][frame_idx]
-            for past_det in past_detections: # past_det = [frame_idx,tracklet_id,x,y,w,h,xc,yc]
-                tracklet_id = past_det[1]
-                if tracklet_id not in tracklets_dict:
-                    tracklets_dict[tracklet_id] = []
-                tracklets_dict[tracklet_id].append(past_det)
+        tracklets_dict,current_detections = self._dataAugment(dataset_name,seq_name,current_frame)
         
         tra_graph = self.construct_raw_graph(tracklets_dict,dataset_name,imgs_dir,is_tracklet=True)
         det_graph = self.construct_raw_graph(current_detections,dataset_name,imgs_dir,is_tracklet=False)
@@ -173,6 +164,55 @@ class GraphDataset(torch.utils.data.Dataset):
                     break               
         return gt_matrix
     
+    def _dataAugment(self,dataset_name,seq_name,current_frame) -> Tuple[Dict,List]:
+        '''
+        Reference : https://github.com/dvl-tum/SUSHI/blob/main/src/data/augmentation.py
+        '''
+        tracklets_dict     = {}
+        current_detections = self.dets_dict[seq_name][current_frame]
+        cut_from_frame = max(self.start_frame_idx[dataset_name][seq_name],current_frame - self.trackback_window)
+
+        if self.bt_augmentation:
+            # simulate low framerate
+            cut_to_frame = max(cut_from_frame+1,current_frame -  np.random.randint(0,5)+1)
+        else:
+            cut_to_frame = current_frame
+        # print(f"{cut_from_frame}->{cut_to_frame}")
+        for frame_idx in range(cut_from_frame,cut_to_frame):
+            past_detections = self.dets_dict[seq_name][frame_idx]
+            for past_det in past_detections: # past_det = [frame_idx,tracklet_id,x,y,w,h,xc,yc]
+                tracklet_id = past_det[1]
+                if tracklet_id not in tracklets_dict:
+                    tracklets_dict[tracklet_id] = []
+                tracklets_dict[tracklet_id].append(past_det)
+        
+        if self.bt_augmentation:
+            # simulate missed detections and discontinuous trajectories
+            ids_to_drop_perc = np.random.uniform(self.min_ids_to_drop_perc,self.max_ids_to_drop_perc)
+            detects_to_drop_perc = np.random.uniform(self.min_dets_to_drop_perc,self.max_dets_to_drop_perc)
+
+            num_ids_to_drop  = np.round(ids_to_drop_perc * len(tracklets_dict.keys())).astype(int)
+            num_dets_to_drop = np.round(detects_to_drop_perc * len(current_detections)).astype(int)
+
+            if num_ids_to_drop > 0:
+                # drop ids
+                ids_to_drop = np.random.choice(list(tracklets_dict.keys()),num_ids_to_drop,replace=False)
+                tracklet_ids = np.array(list(tracklets_dict.keys()))
+                mask = ~ np.isin(tracklet_ids,ids_to_drop)
+                keys_to_keep = tracklet_ids[mask]
+                tracklets_dict = {
+                    key:tracklets_dict[key] for key in keys_to_keep
+                }
+            if num_dets_to_drop > 0 :
+                # drop dets
+                dets_to_drop = np.random.choice(list(range(len(current_detections))),num_dets_to_drop,replace=False)
+                current_detections = np.array(current_detections)    
+                mask = np.ones(len(current_detections),dtype=bool)
+                mask[dets_to_drop] = False
+                current_detections = current_detections[mask].tolist()
+
+        return tracklets_dict,current_detections
+
 def graph_collate_fn(batch):
     """
     Custom collate function for DataLoader to handle PyTorch Geometric data.

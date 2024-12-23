@@ -9,12 +9,10 @@
 
 import torch 
 import torch.nn as nn 
-from typing import Union
-from loguru import logger
 from functools import partial
 from torch_geometric.data import Batch,Data
 from models.core.graphConv import GraphConv
-from models.graphToolkit import Sinkhorn,sinkhorn_unrolled
+from models.graphToolkit import sinkhorn_unrolled
 from models.core.graphEncoder import NodeEncoder,EdgeEncoder
 
 __all__ =['TrainingGraphModel','GraphModel']
@@ -75,12 +73,13 @@ class TrainingGraphModel(nn.Module):
             tra_feats = tra_node_feats[tra_batch_indices == graph_idx]  
             det_feats = det_node_feats[det_batch_indices == graph_idx]  
             # compute mask to filter out some unmatched nodes
-            dist_mask = ( torch.cdist(tra_graph_batch.location_info[tra_batch_indices == graph_idx][:,-2:],
-                                      det_graph_batch.location_info[det_batch_indices == graph_idx][:,-2:]) <= self.dist_thresh ).float()
+            # dist_mask = ( torch.cdist(tra_graph_batch.location_info[tra_batch_indices == graph_idx][:,-2:],
+            #                           det_graph_batch.location_info[det_batch_indices == graph_idx][:,-2:]) <= self.dist_thresh ).float()
             # 1. Compute affinity matrix for the current graph 
             n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
             n2   = torch.norm(det_feats,dim=-1,keepdim=True)
-            corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+            # corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+            corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
             # 2. Prepare the augmented affinity matrix for Sinkhorn
             m , n = corr.shape
             bins0 = self.alpha.expand(m, 1)
@@ -169,12 +168,12 @@ class GraphModel(nn.Module):
         tra_feats = tra_node_feats  
         det_feats = det_node_feats  
         # compute mask to filter out some unmatched nodes
-        dist_mask = ( torch.cdist(tra_graph.location_info[:,-2:],
-                                det_graph.location_info[:,-2:]) <= self.dist_thresh ).float()
+        # dist_mask = ( torch.cdist(tra_graph.location_info[:,-2:],
+        #                         det_graph.location_info[:,-2:]) <= self.dist_thresh ).float()
         # 1. Compute affinity matrix for the current graph 
         n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
         n2   = torch.norm(det_feats,dim=-1,keepdim=True)
-        corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+        corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) 
         # corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
         # 2. Prepare the augmented affinity matrix for Sinkhorn
         m , n = corr.shape

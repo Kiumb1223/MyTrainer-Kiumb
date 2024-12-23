@@ -96,7 +96,6 @@ class GraphTrainer:
             os.makedirs(self.tb_log_dir, exist_ok=True)
             
 
-
     @property
     def cur_total_iter(self) -> int:
         '''The total number of current iterations'''
@@ -191,7 +190,7 @@ class GraphTrainer:
         try:
             batch = next(self._train_iter)
         except StopIteration:
-            logger.warning("StopIteration Occur.")
+            # logger.warning("StopIteration Occur.")
             self._train_iter = iter(self.train_loader)
             batch = next(self._train_iter)
         data_end_time = time.perf_counter()
@@ -226,7 +225,6 @@ class GraphTrainer:
         self._grad_scaler.update()
 
         lr = self.optimizer.param_groups[0]['lr']
-        self.lr_scheduler.iter_update()
 
         iter_end_time = time.perf_counter()
 
@@ -238,7 +236,11 @@ class GraphTrainer:
             loss=losses,
         )
     def after_iter(self):
+
         """ log information """
+        
+        self.lr_scheduler.iter_update()
+
         if (self.cur_iter + 1) % self.log_period == 0:
             # write to console 
             left_iters = self.epoch_len * self.max_epoch - (self.cur_total_iter + 1)
@@ -375,7 +377,7 @@ class GraphTrainer:
             self.tbWritter.add_scalar('Evalution/f1_score',f1_score,self.cur_epoch)
             if f1_score >= self._best_f1_score:
                 self._best_f1_score = f1_score
-                self.save_checkpoint(f"bestScore({self._best_f1_score})_epoch{self.cur_epoch}.pth")
+                self.save_checkpoint(f"bestScore({self._best_f1_score:.2f})_epoch{self.cur_epoch}.pth")
             self.model_or_module.train()
         synchronize()
     

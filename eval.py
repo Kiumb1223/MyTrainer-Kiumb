@@ -109,7 +109,12 @@ def main():
         shutil.copy(output_txt+os.sep+f'{seq}.txt',move_to_folder)
         trackManager.clean_cache()
         vid_writer.release()
+
+        average_elapsed_time = sum(elapsed_times) / len(elapsed_times)
+        frame_rate = 1 / average_elapsed_time
         logger.info(f'{seq} is done and saved to {output_txt} and {output_video}')
-        logger.info(f'{seq}  - Average elapsed time: {datetime.timedelta(seconds=sum(elapsed_times) / len(elapsed_times))}')
+        logger.info(f'{seq}  - Average elapsed time: {datetime.timedelta(seconds=average_elapsed_time)}')
+        logger.info((f'{seq} - Frame rate: {frame_rate:.2f} fps'))
+        
 if __name__ == '__main__':
     main()
