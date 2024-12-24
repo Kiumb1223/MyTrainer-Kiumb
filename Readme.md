@@ -114,7 +114,7 @@ As we all known, the MOT problem can be viewed as a problem of **maximizing a po
 
 > In order to avoid overfitting, it\`s overwhelmingly necessary to find out the various and valid data augmentation techniques.
 
-![dataAugmentation ](./.assert/dataAugmentation .bmp)
+![dataAugmentation ](./.assert/dataAugmentation.bmp)
 
 There are three data augmentation techniques — Low framerate, missed detections and discontinuous trajectories. All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
 
