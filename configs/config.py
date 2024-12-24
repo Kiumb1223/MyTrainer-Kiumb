@@ -25,7 +25,7 @@ def get_config():
         LR                = 3.5e-4,
         WEIGHT_DECAY      = 1e-4,
         BATCH_SIZE        = 2,
-        MAXEPOCH          = 120,
+        MAXEPOCH          = 80,
         
         # lr scheduler(MultiStepLR)
         MILLESTONES       = [40,70],
@@ -67,7 +67,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\epoch_40_undirected.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\addcosineDist\bestScore(1.00)_epoch81.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

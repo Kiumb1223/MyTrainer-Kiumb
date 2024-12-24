@@ -1,12 +1,10 @@
 [toc]
 
-
-
 # Readme
 
 > make a small record about my train of thought when trying to apply GNN to MOT
 
-## 1. Brief  Introduction about My Model
+## 1. Brief Introduction about My Model
 
 > Reference paper : [Recurrent graph optimal transport for learning 3D flow motion in particle tracking(Nature 2023)](https://www.nature.com/articles/s42256-023-00648-y)
 
@@ -69,7 +67,7 @@ Here is the original quantitative results of my model without **any modification
 
 | Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
 | :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 28.21 | 50.28 | 15.87 | 28.52 | 23.17 | 37.07 |
+| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 |
 
 Obviously, my model still have a long way to go. However, what makes me proud is that my model has **a relatively fast inference speed**, which can reach up to 11 fps to process a 30fps, 1080p video.
 
@@ -98,13 +96,37 @@ Obviously, my model still have a long way to go. However, what makes me proud is
 
 ## 4. Experimental Record
 
-The quantitative results of the vanilla model  (the same results in [Sec.1](#1. Brief  Introduction about My Model), just repeat one more time):
+The quantitative results of the vanilla model  (the same results in [Sec.1](#1. Brief  Introduction about My Model), just repeat one more time and add some curves which can reflect something):
 
+| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
+| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 |
 
+![vanilaOne-index](./.assert/vanilaOne-index.bmp)
 
-### 4.1 Before Vanilla one After data Augmentation
+Apart from the quantitative results of the vanilla one , let\`s focus on these two curves. The training data is 2650, which is relatively small and easily make models overfit. So I have to design more precise training strategy to avoid overfitting, where I adjust the warmup strategy and multiStep lr scheduler.
 
+Noted that the f1 curve in evaluation phase surges to 0.9 or so and then slowly grows up, this f1 score is slightly different from one in MOT metric. Both of them is based on ID of tracked object, but the f1 score here is calculated in each timestamp — in other words, **the default prerequisite here is that the tracking result of each timestamp is independent**, which is quite different from one in MOT metric.
 
+As we all known, the MOT problem can be viewed as a problem of **maximizing a posteriori probability** —— the tracking result of each timestamp is quite dependent on the results of previous moment. It\`s reasonable to infer that the worse tracking results from previous moment, the worse tracking results from current moment. Actually, the performance of my model is indeed like this.
+
+### 4.1 Before Vanilla one After data Augmentation [:rocket:]
+
+> In order to avoid overfitting, it\`s overwhelmingly necessary to find out the various and valid data augmentation techniques.
+
+![dataAugmentation ](./.assert/dataAugmentation .bmp)
+
+There are three data augmentation techniques — Low framerate, missed detections and discontinuous trajectories. All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
+
+| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
+| MOT17-half(SDP) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 |
+
+![dataAug](./.assert/dataAug-index.bmp)
+
+:loudspeaker: Obviously,**my model is not overfitting in the whole training phase due to three data augmentation techniques. **
+
+<strong style="color: red;">And I wanna use this as the main comparison.</strong> 
 
 ### 4.2 Before Vanilla one After Graphconv
 
@@ -114,7 +136,21 @@ The quantitative results of the vanilla model  (the same results in [Sec.1](#1. 
 
 
 
-### 4.4 Before Vanilla one After Mask 
+### 4.4 Before Vanilla one After Distance mask 
+
+![distanceMask](./.assert/distanceMask.bmp)
+
+What\` s distance mask here ? Actually, it is a kind of precondition which is that the movement distance of objects in adjacent frames is likely to be small, but **sometimes can be large when in low framerate video or objects moving fast**. So it\`s necessary to statistically calculate **the max movement distance** of different situations, like **different framerate, fast-moving objects or video from a moving perspective.**  And here is the statistical results in **MOT17(Train set), MOT20(Train set), DanceTrack(Train && val set)**.
+
+![DifferentWindow](./.assert/DifferentWindow.bmp)
+
+Noted that it seems that the **max movement distance of adjacent frames (window - 2) is more reliable**. Let\`s dive into the situations of **windowSize[2]**.
+
+![MOT17](./.assert/MOT17_20.bmp)
+
+![Dancetrack](./.assert/Dancetrack.bmp)
+
+It seems that **the speed of object moving poses the bigger influence on the statistical experiment among all factors.**:confused: . Oops, maybe **the distance between camera and objects also matters!**
 
 
 
@@ -123,3 +159,26 @@ The quantitative results of the vanilla model  (the same results in [Sec.1](#1. 
 
 
 ### 4.6 Before Vanilla one After Weight of edge 
+
+The reason why I wanna change the weight of edge is **the week connection between similar objects or closely positioned objects.** In other words, for similar objects in close positions, **the current model has week differentiation capability (i.e. insufficient feature discriminability).** More details in the following picture.
+
+![whyEdge](./.assert/whyEdge.bmp)
+
+How to alleviate or even solve this problem? Some trial methods are waiting for me to practice.
+
+#### 4.6.1 Add Cosine Distance in edge embedding [:sob:]
+
+I all **cosine distance of connected nodes** to edge embedding of static graph:
+$$
+Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
+$$
+And here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :sob:）
+
+| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
+| MOT17-half(SDP) | 25.41 | 51.08 | 12.70 | 23.81 | 19.50 | 30.67 |
+
+![AddCosineDist-index](./.assert/AddCosineDist-index.bmp)
+
+#### 4.6.2 Attention Mechanism
+

@@ -16,12 +16,14 @@ if __name__ == '__main__':
 
     dataset_name = 'MOT17'
     cfg   = get_config()
-
+    tag   = ''
     with open(cfg.JSON_PATH,'r') as f:
         data_json = json.load(f)
 
+    tb_folder = os.path.join(cfg.WORK_DIR,'tb_eval')
+    os.makedirs(tb_folder,exist_ok=True)
     tbwriter = SummaryWriter(
-        os.path.join(cfg.WORK_DIR,'tb_logs')
+        os.path.join(tb_folder)
     )
 
     freeze_support()
@@ -64,8 +66,8 @@ if __name__ == '__main__':
     
     record_metrics_list = {
         'HOTA':['HOTA','DetA','AssA'],
-        'CLEAR':['MOTA','MOTP'],
         'Identity':['IDF1','IDR','IDP'],
+        'CLEAR':['MOTA','MOTP'],
     }
     for type, tracker in raw_results.items():
         for tracker_name , metrics_per_seq in tracker.items():
@@ -74,7 +76,7 @@ if __name__ == '__main__':
                 for metrics,index_list in record_metrics_list.items():
                     for index in index_list:
                         print(f"{index}(%):[{number_per_metrics[metrics][index].mean() * 100 :.2f}]")
-                        tbwriter.add_scalar(f'Evalutions\{index}',number_per_metrics[metrics][index].mean())
+                        tbwriter.add_scalar(f'Evalutions\{index}\{tag}',number_per_metrics[metrics][index].mean())
         
     # freeze_support()
     # #---------------------------------#

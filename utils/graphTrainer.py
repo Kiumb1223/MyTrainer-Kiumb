@@ -374,7 +374,7 @@ class GraphTrainer:
                 f1_score.append(compute_f1_score(binary_pred_mtx,gt_mtx.cpu().numpy()))
             f1_score = np.mean(f1_score)
             logger.info(f'Evalution -> f1_score: [{f1_score}]')
-            self.tbWritter.add_scalar('Evalution/f1_score',f1_score,self.cur_epoch)
+            self.tbWritter.add_scalar('Evaluation/f1_score',f1_score,self.cur_epoch)
             if f1_score >= self._best_f1_score:
                 self._best_f1_score = f1_score
                 self.save_checkpoint(f"bestScore({self._best_f1_score:.2f})_epoch{self.cur_epoch}.pth")

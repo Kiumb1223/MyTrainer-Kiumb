@@ -103,7 +103,7 @@ class EdgeEncoder(nn.Module):
     def __init__(self, edge_embed_size:int):
         super(EdgeEncoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(5,edge_embed_size),
+            nn.Linear(6,edge_embed_size),
             nn.BatchNorm1d(edge_embed_size),
             nn.ReLU(inplace=True),
             nn.Linear(edge_embed_size,edge_embed_size),
@@ -128,7 +128,7 @@ class EdgeEncoder(nn.Module):
         assert len(graph.x.shape) == 2 , 'Encode node attribute first!'
         
         with torch.no_grad():
-            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=False,bt_self_loop=True,bt_directed=False)
+            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=False,bt_self_loop=True,bt_directed=True)
             raw_edge_attr    = self.compute_edge_attr(graph)
         
         graph.edge_attr = self.encoder(raw_edge_attr)
@@ -199,9 +199,9 @@ class EdgeEncoder(nn.Module):
         feat3 = torch.log(source_info[:,-3] / (target_info[:,-3]) )
         feat4 = torch.log(source_info[:,-4] / (target_info[:,-4]) )
         feat5 = 1 - self._calculate_diou(source_info,target_info)
-        # feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
+        feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
 
-        edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5],dim=1)
+        edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim=1)
 
         return edge_attr
 
