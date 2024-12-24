@@ -1,5 +1,3 @@
-[toc]
-
 # Readme
 
 > make a small record about my train of thought when trying to apply GNN to MOT
@@ -17,6 +15,7 @@ Here comes the first discussion which is the **construction of a graph**. Specif
 1. **Graph structure** : I utilize **KNN algorithm** to construct a **self-looped and directed** graph;
 
 2. **Edge embedding** : In order to model the relative relationship between connecting nodes , I concatenate the 6 elements below and feed them to a MLP module to encode a 16 dimension features as edge embedding.
+
 $$
 Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j))])
 $$
@@ -28,10 +27,12 @@ Additionally, let\`s talk about my **graph convolutional operations**, which is 
 
 
 $$
-g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})~\cdot~Edge~emb])}
+g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})~\cdot~ Edge~emb])}
 $$
 
 And in order to **capture high-order discriminative features**, I rebuild the graph, which I call the `dynamic graph`, while the old one is referred to as the `static graph` to keep things clear. And I also perform the edgeconv operations on dynamic graph:
+
+
 $$
 g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})])}
 $$
@@ -82,11 +83,7 @@ Obviously, my model still have a long way to go. However, what makes me proud is
   
 - [x] change directed graph to undirected one
 
-- [x] change graph conv to `GraphConv-type`, like this:
-  $$
-  g^{l+1}_i:= f(g_i^{l})+\max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})~\cdot~Edge~emb])}
-  $$
-
+- [x] change graph conv to `GraphConv-type`
 - [x] add a mask based pixel distance 
   - [x] I can also statistically calculate the moving distances of different time span , framerates and resolutions
   
@@ -110,7 +107,7 @@ Noted that the f1 curve in evaluation phase surges to 0.9 or so and then slowly 
 
 As we all known, the MOT problem can be viewed as a problem of **maximizing a posteriori probability** —— the tracking result of each timestamp is quite dependent on the results of previous moment. It\`s reasonable to infer that the worse tracking results from previous moment, the worse tracking results from current moment. Actually, the performance of my model is indeed like this.
 
-### 4.1 Before Vanilla one After data Augmentation [:rocket:]
+### 4.1 Before Vanilla one After data Augmentation [🎉]
 
 > In order to avoid overfitting, it\`s overwhelmingly necessary to find out the various and valid data augmentation techniques.
 
@@ -169,9 +166,11 @@ How to alleviate or even solve this problem? Some trial methods are waiting for 
 #### 4.6.1 Add Cosine Distance in edge embedding [:sob:]
 
 I all **cosine distance of connected nodes** to edge embedding of static graph:
+
 $$
 Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
 $$
+
 And here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :sob:）
 
 | Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
