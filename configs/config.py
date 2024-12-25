@@ -43,7 +43,7 @@ def get_config():
         FAST_REID_MODELE  = 'fastreid_market_BOT_R50_ibn',
         FAST_REID_WEIGHT  = 'model_weights/fastreid-models/market_bot_R50-ibn.pth',
 
-        K_NEIGHBOR        = 6,     # Excluding self-loop
+        K_NEIGHBOR        = 2,     # Excluding self-loop
         BT_SELF_LOOP      = True,
         BT_DIRECTED       = True,  # True -> directed graph (default)
         BT_COSINE_DYGRAPH = False,  # dynamic graph

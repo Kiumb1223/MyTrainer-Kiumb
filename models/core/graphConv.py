@@ -101,8 +101,8 @@ class DynamicGonv(MessagePassing):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
     def forward(self,x:torch.Tensor,k:int) -> torch.Tensor:
-        assert self.flow == 'source_to_target' 
 
+        
         with torch.no_grad():
             edge_index = knn(x,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
         out = self.propagate(edge_index,x=x)

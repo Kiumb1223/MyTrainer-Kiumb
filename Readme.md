@@ -43,7 +43,7 @@ $$
 
 The last but not least, it\`s necessary to take a glimpse of my **trajectory management strategy**. My trajectory management strategy mainly refers to **ByteTrack**. And here is my program flow chart:
 
-<img src="./.assert/flowChart.png" alt="flowChart" style="zoom: 67%;" />
+<img src="./.assert/flowChart.png" alt="flowChart" style="zoom: 200%;" />
 
 There are four states in the trajectory management strategy — **Born,Active,Sleep,Dead**. It\`s possible that `Born Trajectory` can be false positive, i.e. noise, so there are two phases in trajectory management — `Match Strategy` for denoising and `Graph Matching` for matching. And the rest of the strategy is unnecessary to discuss, which is obvious in the flow chart.
 
@@ -64,7 +64,7 @@ And the GCNNMatch is :warning:**extremely time-consuming**, which takes about 2 
 
 ----
 
-- For the purpose of  **fast training (36min or so) and relatively fair comparison** , my own model also **trains on half data  of MOT and tests on MOT17-half**. Besides, **max epoch is set to 40, batch size is set to 16, warmup iterations are set to 500**.
+- For the purpose of  **fast training (36min or so) and relatively fair comparison** , my own model also **trains on half data  of MOT17 and tests on MOT17-half**. Besides, **max epoch is set to 40, batch size is set to 16, warmup iterations are set to 500**.
 - And **random seed is set to 3407 ** || **k is set to 2 **
 
 Here is the original quantitative results of my model without **any modification on model structure or the use of any data augmentation techniques**. 
@@ -122,7 +122,7 @@ As we all known, the MOT problem can be viewed as a problem of **maximizing a po
 
 ![dataAugmentation ](./.assert/dataAugmentation.bmp)
 
-There are three data augmentation techniques — Low framerate, missed detections and discontinuous trajectories. All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
+There are three data augmentation techniques — **Low framerate, missed detections and discontinuous trajectories. **All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
 
 |       Conditions        |   HOTA    |   DetA    | AssA  |   IDF1    |    IDR    |  IDP  |   MOTA    |   MOTP    |
 | :---------------------: | :-------: | :-------: | :---: | :-------: | :-------: | :---: | :-------: | :-------: |
@@ -179,7 +179,17 @@ Noted that it seems that the **max movement distance of adjacent frames (window 
 
 It seems that **the speed of object moving poses the bigger influence on the statistical experiment among all factors.**:confused: Oops, maybe **the distance between camera and objects also matters!**
 
-
+|     Different Mask Range      | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  |  MOTP  |
+| :---------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :----: |
+| None(Vanilla one<sup>*</sup>) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.861 |
+|              100              | 38.51 | 51.65 | 28.80 | 41.37 | 34.10 | 52.59 | 56.25 | 83.83  |
+|              150              |       |       |       |       |       |       |       |        |
+|              200              |       |       |       |       |       |       |       |        |
+|              250              |       |       |       |       |       |       |       |        |
+|              300              |       |       |       |       |       |       |       |        |
+|              350              |       |       |       |       |       |       |       |        |
+|              400              |       |       |       |       |       |       |       |        |
+|              500              |       |       |       |       |       |       |       |        |
 
 ### 4.5 After Different K [:tada:]
 
@@ -199,7 +209,7 @@ According to the descriptions about construction graph in [[Sec 1]](#1. Brief In
 
 
 
-### 4.6 After Weight of edge 
+### 4.6 After Weight of edge
 
 The reason why I wanna change the weight of edge is **the week connection between similar objects or closely positioned objects.** In other words, for similar objects in close positions, **the current model has week differentiation capability (i.e. insufficient feature discriminability).** More details in the following picture.
 
@@ -209,7 +219,7 @@ How to alleviate or even solve this problem? Some trial methods are waiting for 
 
 #### 4.6.1 Add Cosine Distance in edge embedding [:confused:]
 
-I all **cosine distance of connected nodes** to edge embedding of static graph:
+I add **cosine distance of connected nodes** to edge embedding of static graph:
 
 $$
 Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
@@ -269,10 +279,10 @@ To sum up, here is the state transition network of my track management. And ther
 
 The detailed significance of these four states of each trajectory:
 
-1. BORN state:
-2. ACTIVE state:
-3. SLEEP state:
-4. DEAD state: 
+1. `BORN state`\: in the whole pipeline of track management, only those high-conf detections (conf >= 0.7) can be initialized as `BORN state` trajectory
+2. `ACTIVE state`:
+3. `SLEEP state`:
+4. `DEAD state`: 
 
 ### 5.1 plz live longer [:eyes:]
 
