@@ -75,6 +75,10 @@ Here is the original quantitative results of my model without **any modification
 
 Obviously, my model still have a long way to go. However, what makes me proud is that my model has **a relatively fast inference speed**, which can reach up to 15 fps or so to process a 30fps, 1080p video.
 
+----
+
+
+
 ## 3. TO DO List
 
 - [x] initialize the parameter of  networks plz !
@@ -92,11 +96,13 @@ Obviously, my model still have a long way to go. However, what makes me proud is
   
 - [ ] change the weight of edge 
 
-  I can encode the some info of graph structure into the embeddings
+  I can encode the some info of graph structure into the embeddings(maybe cant be so sufficient)
+  
+- [ ] Design more suitable track management ,like the lifespan of active tracks
 
-## 4. Experimental Record
+## 4. Experimental Record [Technique & Hyperparameters]
 
-The quantitative results of the vanilla model  (the same results in [Sec.1](#1. Brief  Introduction about My Model), just repeat one more time and add some curves which can reflect something):
+The quantitative results of the vanilla model  (the same results in [[Sec 1]](#1. Brief  Introduction about My Model), just repeat one more time and add some curves which can reflect something):
 
 | Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -110,7 +116,7 @@ Noted that the f1 curve in evaluation phase surges to 0.9 or so and then slowly 
 
 As we all known, the MOT problem can be viewed as a problem of **maximizing a posteriori probability** —— the tracking result of each timestamp is quite dependent on the results of previous moment. It\`s reasonable to infer that the worse tracking results from previous moment, the worse tracking results from current moment. Actually, the performance of my model is indeed like this.
 
-### 4.1 Before Vanilla one After data Augmentation [🎉]
+### 4.1 After data Augmentation [🎉]
 
 > In order to avoid overfitting, it\`s overwhelmingly necessary to find out the various and valid data augmentation techniques.
 
@@ -118,29 +124,31 @@ As we all known, the MOT problem can be viewed as a problem of **maximizing a po
 
 There are three data augmentation techniques — Low framerate, missed detections and discontinuous trajectories. All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
 
-|    Conditions     |   HOTA    |   DetA    | AssA  |   IDF1    |    IDR    |  IDP  |   MOTA    |   MOTP    |
-| :---------------: | :-------: | :-------: | :---: | :-------: | :-------: | :---: | :-------: | :-------: |
-|    Vanilla one    |   23.96   |   45.44   | 12.66 |   23.14   |   18.08   | 32.14 |   41.54   |   83.79   |
-| Data Augmentation | **25.29** | **51.08** | 12.57 | **25.02** | **20.49** | 32.13 | **50.01** | **83.86** |
+|       Conditions        |   HOTA    |   DetA    | AssA  |   IDF1    |    IDR    |  IDP  |   MOTA    |   MOTP    |
+| :---------------------: | :-------: | :-------: | :---: | :-------: | :-------: | :---: | :-------: | :-------: |
+| Vanilla one<sup>*</sup> |   23.96   |   45.44   | 12.66 |   23.14   |   18.08   | 32.14 |   41.54   |   83.79   |
+|    Data Augmentation    | **25.29** | **51.08** | 12.57 | **25.02** | **20.49** | 32.13 | **50.01** | **83.86** |
 
 ![dataAug](./.assert/dataAug-index.bmp)
 
-:loudspeaker: Obviously,**my model is not overfitting in the whole training phase due to three data augmentation techniques. And I wanna  **<strong style="color: red;">use this as the main comparison which marks as Vanilla one^*^.</strong> 
+:loudspeaker: Obviously,**my model is not overfitting in the whole training phase due to three data augmentation techniques. And I wanna  **<strong style="color: red;">use this as the main comparison which marks as Vanilla one<sup>*</sup>.</strong> 
 
-### 4.2 Before Vanilla one After Graphconv
+### 4.2 After Graphconv [:sob:]
 
 And I wanna try another way to implement graph convolution operations: (which is similar to Graph conv)
 $$
 g^{l+1}_i:= f_1(g_i^l) + \max _{j \in \mathbb{N}_i}{f_2([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})])}
 $$
+Oops,there is a big drop compared with previous results, which is beyond my expectations.:sob:
 
+|       Conditions        |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    | MOTP  |
+| :---------------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :---: |
+| Vanilla one<sup>*</sup> | **25.29** |   51.08   | **12.57** | **25.02** | **20.49** | **32.13** | **50.01** | 83.86 |
+|        Graphconv        |   20.83   | **51.12** |   8.52    |   18.45   |   15.09   |   23.73   |   42.72   | 83.86 |
 
-|   Conditions    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one^*^  | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
-| Graphconv(pure) |       |       |       |       |       |       |       |       |
+![dataAug](./.assert/graphconv-index.bmp)
 
-### 4.3 Before Vanilla one After Undirected graph [:sob:]
+### 4.3 After Undirected graph [:sob:]
 
 Here is the simple illustration about the undirected graph:
 
@@ -148,14 +156,14 @@ Here is the simple illustration about the undirected graph:
 
 Unfortunately, it doesn`t seem to have a significant improvement, but rather a slight decrease. :sob:
 
-|    Conditions    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :--------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  Vanilla one^*^  | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
-| Undirected Graph |       |       |       |       |       |       |       |       |
+|       Conditions        |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
+| :---------------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
+| Vanilla one<sup>*</sup> | **25.29** | **51.08** | **12.57** | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
+|    Undirected Graph     |   23.88   |   51.02   |   11.22   |   23.13   |   18.93   |   29.72   |    50     |   83.80   |
 
 ![UndirectedGraph-index](./.assert/UndirectedGraph-index.bmp)
 
-### 4.4 Before Vanilla one After Distance mask 
+### 4.4 After Distance mask [:eyes:]
 
 ![distanceMask](./.assert/distanceMask.bmp)
 
@@ -173,21 +181,25 @@ It seems that **the speed of object moving poses the bigger influence on the sta
 
 
 
-### 4.5 Before Vanilla one After Different K [:tada:]
+### 4.5 After Different K [:tada:]
 
-|     Different K     | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| k=2(Vanilla one^*^) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
-|         k=3         | 27.29 | 51.14 | 14.61 | 27.84 | 22.83 | 35.67 | 52.56 | 83.82 |
-|         k=4         | 28.87 | 51.33 | 16.30 | 30.06 | 24.67 | 38.46 | 53.53 | 83.85 |
-|         k=5         |       |       |       |       |       |       |       |       |
-|         k=6         |       |       |       |       |       |       |       |       |
-|         k=7         |       |       |       |       |       |       |       |       |
-|         k=8         |       |       |       |       |       |       |       |       |
+According to the descriptions about construction graph in [[Sec 1]](#1. Brief Introduction about My Model), there is a hyperparameter `k` in knn algorithm. And k is set to 2 in my vanilla model, so let`s search for best k.
+
+|         Different K          | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :--------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| k=2(Vanilla one<sup>*</sup>) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+|             k=3              | 27.29 | 51.14 | 14.61 | 27.84 | 22.83 | 35.67 | 52.56 | 83.82 |
+|             k=4              | 28.87 | 51.33 | 16.30 | 30.06 | 24.67 | 38.46 | 53.53 | 83.85 |
+|             k=5              |       |       |       |       |       |       |       |       |
+|             k=6              |       |       |       |       |       |       |       |       |
+|             k=7              |       |       |       |       |       |       |       |       |
+|             k=8              |       |       |       |       |       |       |       |       |
+|          k=5(6-dim)          | 27.75 | 50.37 | 15.32 | 27.78 | 22.60 | 36.02 | 51.06 | 83.84 |
+|          k=6(6-dim)          | 31.47 | 50.82 | 19.54 | 32.69 | 26.71 | 42.12 | 54.23 | 83.80 |
 
 
 
-### 4.6 Before Vanilla one After Weight of edge 
+### 4.6 After Weight of edge 
 
 The reason why I wanna change the weight of edge is **the week connection between similar objects or closely positioned objects.** In other words, for similar objects in close positions, **the current model has week differentiation capability (i.e. insufficient feature discriminability).** More details in the following picture.
 
@@ -195,7 +207,7 @@ The reason why I wanna change the weight of edge is **the week connection betwee
 
 How to alleviate or even solve this problem? Some trial methods are waiting for me to practice.
 
-#### 4.6.1 Add Cosine Distance in edge embedding [:sob:]
+#### 4.6.1 Add Cosine Distance in edge embedding [:confused:]
 
 I all **cosine distance of connected nodes** to edge embedding of static graph:
 
@@ -203,14 +215,65 @@ $$
 Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
 $$
 
-And here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :sob:）
+And here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :confused:）
 
-|   Conditions   |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
-| :------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
-| Vanilla one^*^ |   25.29   | 51.08 |   12.57   | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
-| 6-dim Edge emb | **25.41** | 51.08 | **12.70** |   23.81   |   19.50   |   30.67   |   48.83   |   83.84   |
+|       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
+| :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
+| Vanilla one<sup>*</sup> |   25.29   | 51.08 |   12.57   | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
+|     6-dim Edge emb      | **25.41** | 51.08 | **12.70** |   23.81   |   19.50   |   30.67   |   48.83   |   83.84   |
 
 ![AddCosineDist-index](./.assert/AddCosineDist-index.bmp)
 
-#### 4.6.2 Attention Mechanism
+#### 4.6.2 Attention Mechanism [:eyes:]
 
+
+
+### 4.7 After Enlarge Dataset [:tada:]
+
+|       Conditions        | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+|     Larger Dataset      | 43.19 | 39.26 | 47.78 | 45.18 | 33.01 | 71.60 | 41.55 | 88.47 |
+
+### 4.8 After Cosine-based Dynamic Graph [:sob:]
+
+|       Conditions        | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+|      Cosine-based       | 22.27 | 51.00 | 9.78  | 20.41 | 16.68 | 26.29 | 45.91 | 83.83 |
+
+
+
+### 4.9 After Superior Appearance Feature Extractor [:eyes:]
+
+### 4.10 After the same GCN opts in sGraph and dGraph [:eyes:]
+
+Suddenly, a idea comes up to my brain — why I **do different GCN operations in static graph and dynamic graph separately**, **and why not do the same opts in both graphs??**
+
+So here comes the formulation of static graph and dynamic graph. Because my model will construct the dynamic graph in higher feature space, it\`s of necessity to **recalculate the edge embedding**  (marks as $Edge~emb^*$) :
+$$
+^{s}g^{l+1}_i:=& \max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~(^s g_j^{l} - ^s g_i^{l})~\cdot ~Edge~emb])}\\
+^{d}g^{l+1}_i:=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})~\cdot ~Edge~emb^*])}
+$$
+And waiting to see :eyes:
+
+
+
+## 5. Experimental Record [Track Management]
+
+In [[Sec 1]](#1. Brief Introduction about my model), I have a brief introduction about the trajectory management in the whole pipeline, but it\`s necessary to supplement more information in order to understand what I\`ll do in this section.
+
+![statetransition](./.assert/statetransition.bmp)
+
+To sum up, here is the state transition network of my track management. And there are four states of my single trajectory. And it\` extremely important to understand the whole switching process in my track management. 
+
+The detailed significance of these four states of each trajectory:
+
+1. BORN state:
+2. ACTIVE state:
+3. SLEEP state:
+4. DEAD state: 
+
+### 5.1 plz live longer [:eyes:]
+
+### 5.2 more robust appearance [:eyes:]

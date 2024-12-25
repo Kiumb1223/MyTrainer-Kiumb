@@ -43,9 +43,9 @@ def get_config():
         FAST_REID_MODELE  = 'fastreid_market_BOT_R50_ibn',
         FAST_REID_WEIGHT  = 'model_weights/fastreid-models/market_bot_R50-ibn.pth',
 
-        K_NEIGHBOR        = 2,     # Excluding self-loop
+        K_NEIGHBOR        = 6,     # Excluding self-loop
         BT_SELF_LOOP      = True,
-        BT_DIRECTED       = False,  # True -> directed graph 
+        BT_DIRECTED       = True,  # True -> directed graph (default)
         BT_COSINE_DYGRAPH = False,  # dynamic graph
 
         RESIZE_TO_CNN     = [256, 128],
@@ -73,7 +73,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\Graphconv\latest_epoch120.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\K\latest_K6_120epoch.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

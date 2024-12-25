@@ -284,7 +284,7 @@ class TrackManager:
         else:
             tras_tlbr = np.vstack([
                 track.tlbr for track in tracks_list 
-            ],dtype=np.float32)
+            ]).astype(np.float32)
 
         dets_tlbr = highconf_unmatch_dets[:,:4]
         dets_tlbr[:,2:] = dets_tlbr[:,2:] + dets_tlbr[:,:2]

@@ -7,7 +7,7 @@ import os
 import sys
 import json
 from configs.config import get_config 
-sys.path.append(os.path.join('thirdparty','Trackeval'))
+sys.path.append(os.path.join('thirdparty','TrackEval'))
 import trackeval 
 from multiprocessing import freeze_support
 from torch.utils.tensorboard import SummaryWriter

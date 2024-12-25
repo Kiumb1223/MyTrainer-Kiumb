@@ -31,14 +31,14 @@ class StaticConv(MessagePassing):
             nn.LeakyReLU(0.1),
         )
 
-        self.lin = nn.Sequential(
-            nn.Linear( node_embed_size ,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
-            nn.LeakyReLU(0.1),
-            nn.Linear( out_channels ,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
-            nn.LeakyReLU(0.1),
-        )
+        # self.lin = nn.Sequential(
+        #     nn.Linear( node_embed_size ,out_channels,bias=False),
+        #     nn.BatchNorm1d(out_channels),
+        #     nn.LeakyReLU(0.1),
+        #     nn.Linear( out_channels ,out_channels,bias=False),
+        #     nn.BatchNorm1d(out_channels),
+        #     nn.LeakyReLU(0.1),
+        # )
 
         self._initialize_weights()
 
@@ -50,8 +50,8 @@ class StaticConv(MessagePassing):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, x:torch.Tensor, edge_index:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
-        return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
-        # return self.propagate(edge_index,edge_attr=edge_attr,x=x)
+        # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
+        return self.propagate(edge_index,edge_attr=edge_attr,x=x)
     
     def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
         '''
@@ -83,14 +83,14 @@ class DynamicGonv(MessagePassing):
             nn.LeakyReLU(0.2),
         )
 
-        self.lin = nn.Sequential(
-            nn.Linear( node_embed_size ,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
-            nn.LeakyReLU(0.2),
-            nn.Linear( out_channels ,out_channels,bias=False),
-            nn.BatchNorm1d(out_channels),
-            nn.LeakyReLU(0.2),
-        )
+        # self.lin = nn.Sequential(
+        #     nn.Linear( node_embed_size ,out_channels,bias=False),
+        #     nn.BatchNorm1d(out_channels),
+        #     nn.LeakyReLU(0.2),
+        #     nn.Linear( out_channels ,out_channels,bias=False),
+        #     nn.BatchNorm1d(out_channels),
+        #     nn.LeakyReLU(0.2),
+        # )
 
         self._initialize_weights()
 
@@ -106,8 +106,8 @@ class DynamicGonv(MessagePassing):
         with torch.no_grad():
             edge_index = knn(x,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
         out = self.propagate(edge_index,x=x)
-        return self.lin(x) + out
-        # return out
+        # return self.lin(x) + out
+        return out
     
     def message(self, x_i:torch.Tensor,x_j:torch.Tensor) -> torch.Tensor:
         '''
