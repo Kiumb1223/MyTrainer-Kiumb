@@ -163,7 +163,7 @@ Unfortunately, it doesn`t seem to have a significant improvement, but rather a s
 
 ![UndirectedGraph-index](./.assert/UndirectedGraph-index.bmp)
 
-### 4.4 After Distance mask [:eyes:]
+### 4.4 After Distance mask [:tada:]
 
 ![distanceMask](./.assert/distanceMask.bmp)
 
@@ -179,17 +179,17 @@ Noted that it seems that the **max movement distance of adjacent frames (window 
 
 It seems that **the speed of object moving poses the bigger influence on the statistical experiment among all factors.**:confused: Oops, maybe **the distance between camera and objects also matters!**
 
-|     Different Mask Range      | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  |  MOTP  |
-| :---------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :----: |
-| None(Vanilla one<sup>*</sup>) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.861 |
-|              100              | 38.51 | 51.65 | 28.80 | 41.37 | 34.10 | 52.59 | 56.25 | 83.83  |
-|              150              |       |       |       |       |       |       |       |        |
-|              200              |       |       |       |       |       |       |       |        |
-|              250              |       |       |       |       |       |       |       |        |
-|              300              |       |       |       |       |       |       |       |        |
-|              350              |       |       |       |       |       |       |       |        |
-|              400              |       |       |       |       |       |       |       |        |
-|              500              |       |       |       |       |       |       |       |        |
+|     Different Mask Range      | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| None(Vanilla one<sup>*</sup>) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+|              100              | 38.51 | 51.65 | 28.80 | 41.37 | 34.10 | 52.59 | 56.25 | 83.83 |
+|              150              | 33.57 | 51.57 | 21.92 | 34.55 | 28.42 | 44.06 | 52.39 | 83.84 |
+|              200              |       |       |       |       |       |       |       |       |
+|              250              |       |       |       |       |       |       |       |       |
+|              300              |       |       |       |       |       |       |       |       |
+|              350              |       |       |       |       |       |       |       |       |
+|              400              |       |       |       |       |       |       |       |       |
+|              500              |       |       |       |       |       |       |       |       |
 
 ### 4.5 After Different K [:tada:]
 
