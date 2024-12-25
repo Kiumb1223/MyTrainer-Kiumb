@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     dataset_name = 'MOT17'
     cfg   = get_config()
-    tag   = ''
+    tag   = 'KFamily'
     with open(cfg.JSON_PATH,'r') as f:
         data_json = json.load(f)
 
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         'BENCHMARK':dataset_name,
         'SPLIT_TO_EVAL':data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL'],
     }
-    
+
     dataset_list = [trackeval.datasets.MotChallenge2DBox(dataset_config)]
 
     raw_results , messages = evaluator.evaluate(dataset_list,metrics_list)
@@ -93,31 +93,38 @@ if __name__ == '__main__':
     # #---------------------------------#
     # metrics_list = [trackeval.metrics.HOTA(),trackeval.metrics.CLEAR(),trackeval.metrics.Identity()]
     
-    # #---------------------------------#
-    # #  配置数据格式以及文件路径等参数
-    # #  按照MOT17格式进行存放数据
-    # #  i.e. 
-    # #    testVideo                               # GT_FOLDER
-    # #       | ---  2024_0909_160937              # SEQ_INFO[key]
-    # #                   | --  gt
-    # #                          | --- gt.txt      # MOT数据存放格式  如果改变可以修改 GT_LOC_FORMAT
-    # #
-    # #    output                                  # TRACKERS_FOLDER  ## 可以用跟踪器的名字来定义名字，但是这里只是刚开始摸索，所以直接OUTPUT了
-    # #       | ---  2024_0909_160937              # TRACKERS_TO_EVAL
-    # #                 |(我这里没有建立文件夹)      # TRACKER_SUB_FOLDER
-    # #                | ---- 2024_0909_160937.txt  # SEQ_INFO[key].txt
-    # #---------------------------------#
+    # ---------------------------------#
+    #  配置数据格式以及文件路径等参数
+    #  按照MOT17格式进行存放数据
+    #  i.e. 
+    #    testVideo                               # GT_FOLDER
+    #       | ---  2024_0909_160937              # SEQ_INFO[key]
+    #                   | --  gt
+    #                          | --- gt.txt      # MOT数据存放格式  如果改变可以修改 GT_LOC_FORMAT
+    
+    #    output                                  # TRACKERS_FOLDER  ## 可以用跟踪器的名字来定义名字，但是这里只是刚开始摸索，所以直接OUTPUT了
+    #       | ---  2024_0909_160937              # TRACKERS_TO_EVAL
+    #                 |(我这里没有建立文件夹)      # TRACKER_SUB_FOLDER
+    #                | ---- 2024_0909_160937.txt  # SEQ_INFO[key].txt
+    # ---------------------------------#
 
     # dataset_config = {
 
     #     # 真值文件路径设置
     #     'GT_FOLDER':r'testVideo',  
     #     'SEQ_INFO':{             # 填写 自搭数据的文件名及总帧数
-    #         '2024_0909_160937':1897, 
+    #         # '2024_0909_160937':1897, 
+    #         'MOT17-02':300, 
+    #         'MOT17-04':525, 
+    #         'MOT17-05':419, 
+    #         'MOT17-09':263, 
+    #         'MOT17-10':327, 
+    #         'MOT17-11':450, 
+    #         'MOT17-13':375, 
     #     },
 
     #     # 跟踪器输出结果文件路径设置
-    #     'TRACKERS_FOLDER':r'testVideo\trackResult',
+    #     'TRACKERS_FOLDER':r'testVideo\testResult',
     #     'TRACKERS_TO_EVAL':[ 'gcnnmatch'
     #                          ],
     #     'TRACKER_SUB_FOLDER':r'',

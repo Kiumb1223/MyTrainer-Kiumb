@@ -3,16 +3,16 @@
 
 import torch
 import numpy as np
+from typing import Tuple
 from loguru import logger
 import scipy.optimize as opt
 import torch.nn.functional as F
-from typing import Optional,Tuple
 
 __all__ = ['knn','hungarian','box_iou','box_ciou','sinkhorn_unrolled','Sinkhorn','compute_f1_score']
 
 
-def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,
-        bt_self_loop: Optional[bool]=False,bt_directed: Optional[bool]=True) -> torch.Tensor:
+def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
+        bt_self_loop: bool=False,bt_directed: bool=True) -> torch.Tensor:
     """
     Calculate K nearest neighbors, supporting Euclidean distance and cosine distance.
     
@@ -73,7 +73,7 @@ def knn(x: torch.tensor, k: int, bt_cosine: Optional[bool]=False,
             ]).to(x.device).to(torch.long)
 
 
-def hungarian(affinity_mtx: np.ndarray,match_thresh: float=0.1,is_iou_match:Optional[bool]=False):
+def hungarian(affinity_mtx: np.ndarray,match_thresh: float=0.1,is_iou_match:bool=False):
     r"""
     Solve optimal LAP permutation by hungarian algorithm. The time cost is :math:`O(n^3)`.
 

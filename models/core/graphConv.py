@@ -31,11 +31,14 @@ class StaticConv(MessagePassing):
             nn.LeakyReLU(0.1),
         )
 
-        # self.lin = nn.Sequential(
-        #     nn.Linear( node_embed_size ,out_channels,bias=False),
-        #     nn.BatchNorm1d(out_channels),
-        #     nn.LeakyReLU(0.1),
-        # )
+        self.lin = nn.Sequential(
+            nn.Linear( node_embed_size ,out_channels,bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.LeakyReLU(0.1),
+            nn.Linear( out_channels ,out_channels,bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.LeakyReLU(0.1),
+        )
 
         self._initialize_weights()
 
@@ -47,8 +50,8 @@ class StaticConv(MessagePassing):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, x:torch.Tensor, edge_index:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
-        # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
-        return self.propagate(edge_index,edge_attr=edge_attr,x=x)
+        return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
+        # return self.propagate(edge_index,edge_attr=edge_attr,x=x)
     
     def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
         '''
@@ -62,9 +65,14 @@ class StaticConv(MessagePassing):
     
 
 class DynamicGonv(MessagePassing):
-    def __init__(self, in_channels:int, out_channels:int,node_embed_size:int):
+    def __init__(self, in_channels:int, out_channels:int,node_embed_size:int,
+                 bt_cosine :bool=False, bt_self_loop :bool=True, bt_directed :bool=True):
 
         super().__init__(aggr='max')
+
+        self.bt_cosine = bt_cosine
+        self.bt_self_loop = bt_self_loop
+        self.bt_directed = bt_directed
 
         self.msgFunc = nn.Sequential(
             nn.Linear(in_channels,out_channels,bias=False),
@@ -75,11 +83,14 @@ class DynamicGonv(MessagePassing):
             nn.LeakyReLU(0.2),
         )
 
-        # self.lin = nn.Sequential(
-        #     nn.Linear( node_embed_size ,out_channels,bias=False),
-        #     nn.BatchNorm1d(out_channels),
-        #     nn.LeakyReLU(0.2),
-        # )
+        self.lin = nn.Sequential(
+            nn.Linear( node_embed_size ,out_channels,bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.LeakyReLU(0.2),
+            nn.Linear( out_channels ,out_channels,bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.LeakyReLU(0.2),
+        )
 
         self._initialize_weights()
 
@@ -93,10 +104,10 @@ class DynamicGonv(MessagePassing):
         assert self.flow == 'source_to_target' 
 
         with torch.no_grad():
-            edge_index = knn(x,k,bt_cosine=False,bt_self_loop=True,bt_directed=True) 
+            edge_index = knn(x,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
         out = self.propagate(edge_index,x=x)
-        # return self.lin(x) + out
-        return out
+        return self.lin(x) + out
+        # return out
     
     def message(self, x_i:torch.Tensor,x_j:torch.Tensor) -> torch.Tensor:
         '''
@@ -107,15 +118,18 @@ class DynamicGonv(MessagePassing):
     
 
 class GraphConv(Module):
-    def __init__(self,node_embed_size:int,edge_embed_size:int):
+    def __init__(self,node_embed_size:int,edge_embed_size:int,
+                bt_cosine :bool=False, bt_self_loop :bool=True, bt_directed :bool=True
+                ):
+
         super().__init__()
 
         self.sg1Func  = StaticConv(2*node_embed_size + edge_embed_size,node_embed_size,node_embed_size)
         self.sg2Func  = StaticConv(2*node_embed_size + edge_embed_size,node_embed_size*2,node_embed_size)
         self.sg3Func  = StaticConv(2*(node_embed_size*2) + edge_embed_size,node_embed_size*3,(node_embed_size*2))
 
-        self.dg1Func  = DynamicGonv(2*node_embed_size,node_embed_size*2,node_embed_size)
-        self.dg2Func  = DynamicGonv(2*(node_embed_size*2),node_embed_size*3,(node_embed_size*2))
+        self.dg1Func  = DynamicGonv(2*node_embed_size,node_embed_size*2,node_embed_size,bt_cosine,bt_self_loop,bt_directed)
+        self.dg2Func  = DynamicGonv(2*(node_embed_size*2),node_embed_size*3,(node_embed_size*2),bt_cosine,bt_self_loop,bt_directed)
 
         self.fuse1Func = nn.Sequential(
             nn.Linear(node_embed_size*11,1024,bias=False),

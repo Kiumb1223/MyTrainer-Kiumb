@@ -86,9 +86,9 @@ def get_model_info(model:torch.nn.Module) -> str:
     return tabulate(model_info,tablefmt="grid")
 
 def get_exp_info(cfg:Namespace) -> str:
-    '''get some experimental information'''
-    training_keywords = ["BATCH", "MAXEPOCH","AMP","DEVICE"]
-    training_params = {k: v for k, v in vars(cfg).items() if any(keyword in k.upper() for keyword in training_keywords)}
+    '''get all experimental information for better debugging'''
+    # training_keywords = ["BATCH", "MAXEPOCH","AMP","DEVICE",'K','BT_SELF_LOOP','BT_DIRECTED','BT_COSINE_DYGRAPH']
+    training_params = {k: v for k, v in vars(cfg).items()}
     return tabulate(training_params.items(),headers=['Setting','Value'],tablefmt="grid")
 
 def set_random_seed(seed: Optional[int] = None, deterministic: bool = False) -> None:

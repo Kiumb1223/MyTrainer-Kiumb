@@ -59,8 +59,8 @@ def create_comparison_plot(data, out_loc, y_label, x_label, sort_label, bg_label
         y_label: the metric_field_name to be plotted on the y-axis
         x_label: the metric_field_name to be plotted on the x-axis
         sort_label: the metric_field_name by which trackers are ordered and ranked
-        bg_label: the metric_field_name by which (optional) background contours are plotted
-        bg_function: the (optional) function bg_function(x,y) which converts the x_label / y_label values into bg_label.
+        bg_label: the metric_field_name by which () background contours are plotted
+        bg_function: the () function bg_function(x,y) which converts the x_label / y_label values into bg_label.
         settings: dict of plot settings with keys:
             'gap_val': gap between axis ticks and bg curves.
             'num_to_plot': maximum number of trackers to plot

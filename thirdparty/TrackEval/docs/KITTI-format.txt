@@ -131,7 +131,7 @@ Tracking Benchmark
 ==================
 
 The goal in the object tracking task is to estimate object tracklets for the 
-classes 'Car', 'Pedestrian', and (optional) 'Cyclist'. The tracking
+classes 'Car', 'Pedestrian', and () 'Cyclist'. The tracking
 algorithm must provide as output the 2D 0-based bounding boxes in each image in
 the sequence using the format specified above, as well as a score, indicating
 the confidence in the particular frame for this track. All other values must be

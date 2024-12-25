@@ -14,7 +14,7 @@ def get_config():
         #---------------------------------#
         #  1. Experimental setting
         #---------------------------------#
-        RANDOM_SEED       = 1,
+        RANDOM_SEED       = 3407,
         LOG_PERIOD        = 10,       # Iteration 
         CHECKPOINT_PERIOD = 1,        # Epoch
         DEVICE            = 'cuda',
@@ -25,14 +25,14 @@ def get_config():
         LR                = 3.5e-4,
         WEIGHT_DECAY      = 1e-4,
         BATCH_SIZE        = 2,
-        MAXEPOCH          = 80,
+        MAXEPOCH          = 120,
         
         # lr scheduler(MultiStepLR)
-        MILLESTONES       = [40,70],
+        MILLESTONES       = [50,80],
         # warmup settings
         # see: https://core-pytorch-utils.readthedocs.io/en/latest/
         BY_EPOCH          = True,
-        WARMUP_T          = 500,
+        WARMUP_T          = 800,
         WARMUP_BY_EPOCH   = False,
         WARMUP_MODE       = "auto",
         WARMUP_INIT_LR    = 0.0,
@@ -43,12 +43,18 @@ def get_config():
         FAST_REID_MODELE  = 'fastreid_market_BOT_R50_ibn',
         FAST_REID_WEIGHT  = 'model_weights/fastreid-models/market_bot_R50-ibn.pth',
 
-        K_NEIGHBOR        = 2,    # Excluding self-loop
+        K_NEIGHBOR        = 2,     # Excluding self-loop
+        BT_SELF_LOOP      = True,
+        BT_DIRECTED       = False,  # True -> directed graph 
+        BT_COSINE_DYGRAPH = False,  # dynamic graph
+
         RESIZE_TO_CNN     = [256, 128],
         NODE_EMBED_SIZE   = 32,
         EDGE_EMBED_SIZE   = 16,
         DIST_THRESH       = 350,    # pixel dist
         SINKHORN_ITERS    = 8,
+
+
 
         #---------------------------------#
         #  3. Dataset related
@@ -67,7 +73,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\addcosineDist\bestScore(1.00)_epoch81.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\Graphconv\latest_epoch120.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

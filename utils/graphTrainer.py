@@ -13,7 +13,6 @@ import datetime
 import numpy as np
 import torch.nn as nn
 from loguru import logger
-from typing import  Optional,Union
 from utils.misc import get_model_info
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
@@ -108,7 +107,7 @@ class GraphTrainer:
             return self.model.module
         return self.model
 
-    def train(self,ckpt_path:Optional[str]=None,auto_resume:Optional[bool]=True):
+    def train(self,ckpt_path:str=None,auto_resume:bool=True):
         self.before_train(ckpt_path,auto_resume)
         try:
             self.train_in_epoch()
@@ -129,7 +128,7 @@ class GraphTrainer:
             self.train_one_iter()
             self.after_iter()
 
-    def before_train(self,ckpt_path:Optional[str]=None,auto_resume:Optional[bool]=True):
+    def before_train(self,ckpt_path:str=None,auto_resume:bool=True):
         '''
 
         '''
@@ -268,7 +267,7 @@ class GraphTrainer:
             # empty the meters
             self.meter.clear_meters()
         
-    def load_checkpoint(self, path: Optional[str] = None, auto_resume: bool = True):
+    def load_checkpoint(self, path: str = None, auto_resume: bool = True):
         """Load the given checkpoint or resume from the latest checkpoint.
 
         Args:
@@ -331,7 +330,7 @@ class GraphTrainer:
     def save_checkpoint(self, file_name:str):
         '''
         Save training state: ``start_epoch``, ``model``,
-            ``optimizer``, ``grad_scaler`` (optional).
+            ``optimizer``, ``grad_scaler`` ().
         '''
         if self.rank == 0:
             data = {

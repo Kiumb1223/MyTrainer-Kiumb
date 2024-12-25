@@ -28,10 +28,10 @@ class TrainingGraphModel(nn.Module):
 
         # Encoder Layer
         self.nodeEncoder = NodeEncoder(cfg.FAST_REID_MODELE,cfg.NODE_EMBED_SIZE)
-        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE)
+        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
 
         # Graph Layer
-        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE)
+        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
         
         # Sinkhorn Layer 
         self.alpha   = nn.Parameter(torch.ones(1))
@@ -113,10 +113,10 @@ class GraphModel(nn.Module):
 
         # Encoder Layer
         self.nodeEncoder = NodeEncoder(cfg.FAST_REID_MODELE,cfg.NODE_EMBED_SIZE)
-        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE)
+        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
 
         # Graph Layer
-        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE)
+        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
         
         # Sinkhorn Layer 
         self.alpha   = nn.Parameter(torch.ones(1))

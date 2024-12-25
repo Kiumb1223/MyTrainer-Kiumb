@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
-import os
-import sys
-from pathlib import Path
 import torch
 import torch.nn as nn
+from typing import Union
 from torchvision import models
 import torch.nn.functional as F
-from typing import Union,Optional
 from models.graphToolkit import knn
 from torch_geometric.data import Batch,Data
 import torchvision.transforms.functional as T
@@ -71,7 +68,7 @@ class NodeEncoder(nn.Module):
             nn.Linear(128,node_embed_size),
             nn.ReLU(inplace=True),
         )
-        # Optional freeze model weights
+        #  freeze model weights
         params = list(self.backbone.parameters())
 
         for param in params:
@@ -100,8 +97,18 @@ class NodeEncoder(nn.Module):
         return graph       
 class EdgeEncoder(nn.Module):
 
-    def __init__(self, edge_embed_size:int):
+    def __init__(self, 
+                edge_embed_size:int,
+                bt_cosine :bool=False, 
+                bt_self_loop :bool=True,
+                bt_directed :bool=True
+                ):
         super(EdgeEncoder, self).__init__()
+
+        self.bt_cosine = bt_cosine
+        self.bt_self_loop = bt_self_loop
+        self.bt_directed = bt_directed
+
         self.encoder = nn.Sequential(
             nn.Linear(6,edge_embed_size),
             nn.BatchNorm1d(edge_embed_size),
@@ -128,14 +135,14 @@ class EdgeEncoder(nn.Module):
         assert len(graph.x.shape) == 2 , 'Encode node attribute first!'
         
         with torch.no_grad():
-            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=False,bt_self_loop=True,bt_directed=True)
+            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed)
             raw_edge_attr    = self.compute_edge_attr(graph)
         
         graph.edge_attr = self.encoder(raw_edge_attr)
         
         return graph 
 
-    def construct_edge_index(self,batch: Union[Batch,Data], k ,bt_cosine: Optional[bool]=False, bt_self_loop: Optional[bool]=True,bt_directed :Optional[bool]=False) -> torch.Tensor:
+    def construct_edge_index(self,batch: Union[Batch,Data], k ,bt_cosine:bool=False, bt_self_loop: bool=True,bt_directed :bool=False) -> torch.Tensor:
         """
         Construct edge_index in either the Batch or Data.
         > construct KNN for each subgraph in the Batch
@@ -170,7 +177,7 @@ class EdgeEncoder(nn.Module):
         
         return edge_index 
 
-    def compute_edge_attr(self,batch:Union[Batch,Data],flow:Optional[str]='source_to_target') -> torch.Tensor:
+    def compute_edge_attr(self,batch:Union[Batch,Data],flow:str='source_to_target') -> torch.Tensor:
         '''
         Compute edge_attr in the either Batch or Data
 

@@ -3,8 +3,8 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
+import torch.nn.functional as F
 from models.graphToolkit import hungarian
 
 __all__ = ['GraphLoss', 'PermutationLossHung', 'CombinedMatchingLoss']

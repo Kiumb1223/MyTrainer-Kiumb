@@ -1,3 +1,5 @@
+[toc]
+
 # Readme
 
 > make a small record about my train of thought when trying to apply GNN to MOT
@@ -53,24 +55,25 @@ There are four states in the trajectory management strategy — **Born,Active,Sl
 
 So there is some quantitative results when **GCNNMatch training on MOT17-half**  tests on **my validation set**.
 
-|   Validation set   | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
-| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  MOT17-half(SDP)   | 48.68 | 48.43 | 49.00 | 57.39 | 46.20 | 75.72 |
-| Indoor Day(YOLOv8) | 36.11 | 66.81 | 19.67 | 33.18 | 32.53 | 33.86 |
+|   Validation set   | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|  MOT17-half(SDP)   | 48.68 | 48.43 | 49.00 | 57.39 | 46.20 | 75.72 | 56.44 | 83.56 |
+| Indoor Day(YOLOv8) | 36.11 | 66.81 | 19.67 | 33.18 | 32.53 | 33.86 | 87.51 | 76.07 |
 
 And the GCNNMatch is :warning:**extremely time-consuming**, which takes about 2 seconds to process each frame in a 30fps, 1080p video.
 
 ----
 
 - For the purpose of  **fast training (36min or so) and relatively fair comparison** , my own model also **trains on half data  of MOT and tests on MOT17-half**. Besides, **max epoch is set to 40, batch size is set to 16, warmup iterations are set to 500**.
+- And **random seed is set to 3407 ** || **k is set to 2 **
 
 Here is the original quantitative results of my model without **any modification on model structure or the use of any data augmentation techniques**. 
 
-| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
-| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 |
+| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 | 41.54 | 83.79 |
 
-Obviously, my model still have a long way to go. However, what makes me proud is that my model has **a relatively fast inference speed**, which can reach up to 11 fps to process a 30fps, 1080p video.
+Obviously, my model still have a long way to go. However, what makes me proud is that my model has **a relatively fast inference speed**, which can reach up to 15 fps or so to process a 30fps, 1080p video.
 
 ## 3. TO DO List
 
@@ -95,9 +98,9 @@ Obviously, my model still have a long way to go. However, what makes me proud is
 
 The quantitative results of the vanilla model  (the same results in [Sec.1](#1. Brief  Introduction about My Model), just repeat one more time and add some curves which can reflect something):
 
-| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
-| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 |
+| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 | 41.54 | 83.79 |
 
 ![vanilaOne-index](./.assert/vanilaOne-index.bmp)
 
@@ -115,23 +118,42 @@ As we all known, the MOT problem can be viewed as a problem of **maximizing a po
 
 There are three data augmentation techniques — Low framerate, missed detections and discontinuous trajectories. All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
 
-| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
-| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 |
+|    Conditions     |   HOTA    |   DetA    | AssA  |   IDF1    |    IDR    |  IDP  |   MOTA    |   MOTP    |
+| :---------------: | :-------: | :-------: | :---: | :-------: | :-------: | :---: | :-------: | :-------: |
+|    Vanilla one    |   23.96   |   45.44   | 12.66 |   23.14   |   18.08   | 32.14 |   41.54   |   83.79   |
+| Data Augmentation | **25.29** | **51.08** | 12.57 | **25.02** | **20.49** | 32.13 | **50.01** | **83.86** |
 
 ![dataAug](./.assert/dataAug-index.bmp)
 
-:loudspeaker: Obviously,**my model is not overfitting in the whole training phase due to three data augmentation techniques. **
-
-<strong style="color: red;">And I wanna use this as the main comparison.</strong> 
+:loudspeaker: Obviously,**my model is not overfitting in the whole training phase due to three data augmentation techniques. And I wanna  **<strong style="color: red;">use this as the main comparison which marks as Vanilla one^*^.</strong> 
 
 ### 4.2 Before Vanilla one After Graphconv
 
+And I wanna try another way to implement graph convolution operations: (which is similar to Graph conv)
+$$
+g^{l+1}_i:= f_1(g_i^l) + \max _{j \in \mathbb{N}_i}{f_2([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})])}
+$$
 
 
-### 4.3 Before Vanilla one After Undirected graph 
+|   Conditions    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one^*^  | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+| Graphconv(pure) |       |       |       |       |       |       |       |       |
 
+### 4.3 Before Vanilla one After Undirected graph [:sob:]
 
+Here is the simple illustration about the undirected graph:
+
+![undirectedgraph](./.assert/undirectedgraph.bmp)
+
+Unfortunately, it doesn`t seem to have a significant improvement, but rather a slight decrease. :sob:
+
+|    Conditions    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :--------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|  Vanilla one^*^  | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+| Undirected Graph |       |       |       |       |       |       |       |       |
+
+![UndirectedGraph-index](./.assert/UndirectedGraph-index.bmp)
 
 ### 4.4 Before Vanilla one After Distance mask 
 
@@ -147,11 +169,21 @@ Noted that it seems that the **max movement distance of adjacent frames (window 
 
 ![Dancetrack](./.assert/Dancetrack.bmp)
 
-It seems that **the speed of object moving poses the bigger influence on the statistical experiment among all factors.**:confused: . Oops, maybe **the distance between camera and objects also matters!**
+It seems that **the speed of object moving poses the bigger influence on the statistical experiment among all factors.**:confused: Oops, maybe **the distance between camera and objects also matters!**
 
 
 
-### 4.5 Before Vanilla one After Different K
+### 4.5 Before Vanilla one After Different K [:tada:]
+
+|     Different K     | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| k=2(Vanilla one^*^) | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
+|         k=3         | 27.29 | 51.14 | 14.61 | 27.84 | 22.83 | 35.67 | 52.56 | 83.82 |
+|         k=4         | 28.87 | 51.33 | 16.30 | 30.06 | 24.67 | 38.46 | 53.53 | 83.85 |
+|         k=5         |       |       |       |       |       |       |       |       |
+|         k=6         |       |       |       |       |       |       |       |       |
+|         k=7         |       |       |       |       |       |       |       |       |
+|         k=8         |       |       |       |       |       |       |       |       |
 
 
 
@@ -173,9 +205,10 @@ $$
 
 And here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :sob:）
 
-| Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  |
-| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 25.41 | 51.08 | 12.70 | 23.81 | 19.50 | 30.67 |
+|   Conditions   |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
+| :------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
+| Vanilla one^*^ |   25.29   | 51.08 |   12.57   | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
+| 6-dim Edge emb | **25.41** | 51.08 | **12.70** |   23.81   |   19.50   |   30.67   |   48.83   |   83.84   |
 
 ![AddCosineDist-index](./.assert/AddCosineDist-index.bmp)
 
