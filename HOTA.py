@@ -10,21 +10,21 @@ from configs.config import get_config
 sys.path.append(os.path.join('thirdparty','TrackEval'))
 import trackeval 
 from multiprocessing import freeze_support
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 #  tensorboard --logdir 'experiments\tb_logs'
 if __name__ == '__main__':
 
     dataset_name = 'MOT17'
     cfg   = get_config()
-    tag   = 'KFamily'
+    # tag   = 'KFamily'
     with open(cfg.JSON_PATH,'r') as f:
         data_json = json.load(f)
 
-    tb_folder = os.path.join(cfg.WORK_DIR,'tb_eval')
-    os.makedirs(tb_folder,exist_ok=True)
-    tbwriter = SummaryWriter(
-        os.path.join(tb_folder)
-    )
+    # tb_folder = os.path.join(cfg.WORK_DIR,'tb_eval')
+    # os.makedirs(tb_folder,exist_ok=True)
+    # tbwriter = SummaryWriter(
+    #     os.path.join(tb_folder)
+    # )
 
     freeze_support()
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
                 for metrics,index_list in record_metrics_list.items():
                     for index in index_list:
                         print(f"{index}(%):[{number_per_metrics[metrics][index].mean() * 100 :.2f}]")
-                        tbwriter.add_scalar(f'Evalutions\{index}\{tag}',number_per_metrics[metrics][index].mean())
+                        # tbwriter.add_scalar(f'Evalutions\{index}\{tag}',number_per_metrics[metrics][index].mean())
         
     # freeze_support()
     # #---------------------------------#

@@ -46,12 +46,12 @@ def get_config():
         K_NEIGHBOR        = 2,     # Excluding self-loop
         BT_SELF_LOOP      = True,
         BT_DIRECTED       = True,  # True -> directed graph (default)
-        BT_COSINE_DYGRAPH = False,  # dynamic graph
+        BT_COSINE_DYGRAPH = False, # dynamic graph
 
         RESIZE_TO_CNN     = [256, 128],
         NODE_EMBED_SIZE   = 32,
         EDGE_EMBED_SIZE   = 16,
-        DIST_THRESH       = 350,    # pixel dist
+        DIST_THRESH       = 450,    # pixel dist
         SINKHORN_ITERS    = 8,
 
 
@@ -73,7 +73,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\K\latest_K6_120epoch.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\mask\latest_mask450_120.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

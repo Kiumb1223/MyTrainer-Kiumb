@@ -110,7 +110,7 @@ class EdgeEncoder(nn.Module):
         self.bt_directed = bt_directed
 
         self.encoder = nn.Sequential(
-            nn.Linear(6,edge_embed_size),
+            nn.Linear(5,edge_embed_size),
             nn.BatchNorm1d(edge_embed_size),
             nn.ReLU(inplace=True),
             nn.Linear(edge_embed_size,edge_embed_size),
@@ -206,9 +206,9 @@ class EdgeEncoder(nn.Module):
         feat3 = torch.log(source_info[:,-3] / (target_info[:,-3]) )
         feat4 = torch.log(source_info[:,-4] / (target_info[:,-4]) )
         feat5 = 1 - self._calculate_diou(source_info,target_info)
-        feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
+        # feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
 
-        edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim=1)
+        edge_attr = torch.stack([feat1,feat2,feat3,feat4,feat5],dim=1)
 
         return edge_attr
 
