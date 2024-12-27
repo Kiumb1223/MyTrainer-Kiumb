@@ -11,8 +11,7 @@ import torch.nn.functional as F
 __all__ = ['knn','hungarian','box_iou','box_ciou','sinkhorn_unrolled','Sinkhorn','compute_f1_score']
 
 
-def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
-        bt_self_loop: bool=False,bt_directed: bool=True) -> torch.Tensor:
+def knn(x: torch.tensor, k: int, bt_cosine: bool=False, bt_directed: bool=True) -> torch.Tensor:
     """
     Calculate K nearest neighbors, supporting Euclidean distance and cosine distance.
     
@@ -20,7 +19,6 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
         x (Tensor): Input point set, shape of (n, d), each row represents a d-dimensional feature vector.
         k (int): Number of neighbors.
         bt_cosine (bool): Whether to use cosine distance.
-        bt_self_loop (bool): Whether to include self-loop (i.e., whether to consider itself as its own neighbor).
         bt_directed (bool): return the directed graph or the undirected one. 
 
     Returns:
@@ -31,46 +29,33 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
 
     if num_node <= k :
         # raise ValueError("The number of points is less than k, please set k smaller than the number of points.")
-        logger.warning(f"SPECIAL SITUATIONS: The number of points is less than k, set k to {x.shape[0] -1}")
-        k = num_node - 1
+        k = num_node - 1 if num_node != 1 else 1 
+        logger.warning(f"SPECIAL SITUATIONS: The number of points [{num_node}] is less than k, set k to {k}")
     
-    if k > 0:
-        if bt_cosine:   # cosine distance
-            x_normalized = F.normalize(x, p=2, dim=1)
-            cosine_similarity_matrix = torch.mm(x_normalized, x_normalized.T)
-            dist_matrix  = 1 - cosine_similarity_matrix  
-        else:           # Euclidean distance
-            assert len(x.shape) == 2  
-            dist_matrix = torch.cdist(x, x) 
-            
+    if bt_cosine:   # cosine distance
+        x_normalized = F.normalize(x, p=2, dim=1)
+        cosine_similarity_matrix = torch.mm(x_normalized, x_normalized.T)
+        dist_matrix  = 1 - cosine_similarity_matrix  
+    else:           # Euclidean distance
+        assert len(x.shape) == 2  
+        dist_matrix = torch.cdist(x, x) 
+    
+    if num_node != 1:    
         dist_matrix.fill_diagonal_(float('inf'))  
+
+    _, indices1 = torch.topk(dist_matrix, k, largest=False, dim=1)
+    indices2 = torch.arange(0, num_node, device=x.device).repeat_interleave(k)
+
     
-        _, indices1 = torch.topk(dist_matrix, k, largest=False, dim=1)
-        indices2 = torch.arange(0, num_node, device=x.device).repeat_interleave(k)
+    if bt_directed:
+        return torch.stack([  # flow: from source node to target node 
+            indices1.flatten(),indices2
+        ]).to(x.device).to(torch.long)
     else:
-        indices1 = torch.tensor([],device=x.device)
-        indices2 = torch.tensor([],device=x.device)
-    
-    if bt_self_loop:
-        indices_self = torch.arange(0,num_node,device=x.device)
-        if bt_directed:
-            return torch.stack([  # flow: from source node to target node 
-                torch.cat([indices1.flatten(),indices_self],dim=-1),
-                torch.cat([indices2,indices_self],dim=-1),
-            ]).to(x.device).to(torch.long)
-        else:
-            return torch.stack([  # flow: from source node to target node 
-                torch.cat([indices1.flatten(),indices_self,indices2],dim=-1),
-                torch.cat([indices2,indices_self,indices1.flatten()],dim=-1),
-            ]).to(x.device).to(torch.long)
-    else:
-        if bt_directed:
-            return torch.stack([indices1.flatten(),indices2]).to(x.device).to(torch.long)  # flow: from source node to target node 
-        else:
-            return torch.stack([  # flow: from source node to target node 
-                torch.cat([indices1.flatten(),indices2],dim=-1),
-                torch.cat([indices2,indices1.flatten()],dim=-1),
-            ]).to(x.device).to(torch.long)
+        return torch.stack([  # flow: from source node to target node 
+            torch.cat([indices1.flatten(),indices2],dim=-1),
+            torch.cat([indices2,indices1.flatten()],dim=-1),
+        ]).to(x.device).to(torch.long)
 
 
 def hungarian(affinity_mtx: np.ndarray,match_thresh: float=0.1,is_iou_match:bool=False):

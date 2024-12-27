@@ -25,7 +25,7 @@ def get_config():
         LR                = 3.5e-4,
         WEIGHT_DECAY      = 1e-4,
         BATCH_SIZE        = 2,
-        MAXEPOCH          = 120,
+        MAXEPOCH          = 1,
         
         # lr scheduler(MultiStepLR)
         MILLESTONES       = [50,80],
@@ -44,13 +44,13 @@ def get_config():
         FAST_REID_WEIGHT  = 'model_weights/fastreid-models/market_bot_R50-ibn.pth',
 
         K_NEIGHBOR        = 2,     # Excluding self-loop
-        BT_SELF_LOOP      = True,
         BT_DIRECTED       = True,  # True -> directed graph (default)
         BT_COSINE_DYGRAPH = False, # dynamic graph
 
         RESIZE_TO_CNN     = [256, 128],
         NODE_EMBED_SIZE   = 32,
         EDGE_EMBED_SIZE   = 16,
+        BT_DIST_MASK      = False,
         DIST_THRESH       = 450,    # pixel dist
         SINKHORN_ITERS    = 8,
 
@@ -60,7 +60,7 @@ def get_config():
         #  3. Dataset related
         #---------------------------------#
         DATA_DIR          = 'datasets',
-        JSON_PATH         = 'configs/train_MOT17.json',
+        JSON_PATH         = 'configs/train_mix.json',
         TRACKBACK_WINDOW  = 10,
         ACCEPTABLE_OBJ_TYPE   = [1,2,7],
 

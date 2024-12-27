@@ -100,13 +100,11 @@ class EdgeEncoder(nn.Module):
     def __init__(self, 
                 edge_embed_size:int,
                 bt_cosine :bool=False, 
-                bt_self_loop :bool=True,
                 bt_directed :bool=True
                 ):
         super(EdgeEncoder, self).__init__()
 
         self.bt_cosine = bt_cosine
-        self.bt_self_loop = bt_self_loop
         self.bt_directed = bt_directed
 
         self.encoder = nn.Sequential(
@@ -135,14 +133,14 @@ class EdgeEncoder(nn.Module):
         assert len(graph.x.shape) == 2 , 'Encode node attribute first!'
         
         with torch.no_grad():
-            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed)
+            graph.edge_index = self.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_directed=self.bt_directed)
             raw_edge_attr    = self.compute_edge_attr(graph)
         
         graph.edge_attr = self.encoder(raw_edge_attr)
         
         return graph 
 
-    def construct_edge_index(self,batch: Union[Batch,Data], k ,bt_cosine:bool=False, bt_self_loop: bool=True,bt_directed :bool=False) -> torch.Tensor:
+    def construct_edge_index(self,batch: Union[Batch,Data], k ,bt_cosine:bool=False,bt_directed :bool=False) -> torch.Tensor:
         """
         Construct edge_index in either the Batch or Data.
         > construct KNN for each subgraph in the Batch
@@ -150,7 +148,6 @@ class EdgeEncoder(nn.Module):
         Args:
             batch (Batch): Batch object containing multiple graphs.
             bt_cosine (bool): Whether to use cosine distance.
-            bt_self_loop (bool): Whether to include self-loop.
             bt_directed (bool): return the directed graph or the undirected one.
 
             
@@ -159,7 +156,7 @@ class EdgeEncoder(nn.Module):
         """
 
         if not hasattr(batch,'num_graphs'): # Date Type
-            edge_index = knn(batch.location_info[:,-2:],k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_directed=bt_directed)
+            edge_index = knn(batch.location_info[:,-2:],k, bt_cosine=bt_cosine,bt_directed=bt_directed)
             return edge_index
         
         # Batch Type
@@ -169,7 +166,7 @@ class EdgeEncoder(nn.Module):
             
             sub_positions = batch.location_info[start:end,-2:]
             
-            edge_index = knn(sub_positions, k, bt_cosine=bt_cosine, bt_self_loop=bt_self_loop,bt_directed=bt_directed)
+            edge_index = knn(sub_positions, k, bt_cosine=bt_cosine,bt_directed=bt_directed)
             
             all_edge_index.append(edge_index + start)
         

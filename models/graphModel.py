@@ -23,15 +23,16 @@ class TrainingGraphModel(nn.Module):
         super().__init__()
 
         self.k = cfg.K_NEIGHBOR
-        self.device = cfg.DEVICE
+        self.device  = cfg.DEVICE
+        self.bt_mask = cfg.BT_DIST_MASK 
         self.dist_thresh = cfg.DIST_THRESH
 
         # Encoder Layer
         self.nodeEncoder = NodeEncoder(cfg.FAST_REID_MODELE,cfg.NODE_EMBED_SIZE)
-        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
+        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_DIRECTED)
 
         # Graph Layer
-        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
+        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_DIRECTED)
         
         # Sinkhorn Layer 
         self.alpha   = nn.Parameter(torch.ones(1))
@@ -54,8 +55,8 @@ class TrainingGraphModel(nn.Module):
         # and return the node feature for each graph 
         #---------------------------------#
 
-        tra_node_feats = self.graphconvLayer(tra_graph_batch.x,tra_graph_batch.edge_attr,tra_graph_batch.edge_index,self.k)
-        det_node_feats = self.graphconvLayer(det_graph_batch.x,det_graph_batch.edge_attr,det_graph_batch.edge_index,self.k)
+        tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
+        det_node_feats = self.graphconvLayer(det_graph_batch,self.k)
         
         #---------------------------------#
         # Optimal transport
@@ -72,14 +73,17 @@ class TrainingGraphModel(nn.Module):
             # Slice node features for the current graph 
             tra_feats = tra_node_feats[tra_batch_indices == graph_idx]  
             det_feats = det_node_feats[det_batch_indices == graph_idx]  
-            # compute mask to filter out some unmatched nodes
-            # dist_mask = ( torch.cdist(tra_graph_batch.location_info[tra_batch_indices == graph_idx][:,-2:],
-            #                           det_graph_batch.location_info[det_batch_indices == graph_idx][:,-2:]) <= self.dist_thresh ).float()
             # 1. Compute affinity matrix for the current graph 
             n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
             n2   = torch.norm(det_feats,dim=-1,keepdim=True)
-            # corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
-            corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+
+            if self.bt_mask: # compute mask to filter out some unmatched nodes
+                dist_mask = ( torch.cdist(tra_graph_batch.location_info[tra_batch_indices == graph_idx][:,-2:],
+                                        det_graph_batch.location_info[det_batch_indices == graph_idx][:,-2:]) <= self.dist_thresh ).float()
+                corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+            else:
+                corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+                
             # 2. Prepare the augmented affinity matrix for Sinkhorn
             m , n = corr.shape
             bins0 = self.alpha.expand(m, 1)
@@ -108,15 +112,16 @@ class GraphModel(nn.Module):
         super().__init__()
 
         self.k = cfg.K_NEIGHBOR
-        self.device = cfg.DEVICE
+        self.device  = cfg.DEVICE
+        self.bt_mask = cfg.BT_DIST_MASK 
         self.dist_thresh = cfg.DIST_THRESH
 
         # Encoder Layer
         self.nodeEncoder = NodeEncoder(cfg.FAST_REID_MODELE,cfg.NODE_EMBED_SIZE)
-        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
+        self.edgeEncoder = EdgeEncoder(cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_DIRECTED)
 
         # Graph Layer
-        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_SELF_LOOP,cfg.BT_DIRECTED)
+        self.graphconvLayer = GraphConv(cfg.NODE_EMBED_SIZE,cfg.EDGE_EMBED_SIZE,cfg.BT_COSINE_DYGRAPH,cfg.BT_DIRECTED)
         
         # Sinkhorn Layer 
         self.alpha   = nn.Parameter(torch.ones(1))
@@ -154,8 +159,8 @@ class GraphModel(nn.Module):
         # and return the node feature for each graph 
         #---------------------------------#
 
-        tra_node_feats = self.graphconvLayer(tra_graph.x,tra_graph.edge_attr,tra_graph.edge_index,self.k)
-        det_node_feats = self.graphconvLayer(det_graph.x,det_graph.edge_attr,det_graph.edge_index,self.k)
+        tra_node_feats = self.graphconvLayer(tra_graph,self.k)
+        det_node_feats = self.graphconvLayer(det_graph,self.k)
         
         #---------------------------------#
         # Optimal transport
@@ -167,14 +172,16 @@ class GraphModel(nn.Module):
         # Slice node features for the current graph 
         tra_feats = tra_node_feats  
         det_feats = det_node_feats  
-        # compute mask to filter out some unmatched nodes
-        dist_mask = ( torch.cdist(tra_graph.location_info[:,-2:],
-                                det_graph.location_info[:,-2:]) <= self.dist_thresh ).float()
+
         # 1. Compute affinity matrix for the current graph 
         n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
         n2   = torch.norm(det_feats,dim=-1,keepdim=True)
-        # corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) 
-        corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+        if self.bt_mask: # compute mask to filter out some unmatched nodes
+            dist_mask = ( torch.cdist(tra_graph.location_info[:,-2:],det_graph.location_info[:,-2:]) <= self.dist_thresh ).float()
+            corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+        else:
+            corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+
         # 2. Prepare the augmented affinity matrix for Sinkhorn
         m , n = corr.shape
         bins0 = self.alpha.expand(m, 1)

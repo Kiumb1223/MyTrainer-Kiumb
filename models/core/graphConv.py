@@ -4,9 +4,13 @@
 '''
 import torch
 import torch.nn as nn
+from typing import Union
 from torch.nn import Module
 from models.graphToolkit import knn
+from torch_geometric.data import Batch,Data
 from torch_geometric.nn import MessagePassing
+from models.core.graphEncoder import EdgeEncoder
+
 
 __all__ = ['GraphConv']
 
@@ -66,12 +70,11 @@ class StaticConv(MessagePassing):
 
 class DynamicGonv(MessagePassing):
     def __init__(self, in_channels:int, out_channels:int,node_embed_size:int,
-                 bt_cosine :bool=False, bt_self_loop :bool=True, bt_directed :bool=True):
+                 bt_cosine :bool=False, bt_directed :bool=True):
 
         super().__init__(aggr='max')
 
         self.bt_cosine = bt_cosine
-        self.bt_self_loop = bt_self_loop
         self.bt_directed = bt_directed
 
         self.msgFunc = nn.Sequential(
@@ -104,7 +107,7 @@ class DynamicGonv(MessagePassing):
 
         
         with torch.no_grad():
-            edge_index = knn(x,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
+            edge_index = knn(x,k,bt_cosine=self.bt_cosine,bt_directed=self.bt_directed) 
         out = self.propagate(edge_index,x=x)
         # return self.lin(x) + out
         return out
@@ -119,7 +122,7 @@ class DynamicGonv(MessagePassing):
 
 class GraphConv(Module):
     def __init__(self,node_embed_size:int,edge_embed_size:int,
-                bt_cosine :bool=False, bt_self_loop :bool=True, bt_directed :bool=True
+                bt_cosine :bool=False, bt_directed :bool=True
                 ):
 
         super().__init__()
@@ -128,8 +131,8 @@ class GraphConv(Module):
         self.sg2Func  = StaticConv(2*node_embed_size + edge_embed_size,node_embed_size*2,node_embed_size)
         self.sg3Func  = StaticConv(2*(node_embed_size*2) + edge_embed_size,node_embed_size*3,(node_embed_size*2))
 
-        self.dg1Func  = DynamicGonv(2*node_embed_size,node_embed_size*2,node_embed_size,bt_cosine,bt_self_loop,bt_directed)
-        self.dg2Func  = DynamicGonv(2*(node_embed_size*2),node_embed_size*3,(node_embed_size*2),bt_cosine,bt_self_loop,bt_directed)
+        self.dg1Func  = DynamicGonv(2*node_embed_size,node_embed_size*2,node_embed_size,bt_cosine,bt_directed)
+        self.dg2Func  = DynamicGonv(2*(node_embed_size*2),node_embed_size*3,(node_embed_size*2),bt_cosine,bt_directed)
 
         self.fuse1Func = nn.Sequential(
             nn.Linear(node_embed_size*11,1024,bias=False),
@@ -166,11 +169,13 @@ class GraphConv(Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self,node_embedding:torch.Tensor,edge_embedding:torch.Tensor,edge_index:torch.Tensor,k:int) -> torch.Tensor:
+    def forward(self,graph:Union[Batch,Data],k:int) -> torch.Tensor:
+        assert graph.x is not None and graph.edge_index is not None and graph.edge_attr is not None and graph.location_info is not None
 
-        node_embedding_sg1 = self.sg1Func(node_embedding,edge_index,edge_embedding)      # torch.Size([32, 32])
-        node_embedding_sg2 = self.sg2Func(node_embedding_sg1,edge_index,edge_embedding)  # torch.Size([32, 64])
-        node_embedding_sg3 = self.sg3Func(node_embedding_sg2,edge_index,edge_embedding)  # torch.Size([32, 96])
+
+        node_embedding_sg1 = self.sg1Func(graph.x,graph.edge_index,graph.edge_attr)      # torch.Size([32, 32])
+        node_embedding_sg2 = self.sg2Func(node_embedding_sg1,graph.edge_index,graph.edge_attr)  # torch.Size([32, 64])
+        node_embedding_sg3 = self.sg3Func(node_embedding_sg2,graph.edge_index,graph.edge_attr)  # torch.Size([32, 96])
 
 
         node_embedding_dg1 = self.dg1Func(node_embedding_sg1,k)  # torch.Size([32,64])

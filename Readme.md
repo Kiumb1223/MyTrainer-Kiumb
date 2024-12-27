@@ -83,36 +83,38 @@ And it is also essential to record the time consumption of training and inferenc
 
   Here are two computing systems to train all following models of different experimental settings:
 
-  |  Platforms  |          CPU           |     GPU      |
-  | :---------: | :--------------------: | :----------: |
-  | 4090(Linux) | Platinum 8352V(2.5GHz) | RTX4090(8.9) |
-  | 3090(Linux) |    i9-13900K(3GHz)     | RTX3090(8.6) |
+  |  Platforms  |           CPU           |      GPU      |
+  | :---------: | :---------------------: | :-----------: |
+  | 4090(Linux) | Platinum 8352V (2.5GHz) | RTX4090 (8.9) |
+  | 3090(Linux) |    i9-13900K (3GHz)     | RTX3090 (8.6) |
 
   Additionally, there is also a minor difference in hardware architecture of the two platforms: **the 4090 system uses a southbridge chip** to establish a communication link between the CPU and GPU, while the **3090 system lacks a southbridge chip**, allowing the CPU and GPU to communicate directly. As a result, **the speed on the 3090 system is faster than on the 4090 system when training.** And here is more detailed comparison:
 
   |  Platform   | Data <br/>Loading Time | Data <br/>Migration Time | Model Time<br>(Forward + Backward) | Total Time<br>(120 Epoch) |
   | :---------: | :--------------------: | :----------------------: | :--------------------------------: | :-----------------------: |
-  | 4090(Linux) |        0.548 s         |          0.07 s          |               0.35 s               |        5 h 17 min         |
+  | 4090(Linux) |        0.000 s         |          0.08 s          |               0.35 s               |        2 h 38 min         |
   | 3090(Linux) |        0.000 s         |          0.05 s          |               0.34 s               |        2 h 15 min         |
 
-  P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 , BATCH SIZE is 16 and NUM WORKS is 2 in both two platforms. Plus, whole model is trained in a single GPU, not in distributed training.
+  P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 and BATCH SIZE is 16. Plus, whole model is trained in a single GPU, not in distributed training. NUM WORKER is set to 6 in 4090 and 2 in 3090.
 
 - **Inference Time Analysis:**
 
-  Here is also two platforms to do evaluation (Model Inference) after training.
+  Here is also three platforms to do evaluation (Model Inference) after training.
 
-  |  Platforms   |       CPU       |     GPU      |
-  | :----------: | :-------------: | :----------: |
-  | 3090(Linux)  | i9-13900K(3GHz) | RTX3090(8.6) |
-  | 3060(Window) | i5-12490F(3GHz) | RTX3060(8.6) |
-
+  |  Platforms   |           CPU           |      GPU      |
+  | :----------: | :---------------------: | :-----------: |
+  | 4090(Linux)  | Platinum 8352V (2.5GHz) | RTX4090 (8.9) |
+  | 3090(Linux)  |    i9-13900K (3GHz)     | RTX3090 (8.6) |
+  | 3060(Window) |    i5-12490F (3GHz)     | RTX3060 (8.6) |
+  
   And here is the time consumption of different **resolution** video in both two platforms:
-
+  
   |  Platforms   | 480p Video | 1080p Video | 4K video |
   | :----------: | :--------: | :---------: | :------: |
+  | 4090(Linux)  |   30 FPS   |   15 FPS    |  9 FPS   |
   | 3090(Linux)  |   68 FPS   |   30 FPS    |  13 FPS  |
   | 3060(Window) |   30 FPS   |   15 FPS    |  8 FPS   |
-
+  
   P.S. **the bigger K in KNN sets, the slower model infers.**
 
 ## 3. TO DO List
@@ -240,8 +242,8 @@ The following two tables present **different experimental settings**, both of wh
 |                300                |   29.70   | 51.34 |   17.24   |   30.07   |   24.67   |   38.48   | 52.20 | 83.89 |
 |                350                |   29.34   | 51.30 |   16.84   |   29.52   |   24.23   |   37.76   | 51.54 | 83.83 |
 |                400                |   27.60   | 51.42 |   14.86   |   26.91   |   22.08   |   34.44   | 51.39 | 83.82 |
-|                450                |   26.05   | 51.46 |   13.25   |   25.68   |   21.08   |   32.83   | 51.63 | 83.83 |
-|                500                |   28.01   | 51.47 |   15.32   |   27.46   |   22.55   |   35.09   | 51.80 | 83.83 |
+|              450(re)              |   26.05   | 51.46 |   13.25   |   25.68   |   21.08   |   32.83   | 51.63 | 83.83 |
+|              500(re)              |   28.01   | 51.47 |   15.32   |   27.46   |   22.55   |   35.09   | 51.80 | 83.83 |
 
 | Mask Range<br>[trained without mask] |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
@@ -303,7 +305,7 @@ Inspired by the discovery in the previous section, I also design two experimenta
 
 Obviously, it\`s not effective way to apply different k in the vanilla model<sup>*</sup>, whose k is 2 in training. Actually, it should have been like this. **In my opinion,the models of different K, when training, can learn different inductive bias , which make model prioritise solutions with certain properties, or have a different capability of feature extraction**
 
-Besides, here is a picture to visually illustrates the process of graph construction with the increase of K. ( Due to the shape of each figure, the relative positions of every nodes are distorted to some extent. And **the following graph construction is based on true coordinates in original image plane**) P.S.  Confront with some common but special situations, like **only a few objects (maybe less than K value)**, my model will **adaptively adjust the K value** (make K equal to `number of object - 1` ). If K is set to a infinite number, like 999, the KNN graph will be converted into full connected graph.
+Besides, here is a picture to visually illustrates the process of graph construction with the increase of K. ( Due to the shape of each figure, the relative positions of every nodes are distorted to some extent. And **the following graph construction is based on true coordinates in original image plane**) P.S.  Confront with some common but special situations, like **only  objects (maybe less than K value)**, my model will **adaptively adjust the K value** (make K equal to `number of object - 1` ). If K is set to a infinite number, like 999, the KNN graph will be converted into full connected graph.
 
 ![evolutionK](./.assert/evolutionK.bmp)
 
@@ -319,22 +321,144 @@ The reason why I wanna change the weight of edge is **the week connection betwee
 
 How to alleviate or even solve this problem? Some trial methods are waiting for me to practice.
 
-#### 4.6.1 Add Cosine Distance in edge embedding [:confused:]
+#### 4.6.1 several Variants of Edge Embedding
 
-I add **cosine distance of connected nodes** to edge embedding of static graph:
+Curious about the influences of edge embedding , I design several variants of Edge embedding  and do some experiments. And here are some mathematical formulation of my ideas. [The edge embedding of `Vanilla model`  mainly refers [SUSHI(CVPR 2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Cetintas_Unifying_Short_and_Long-Term_Tracking_With_Graph_Hierarchies_CVPR_2023_paper.pdf) , which is a offline and graph-based tracker. And it\` another motivation to encourage me to solve the puzzle ]
 
-$$
-Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
-$$
+1. **4-dim** Edge embedding (normalized by the **length and width of the original image**):
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w},\frac{y_j-y_i}{h},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
 
-And here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :confused:）
+2. **4-dim** Edge embedding (normalized by the **length and width of the bounding box of source nodes** ,i.e. neighbor nodes):
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_j},\frac{y_j-y_i}{h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
 
-|       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
-| :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
-| Vanilla one<sup>*</sup> |   25.29   | 51.08 |   12.57   | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
-|     6-dim Edge emb      | **25.41** | 51.08 | **12.70** |   23.81   |   19.50   |   30.67   |   48.83   |   83.84   |
+3. **4-dim** Edge embedding (normalized by the **length and width of the bounding box of target nodes**):
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
 
-<img src="./.assert/AddCosineDist-index.bmp" alt="AddCosineDist-index" style="zoom:25%;" />
+4. **4-dim** Edge embedding (normalized by the **mean width and height of nodes**):
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{h_i+w_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
+
+5. **4-dim** Edge embedding (normalized by the **mean height of nodes**):
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i+h_j},\frac{2(y_j-y_i)}{h_i+w_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
+
+6. **5-dim** Edge embedding (add **IOU distance** as another dimension to supply more information):
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),iouDist(i,j)])
+   $$
+
+7. **5-dim** Edge embedding (add **DIOU distance** as another dimension to supply more information): [Actually, the same as `Vanilla model`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j)])
+   $$
+
+8. **6-dim** Edge embedding (add **Cosine distance** as another dimension to supply more information):
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
+   $$
+
+9. **8-dim** Edge embedding (the same as [GSM (IJCAI 2020)](https://www.ijcai.org/Proceedings/2020/74)):
+   $$
+   Edge~emb~:= f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{x_j - x_i}{w},\frac{y_j-y_i}{h},\frac{w_j - w_i}{w},\frac{h_j-h_i}{h},])
+   $$
+
+In order to better  organize and manage these experiments, it is necessary to rename these experiments:
+
+| Experimental Index | Experimental Name |
+| :----------------: | :---------------: |
+|    1 - (4090:1)    |     ImgNorm4      |
+|    2 - (4090:2)    |     SrcNorm4      |
+|    3 - (3090:1)    |     TgtNorm4      |
+|    4 - (4090:1)    |   MeanSizeNorm4   |
+|    5 - (4090:2)    |  MeanHeightNorm4  |
+|    6 - (3090:1)    |       IOU5        |
+|    7 - (4090:1)    |       DIOU5       |
+|    8 - (4090:2)    |     DIOU-Cos6     |
+|    9 - (3090:1)    |       GSM8        |
+
+##### 1. ImgNorm4
+
+It seems that model has not converge if normalizing by the shape of original image.:confused:
+
+|        Experimental name        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :-----------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+| DIOU5 (Vanilla one<sup>*</sup>) | **25.29** | 51.08 | **12.57** | **25.02** | **20.49** | **32.13** | 50.01 | 83.86 |
+|            ImgNorm4             |   11.82   | 37.94 |   3.72    |   8.30    |   6.14    |   12.79   | 18.09 | 82.36 |
+
+<img src="./.assert/ImgNorm4.bmp" style="zoom:25%;" />
+
+##### 2. SrcNorm4
+
+|        Experimental name        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :-----------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+| DIOU5 (Vanilla one<sup>*</sup>) | **25.29** | 51.08 | **12.57** | **25.02** | **20.49** | **32.13** | 50.01 | 83.86 |
+|            SrcNorm4             |   13.12   | 45.82 |   3.80    |   9.37    |   7.44    |   12.65   | 23.96 | 82.10 |
+
+<img src="./.assert/SrcNorm4.bmp" style="zoom:25%;" />
+
+##### 3. TgtNorm4
+
+|        Experimental name        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :-----------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+| DIOU5 (Vanilla one<sup>*</sup>) | **25.29** | 51.08 | **12.57** | **25.02** | **20.49** | **32.13** | 50.01 | 83.86 |
+|            TgtNorm4             |   13.72   | 45.92 |   4.15    |   10.15   |   8.08    |   13.67   | 24.21 | 81.99 |
+
+<img src="./.assert/TgtNorm4.bmp" style="zoom:25%;" />
+
+##### 4. MeanSizeNorm4
+
+
+
+##### 5. MeanHeightNorm4
+
+
+
+##### 6. IOU5
+
+
+
+##### 7. DIOU5 (Vanilla one<sup>*</sup>)
+
+Actually, it is the same as the `Vanilla model`. Plz see more details in  [Sec 4. Experimental Records [Technique & Hyperparameters]](###4. Experimental Records [Technique & Hyperparameters]).
+
+##### 8. DIOU-Cos6
+
+Here are the quantitative results blow：（Compared with the results of dataAugmentation, it\`s slightly smaller :confused:）
+
+|        Experimental name        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :-----------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+| DIOU5 (Vanilla one<sup>*</sup>) |   25.29   | 51.08 |   12.57   | **25.02** | **20.49** | **32.13** | 50.01 | 83.86 |
+|            DIOU-Cos6            | **25.41** | 51.08 | **12.70** |   23.81   |   19.50   |   30.67   | 48.83 | 83.84 |
+
+<img src="./.assert/DIOU-Cos6-index.bmp" style="zoom:25%;" />
+
+##### 9. GSM8
+
+
+
+##### Summary Result of Experiment 4.6.1
+
+|        Experimental name        | HOTA  | DetA  | AssA  |   IDF1    |    IDR    |  IDP  | MOTA  | MOTP  |
+| :-----------------------------: | :---: | :---: | :---: | :-------: | :-------: | :---: | :---: | :---: |
+|            ImgNorm4             | 11.82 | 37.94 | 3.72  |   8.30    |   6.14    | 12.79 | 18.09 | 82.36 |
+|            SrcNorm4             | 13.12 | 45.82 | 3.80  |   9.37    |   7.44    | 12.65 | 23.96 | 82.10 |
+|            TgtNorm4             | 13.72 | 45.92 | 4.15  |   10.15   |   8.08    | 13.67 | 24.21 | 81.99 |
+|          MeanSizeNorm4          |       |       |       |           |           |       |       |       |
+|         MeanHeightNorm4         |       |       |       |           |           |       |       |       |
+|              IOU5               |       |       |       |           |           |       |       |       |
+| DIOU5 (Vanilla one<sup>*</sup>) | 25.29 | 51.08 | 12.57 | **25.02** | **20.49** | 32.13 | 50.01 | 83.86 |
+|            DIOU-Cos6            | 25.41 | 51.08 | 12.70 |   23.81   |   19.50   | 30.67 | 48.83 | 83.84 |
+|              GSM8               |       |       |       |           |           |       |       |       |
+
+
 
 #### 4.6.2 Attention Mechanism [:eyes:]
 
@@ -391,7 +515,7 @@ To sum up, here is the state transition network of my track management. And ther
 
 The detailed significance of these four states of each trajectory:
 
-1. `BORN state`\: in the whole pipeline of track management, only those high-conf detections (conf >= 0.7) can be initialized as `BORN state` trajectory
+1. `BORN state`\:  only those high-confidence detections (confidence >= 0.7) filtered by two-phase matching can be initialized as `BORN state` trajectory in the whole pipeline of track management. And 
 2. `ACTIVE state`:
 3. `SLEEP state`:
 4. `DEAD state`: 
@@ -399,3 +523,79 @@ The detailed significance of these four states of each trajectory:
 ### 5.1 plz live longer [:eyes:]
 
 ### 5.2 more robust appearance [:eyes:]
+
+
+
+## 6. Experimental Records [Code Optimization]
+
+What I always aspire for in my coding project is beautiful , efficient and simple programing logic. Needless to say that my whole project will run in an embeded system, which have lower computing capability and demands more efficient code. So I decide to record something about code optimization in the process of project optimization.
+
+### 6.1 Remove Variable bt_self_loop
+
+First of all, let me explain why I set this variable at the beginning of coding. It\`s possible that there is one object detected or tracked, where the number of objects is less than K value in KNN algorithm. And the graph-based project encounters fatal error, due to inability to construct a graph. Considering that the mathematical formulation of my graph convolution operations, I find that self loop of each node should have no impact on my model\`s performance, because subtracting oneself equals zero which is filter by the aggregation `max`. So why not add self loop for each node ，which can fix this fatal bug without affecting the performance of the model.  And here goes the original code about KNN algorithm, meanwhile is also the point waiting to optimization further.
+
+```python
+def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
+        bt_self_loop: bool=False,bt_directed: bool=True) -> torch.Tensor:
+    """
+    Calculate K nearest neighbors, supporting Euclidean distance and cosine distance.
+    
+    Args:
+        x (Tensor): Input point set, shape of (n, d), each row represents a d-dimensional feature vector.
+        k (int): Number of neighbors.
+        bt_cosine (bool): Whether to use cosine distance.
+        bt_self_loop (bool): Whether to include self-loop (i.e., whether to consider itself as its own neighbor).
+        bt_directed (bool): return the directed graph or the undirected one. 
+
+    Returns:
+        edge_index (tensor): the edge index of the graph, shape of (2, n * k).
+    """
+    
+    num_node = x.shape[0]
+
+    if num_node <= k :
+        # raise ValueError("The number of points is less than k, please set k smaller than the number of points.")
+        logger.warning(f"SPECIAL SITUATIONS: The number of points is less than k, set k to {x.shape[0] -1}")
+        k = num_node - 1
+    
+    if k > 0:
+        if bt_cosine:   # cosine distance
+            x_normalized = F.normalize(x, p=2, dim=1)
+            cosine_similarity_matrix = torch.mm(x_normalized, x_normalized.T)
+            dist_matrix  = 1 - cosine_similarity_matrix  
+        else:           # Euclidean distance
+            assert len(x.shape) == 2  
+            dist_matrix = torch.cdist(x, x) 
+            
+        dist_matrix.fill_diagonal_(float('inf'))  
+    
+        _, indices1 = torch.topk(dist_matrix, k, largest=False, dim=1)
+        indices2 = torch.arange(0, num_node, device=x.device).repeat_interleave(k)
+    else:
+        indices1 = torch.tensor([],device=x.device)
+        indices2 = torch.tensor([],device=x.device)
+    
+    if bt_self_loop:
+        indices_self = torch.arange(0,num_node,device=x.device)
+        if bt_directed:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices1.flatten(),indices_self],dim=-1),
+                torch.cat([indices2,indices_self],dim=-1),
+            ]).to(x.device).to(torch.long)
+        else:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices1.flatten(),indices_self,indices2],dim=-1),
+                torch.cat([indices2,indices_self,indices1.flatten()],dim=-1),
+            ]).to(x.device).to(torch.long)
+    else:
+        if bt_directed:
+            return torch.stack([indices1.flatten(),indices2]).to(x.device).to(torch.long)  # flow: from source node to target node 
+        else:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices1.flatten(),indices2],dim=-1),
+                torch.cat([indices2,indices1.flatten()],dim=-1),
+            ]).to(x.device).to(torch.long)
+```
+
+If variable `bt_self_loop` set True, the above code will add self loop for every objects  without consideration about whether the only one object detected or tracked . So why not add self loop only when there is one object? **This method can simply further the graph structure and save more time expanse and space expanse.** :point_right: [Modified version of KNN](./models/graphtoolkit.py)​ :point_left:
+

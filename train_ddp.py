@@ -18,8 +18,8 @@ from configs.config import get_config
 from utils.logger import setup_logger
 from models.lossFunc import GraphLoss
 from torch.utils.data import DataLoader
-from models.graphModel import GraphModel
 from utils.graphTrainer import GraphTrainer
+from models.graphModel import TrainingGraphModel
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.nn.parallel import DistributedDataParallel
 from utils.distributed import get_rank,init_distributed
@@ -57,7 +57,7 @@ def main():
     valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
-    model = GraphModel(cfg).to(cfg.DEVICE)
+    model = TrainingGraphModel(cfg).to(cfg.DEVICE)
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model) .to(cfg.DEVICE)
     if is_distributed:
         model = DistributedDataParallel(model,device_ids=[local_rank])

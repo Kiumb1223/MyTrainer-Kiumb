@@ -32,7 +32,8 @@ class Tracker:
 
     _track_id = 0
 
-    def __init__(self,start_frame,appearance_feat,conf,tlwh,cnt_to_active,cnt_to_sleep,max_cnt_to_dead,feature_list_size):
+    def __init__(self,start_frame:int,appearance_feat:torch.Tensor,conf:float,location_info:list,
+                 cnt_to_active:int,cnt_to_sleep:int,max_cnt_to_dead:int,feature_list_size:int):
         
         self.track_id   = None # when state: Born to Active, this will be assigned
         self.track_len  = 0
@@ -43,7 +44,8 @@ class Tracker:
         self.start_frame   = start_frame 
 
         self.conf = conf
-        self.tlwh = tlwh # (top left x, top left y, width, height)
+        # self.tlwh = tlwh # (top left x, top left y, width, height)
+        self.location_info = location_info
         self.appearance_feats_list = []
         self.appearance_feats_list.append(appearance_feat) 
         
@@ -52,7 +54,7 @@ class Tracker:
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
-    def to_active(self,frame_idx,appearance_feat,conf,tlwh):
+    def to_active(self,frame_idx,appearance_feat,conf,location_info):
         
         assert appearance_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {appearance_feat.shape}'
         if self.state  == LifeSpan.Born:
@@ -72,7 +74,8 @@ class Tracker:
         self.track_len += 1 
         self.frame_idx = frame_idx
         self.conf = conf
-        self.tlwh = tlwh
+        # self.tlwh = tlwh
+        self.location_info = location_info
         self.appearance_feats_list.append(appearance_feat)
 
         if len(self.appearance_feats_list) > self._feature_list_size:
@@ -120,23 +123,22 @@ class Tracker:
         return self.state == LifeSpan.Dead
     
     @property
-    def tlbr(self):
-        """Convert bounding box to format `(min x, min y, max x, max y)`, i.e.,
-        `(top left, bottom right)`.
-        """
-        ret = self.tlwh.copy()
-        ret[2:] += ret[:2]
-        return ret
-    
+    def tlwh(self):
+        """Convert bounding box to format `(top left x, top left y, width, height)`."""
+        top_left_x = self.location_info[0]
+        top_left_y = self.location_info[1]
+        width   = self.location_info[4]
+        height  = self.location_info[5]
+        return [top_left_x, top_left_y, width, height]
+
     @property
-    def location_info(self):
-        """Convert bounding box to format `(min x, min y, max x, max y, width, height,center x, center y,)`"""
-        ret = self.tlwh.copy().astype(np.float32)
-        ret = np.append(ret,self.tlwh[-2:])
-        ret = np.append(ret,self.tlwh[-2:])
-        ret[2:4] = ret[2:4] + ret[:2]
-        ret[-2:] = ret[-2:] / 2+ ret[:2]
-        return ret
+    def tlbr(self):
+        """Convert bounding box to format `(min x, min y, max x, max y)`."""
+        min_x = self.location_info[0]
+        min_y = self.location_info[1]
+        max_x = self.location_info[2]
+        max_y = self.location_info[3]
+        return [min_x, min_y, max_x, max_y]
     
     @staticmethod
     def get_track_id():
@@ -196,12 +198,11 @@ class TrackManager:
             tra_idx ,det_idx = match_idx
             for tra_id, det_id in zip(tra_idx,det_idx):
                 first_tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
-                                current_detections[det_id][4],current_detections[det_id][:4])
+                                current_detections[det_id][4],det_graph.location_info[det_id].cpu().numpy())
                 if not first_tracks_list[tra_id].is_Born:
                     output_track_list.append(first_tracks_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
             first_tracks_list[tra_id].to_sleep()
-        first_tracks_list = self.remove_dead_tracks(first_tracks_list)
 
         second_tracks_list = [track for track in self.tracks_list if track.is_Born]
         highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
@@ -213,21 +214,20 @@ class TrackManager:
             for tra_id, det_id in zip(tra_idx,det_idx):
                 global_id = highconf_to_global_det_idx[det_id]
                 second_tracks_list[tra_id].to_active(frame_idx,det_graph.x[global_id],
-                                highconf_unmatch_dets[det_id][4],highconf_unmatch_dets[det_id][:4])
+                                highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy())
                 if not second_tracks_list[tra_id].is_Born:
                     output_track_list.append(second_tracks_list[tra_id])
         for tra_id in unmatch_tra:# unmatched tras 
             second_tracks_list[tra_id].to_sleep()
-        second_tracks_list = self.remove_dead_tracks(second_tracks_list)
         for det_id in unmatch_det:
             global_id = highconf_to_global_det_idx[det_id]
             second_tracks_list.append(
                 Tracker(frame_idx,det_graph.x[global_id],
-                        highconf_unmatch_dets[det_id][4],highconf_unmatch_dets[det_id][:4],
+                        highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy(),
                         self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
             )
         
-        self.tracks_list = first_tracks_list + second_tracks_list
+        self.tracks_list = self.remove_dead_tracks(first_tracks_list + second_tracks_list)
         return output_track_list
 
     def construct_tra_graph(self,tracks_list:List[Tracker]) -> Data:
