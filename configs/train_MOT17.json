@@ -1,0 +1,72 @@
+{
+    "train_seq": {
+        "MOT17": {
+            "seq_name": [
+                "MOT17-02",
+                "MOT17-04",
+                "MOT17-05",
+                "MOT17-09",
+                "MOT17-10",
+                "MOT17-11",
+                "MOT17-13"
+            ],
+            "start_frame": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+            ],
+            "end_frame": [
+                300,
+                525,
+                418,
+                262,
+                327,
+                450,
+                375
+            ]
+        }
+    },
+    "valid_seq": {
+        "MOT17": {
+            "seq_name": [
+                "MOT17-02",
+                "MOT17-04",
+                "MOT17-05",
+                "MOT17-09",
+                "MOT17-10",
+                "MOT17-11",
+                "MOT17-13"
+            ],
+            "start_frame": [
+                301,
+                526,
+                419,
+                263,
+                328,
+                451,
+                376
+            ],
+            "end_frame": [
+                600,
+                1050,
+                837,
+                525,
+                654,
+                900,
+                750
+            ],
+            "Trackeval": {
+                "SPLIT_TO_EVAL": "half"
+            }
+        }
+    },
+    "Trackeval": {
+        "GT_FOLDER": "datasets\\eval_datasets\\gt\\mot_challenge",
+        "TRACKERS_FOLDER": "datasets\\eval_datasets\\trackers\\mot_challenge",
+        "SKIP_SPLIT_FOL": true
+    }
+}

@@ -1,0 +1,71 @@
+# hyper parameters
+K_NEIGHBOR: 2
+SINKHORN_ITERS: 8
+BT_DIST_MASK: False
+DIST_THRESH: 450
+
+
+# model structure
+node_encoder:
+  backbone: 'densenet121'
+  wight_path: null
+  dims_list: [1024,512,256,128,64,32]
+  layer_type: 'linear'
+  layer_bias: False
+  use_batchnorm: True
+  activate_func: 'relu'
+  lrelu_slope: 0.0
+
+edge_encoder:
+  edge_type: 'DIOU5'
+  dims_list: [5,16,16]
+  layer_type: 'linear'
+  layer_bias: False
+  use_batchnorm: True
+  activate_func: 'relu'
+  lrelu_slope: 0.0
+  # static graph construction
+  bt_cosine: False 
+  bt_self_loop: True
+  bt_directed: True
+
+static_graph_model:
+  layer:
+  # [msg_in,msg_out,update_out]
+  # msg_in equals to (node emb size + edge emb size)
+    - [48,64,64]
+    - [80,96,96]
+    - [112,128,128]
+  aggr: 'max'
+  layer_type: 'linear'
+  layer_bias: False
+  use_batchnorm: True
+  activate_func: 'lrelu'
+  lrelu_slope: 0.1
+
+dynamic_graph_model:
+  layer:
+  # [msg_in,msg_mid,msg_out]
+  # and msg_in equals to (node emb size *2)
+    - [128,96,96]
+    - [192,128,128]
+  aggr: 'max'
+  layer_type: 'linear'
+  layer_bias: False
+  use_batchnorm: True
+  activate_func: 'lrelu'
+  lrelu_slope: 0.1
+  # dynamic graph construction
+  bt_cosine: False 
+  bt_self_loop: True
+  bt_directed: True
+
+fuse_model:
+  # [in_dim , mid_dim, out_dim]
+  fuse1_dims: [512,1024]
+  fuse2_dims: [1536,768,384,192] 
+  layer_type: 'Conv1d'
+  layer_bias: False
+  use_batchnorm: True
+  activate_func: 'lrelu'
+  lrelu_slope: 0.2
