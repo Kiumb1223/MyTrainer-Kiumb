@@ -31,10 +31,8 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
 
     if num_node <= k :
         # raise ValueError("The number of points is less than k, please set k smaller than the number of points.")
-        logger.warning(f"SPECIAL SITUATIONS: The number of points is less than k, set k to {x.shape[0] -1}")
         k = num_node - 1
-        if k ==0 :
-            print('checkt it out')
+        logger.warning(f"SPECIAL SITUATIONS: The number of points[{num_node}] is less than k, set k to {x.shape[0] -1}")
     if k > 0:
         if bt_cosine:   # cosine distance
             x_normalized = F.normalize(x, p=2, dim=1)
@@ -49,8 +47,17 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
         _, indices1 = torch.topk(dist_matrix, k, largest=False, dim=1)
         indices2 = torch.arange(0, num_node, device=x.device).repeat_interleave(k)
     else:
-        indices1 = torch.tensor([],device=x.device)
-        indices2 = torch.tensor([],device=x.device)
+        # Ensure valid graph even if k == 0 
+        # it will construct self-looped graph no matter whether bt_self_loop
+        indices_self = torch.arange(0,num_node,device=x.device)
+        if bt_directed:
+            return torch.stack([indices_self,indices_self]).to(x.device).to(torch.long)   
+        else:
+            return torch.stack([  # flow: from source node to target node 
+                torch.cat([indices_self,indices_self],dim=-1),
+                torch.cat([indices_self,indices_self],dim=-1),
+            ]).to(x.device).to(torch.long)
+    
     
     if bt_self_loop:
         indices_self = torch.arange(0,num_node,device=x.device)
