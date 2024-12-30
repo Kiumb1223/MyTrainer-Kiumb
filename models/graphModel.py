@@ -131,7 +131,7 @@ class GraphModel(nn.Module):
         self.graphconvLayer = SDgraphConv(
             static_graph_model_dict = model_dict['static_graph_model'],
             dynamic_graph_model_dict = model_dict['dynamic_graph_model'],
-            fuse_model_dict = model_dict['fuse_model_dict']
+            fuse_model_dict = model_dict['fuse_model']
             )
         
         # Sinkhorn Layer 

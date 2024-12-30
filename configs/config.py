@@ -25,7 +25,7 @@ def get_config():
         LR                = 3.5e-4,
         WEIGHT_DECAY      = 1e-4,
         BATCH_SIZE        = 2,
-        MAXEPOCH          = 1,
+        MAXEPOCH          = 2,
         
         # lr scheduler(MultiStepLR)
         MILLESTONES       = [50,80],

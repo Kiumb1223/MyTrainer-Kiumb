@@ -29,7 +29,7 @@ def main():
 
 
     cfg   = get_config()
-    model = GraphModel(cfg)
+    model = GraphModel(cfg['MODEL_YAML_PATH'])
     trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,
                     cfg.RESIZE_TO_CNN,cfg.MATCH_THRESH,cfg.Det2Tra_CONF,
                     cfg.CNT_TO_ACTIVE,cfg.CNT_TO_SLEEP,cfg.MAX_CNT_TO_DEAD,cfg.FEATURE_LIST_SIZE)
