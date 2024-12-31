@@ -20,8 +20,8 @@ def main():
         'train_seq':{},
         'valid_seq':{},
         'Trackeval':{
-            'GT_FOLDER':os.path.join(cfg.DATA_DIR,'eval_datasets','gt',data_construct_type),
-            'TRACKERS_FOLDER':os.path.join(cfg.DATA_DIR,'eval_datasets','trackers',data_construct_type),
+            'GT_FOLDER':os.path.join(cfg.DATA_DIR,subfolder,'gt',data_construct_type),
+            'TRACKERS_FOLDER':os.path.join(cfg.DATA_DIR,subfolder,'trackers',data_construct_type),
             'SKIP_SPLIT_FOL':True,
         }
     }
@@ -71,7 +71,7 @@ def main():
                 os.makedirs(gt_seqmap_folder,exist_ok=True)
                 os.makedirs(track_seqname_folder,exist_ok=True)
 
-                seqmap_dict[dataset_name]['path'] = os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),
+                seqmap_dict[dataset_name]['path'] = os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt')
                 seqmap_dict[dataset_name]['items'].append(seq + '\n')
 
                 # # for seqmap
@@ -177,7 +177,7 @@ def main():
                 os.makedirs(gt_seqmap_folder,exist_ok=True)
                 os.makedirs(track_seqname_folder,exist_ok=True)
 
-                seqmap_dict[dataset_name]['path'] = os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),
+                seqmap_dict[dataset_name]['path'] = os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt')
                 seqmap_dict[dataset_name]['items'].append(valid_seq + '\n')
 
                 # for seqmap
@@ -206,9 +206,9 @@ def main():
             raise ValueError('dataset_name not supported')
         
 
-        for path , items in seqmap_dict.items():
-            with open(path,'w') as f:
-                f.writelines(items)
+        for value_dict in seqmap_dict.values():
+            with open(value_dict['path'],'w') as f:
+                f.writelines(value_dict['items'])
 
         with open(save_json_path,'w') as json_file:
             json.dump(save_json, json_file,indent=4)
