@@ -29,7 +29,7 @@ Additionally, let\`s talk about my **graph convolutional operations**, which is 
 
 
 $$
-g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})~\cdot~ Edge~emb])}
+g^{l+1}_i:= \Phi(\max _{j \in \mathbb{N}_i}{f([Edge~emb~\cdot~(g_j^{l} - g_i^{l}) ])})
 $$
 
 And in order to **capture high-order discriminative features**, I rebuild the graph, which I call the `dynamic graph`, while the old one is referred to as the `static graph` to keep things clear. And I also perform the edgeconv operations on dynamic graph:
@@ -46,6 +46,10 @@ The last but not least, it\`s necessary to take a glimpse of my **trajectory man
 <img src="./.assert/flowChart.png" alt="flowChart" style="zoom: 50%;" />
 
 There are four states in the trajectory management strategy — **Born,Active,Sleep,Dead**. It\`s possible that `Born Trajectory` can be false positive, i.e. noise, so there are two phases in trajectory management — `Match Strategy` for denoising and `Graph Matching` for matching. And the rest of the strategy is unnecessary to discuss, which is obvious in the flow chart.
+
+----
+
+Supplement Details about my graph convolution network
 
 ## 2. Experimental Settings
 
@@ -71,7 +75,7 @@ Here is the original quantitative results of my model without **any modification
 
 | Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 | 41.54 | 83.79 |
+| MOT17-half(SDP) | 24.25 | 48.98 | 12.09 | 24.04 | 19.59 | 31.11 | 50.95 | 81.98 |
 
 Obviously, my model still have a long way to go. However, what makes me proud is that my model has **a relatively fast inference speed**, which can reach up to 15 fps or so to process a 30fps, 1080p video.
 
@@ -81,21 +85,23 @@ And it is also essential to record the time consumption of training and inferenc
 
 - **Training Time Analysis:**
 
-  Here are two computing systems to train all following models of different experimental settings:
+  Here are three computing systems to train all following models of different experimental settings:
 
-  |  Platforms  |           CPU           |      GPU      |
-  | :---------: | :---------------------: | :-----------: |
-  | 4090(Linux) | Platinum 8352V (2.5GHz) | RTX4090 (8.9) |
-  | 3090(Linux) |    i9-13900K (3GHz)     | RTX3090 (8.6) |
+  |    Platforms    |           CPU           |      GPU       |
+  | :-------------: | :---------------------: | :------------: |
+  |   4090(Linux)   | Platinum 8352V (2.5GHz) | RTX4090 (8.9)  |
+  |   3090(Linux)   |    i9-13900K (3GHz)     | RTX3090 (8.6)  |
+  | Titan XP(Linux) |   E5-2678 v3 (2.5GHz)   | TITAN XP (6.1) |
 
-  Additionally, there is also a minor difference in hardware architecture of the two platforms: **the 4090 system uses a southbridge chip** to establish a communication link between the CPU and GPU, while the **3090 system lacks a southbridge chip**, allowing the CPU and GPU to communicate directly. As a result, **the speed on the 3090 system is faster than on the 4090 system when training.** And here is more detailed comparison:
+  Additionally, there is also a minor difference in hardware architecture in the first and the second rows (Do not understand the Titan XP) : **the 4090 system uses a southbridge chip** to establish a communication link between the CPU and GPU, while the **3090 system lacks a southbridge chip**, allowing the CPU and GPU to communicate directly. As a result, **the speed on the 3090 system is faster than on the 4090 system when training.** And here is more detailed comparison:
 
-  |  Platform   | Data <br/>Loading Time | Data <br/>Migration Time | Model Time<br>(Forward + Backward) | Total Time<br>(120 Epoch) |
-  | :---------: | :--------------------: | :----------------------: | :--------------------------------: | :-----------------------: |
-  | 4090(Linux) |        0.000 s         |          0.1 s           |               0.45 s               |        3 h 38 min         |
-  | 3090(Linux) |        0.000 s         |          0.05 s          |               0.34 s               |        2 h 15 min         |
+  |    Platform     | Data <br/>Loading Time | Data <br/>Migration Time | Model Time<br>(Forward + Backward) | Total Time<br>(120 Epoch) |
+  | :-------------: | :--------------------: | :----------------------: | :--------------------------------: | :-----------------------: |
+  |   4090(Linux)   |        0.000 s         |          0.1 s           |               0.45 s               |        3 h 38 min         |
+  |   3090(Linux)   |        0.000 s         |          0.05 s          |               0.34 s               |        2 h 15 min         |
+  | Titan XP(Linux) |        0.000 s         |         0.088 s          |                2 s                 |                           |
 
-  P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 and BATCH SIZE is 16. Plus, whole model is trained in a single GPU, not in distributed training. NUM WORKER is set to 6 in 4090 and 2 in 3090.
+  P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 and BATCH SIZE is 16. Plus, whole model is trained in a single GPU, not in distributed training, except Titan XP. NUM WORKER is set to 6 in 4090 and 2 in 3090 and Titan XP.  My model is trained on 4 GPUs in Titan XP.
 
 - **Inference Time Analysis:**
 
@@ -151,7 +157,7 @@ The quantitative results of the vanilla model  (the same results in [[Sec 1. Bri
 
 | Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 23.96 | 45.44 | 12.66 | 23.14 | 18.08 | 32.14 | 41.54 | 83.79 |
+| MOT17-half(SDP) | 24.25 | 49.21 | 12.03 | 24.24 | 19.79 | 31.27 | 51.34 | 81.96 |
 
 <img src="./.assert/vanilaOne-index.bmp" alt="vanilaOne-index" style="zoom:25%;" />
 
@@ -169,16 +175,18 @@ As we all known, the MOT problem can be viewed as a problem of **maximizing a po
 
 There are three data augmentation techniques — **Low framerate, missed detections and discontinuous trajectories. **All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
 
-|       Conditions        |   HOTA    |   DetA    | AssA  |   IDF1    |    IDR    |  IDP  |   MOTA    |   MOTP    |
-| :---------------------: | :-------: | :-------: | :---: | :-------: | :-------: | :---: | :-------: | :-------: |
-| Vanilla one<sup>*</sup> |   23.96   |   45.44   | 12.66 |   23.14   |   18.08   | 32.14 |   41.54   |   83.79   |
-|    Data Augmentation    | **25.29** | **51.08** | 12.57 | **25.02** | **20.49** | 32.13 | **50.01** | **83.86** |
+|    Conditions     |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :---------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+|    Vanilla one    | **24.25** | **49.21** | **12.03** | **24.24** | **19.79** | **31.27** | 51.34 | 81.96 |
+| Data Augmentation |   22.92   |   49.66   |   10.67   |   22.53   |   18.49   |   28.81   | 51.65 | 82.00 |
 
 <img src="./.assert/dataAug-index.bmp" alt="dataAug" style="zoom:25%;" />
 
-:loudspeaker: Obviously,**my model is not overfitting in the whole training phase due to three data augmentation techniques. And I wanna  **<strong style="color: red;">use this as the main comparison which marks as Vanilla one<sup>*</sup>.</strong> 
+:loudspeaker:  Due to special designed data augmentation techniques , like missed detections simulations, low framerate, which is beneficial for network training,  I  <strong style="color: red;">use this as the main comparison which marks as Vanilla one<sup>*</sup>.</strong> 
 
-### 4.2 After Undirected graph [:sob:]
+### 4.2 After Undirected Graph [:eyes:]
+
+> **Graph matters in whole pipeline, which impacts on the ability of feature extraction.** Experiments in directed and undirected graphs , graphs with and without self-loops, and graph with varying K values are awaiting me.
 
 Here is the simple illustration about the undirected graph:
 
@@ -186,14 +194,27 @@ Here is the simple illustration about the undirected graph:
 
 Unfortunately, it doesn`t seem to have a significant improvement, but rather a slight decrease. :sob:
 
-|       Conditions        |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
-| :---------------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
-| Vanilla one<sup>*</sup> | **25.29** | **51.08** | **12.57** | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
-|    Undirected Graph     |   23.88   |   51.02   |   11.22   |   23.13   |   18.93   |   29.72   |    50     |   83.80   |
+|       Conditions        |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> |     22.92      | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+|    Undirected Graph     | :white_circle: |       |       |       |       |       |       |       |
 
 <img src="./.assert/UndirectedGraph-index.bmp" alt="UndirectedGraph-index" style="zoom: 25%;" />
 
-### 4.3 After Distance mask [:tada:]
+### 4.3 After without Self-Loop
+
+![](./.assert/self-loop.bmp)
+
+Here is the simple example to show the graph with or without self loop. A special case is highlighted when only object is detected in an image (e.g., Fig3.). In such cases , a self-loop is retained for the object. This ensures the graph neural network can process the date effectively, avoiding issues that arise from an empty graph structure.
+
+|   Conditions    |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|  Vanilla one*   |     22.92      | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+| *w/o* self loop | :white_circle: |       |       |       |       |       |       |       |
+
+
+
+### 4.4 After Distance Mask [:tada:]
 
 ![distanceMask](./.assert/distanceMask.bmp)
 
@@ -214,91 +235,56 @@ The following two tables present **different experimental settings**, both of wh
 1. **Trained with mask** (first table): I apply distance mask only in training phases but also in evaluation phases
 2. **Trained without mask** (second table || **Only Evaluated with mask**): I apply distance mask to vanilla model<sup>*</sup> only in evaluation phases
 
-| Mask Range<br>[trained *w/* mask] |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :-------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|   None(Vanilla one<sup>*</sup>)   |   25.29   | 51.08 |   12.57   |   25.02   |   20.49   |   32.13   | 50.01 | 83.86 |
-|                35                 |   39.53   | 52.33 |   29.94   |   43.65   |   36.00   |   55.44   | 58.03 | 83.88 |
-|                50                 |   40.62   | 52.16 |   31.73   | **44.76** | **36.91** | **56.85** | 57.58 | 83.81 |
-|                60                 | **40.71** | 51.99 | **31.97** |   44.15   |   36.41   |   56.08   | 57.33 | 83.86 |
-|                100                |   38.51   | 51.65 |   28.80   |   41.37   |   34.10   |   52.59   | 56.25 | 83.83 |
-|                150                |   33.57   | 51.57 |   21.92   |   34.55   |   28.42   |   44.06   | 52.39 | 83.84 |
-|                200                |   30.70   | 51.61 |   18.33   |   31.62   |   26.00   |   40.36   | 52.50 | 83.87 |
-|                250                |   29.50   | 51.52 |   16.94   |   29.38   |   24.14   |   37.52   | 51.14 | 83.90 |
-|                300                |   29.70   | 51.34 |   17.24   |   30.07   |   24.67   |   38.48   | 52.20 | 83.89 |
-|                350                |   29.34   | 51.30 |   16.84   |   29.52   |   24.23   |   37.76   | 51.54 | 83.83 |
-|                400                |   27.60   | 51.42 |   14.86   |   26.91   |   22.08   |   34.44   | 51.39 | 83.82 |
-|              450(re)              |   26.05   | 51.46 |   13.25   |   25.68   |   21.08   |   32.83   | 51.63 | 83.83 |
-|              500(re)              |   28.01   | 51.47 |   15.32   |   27.46   |   22.55   |   35.09   | 51.80 | 83.83 |
-
-| Mask Range<br>[trained *w/o* mask] |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :--------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|   None(Vanilla one<sup>*</sup>)    |   25.29   | 51.08 |   12.57   |   25.02   |   20.49   |   32.13   | 50.01 | 83.86 |
-|                 35                 |   41.80   | 52.40 |   33.40   |   47.37   |   39.08   |   60.13   | 59.16 | 83.79 |
-|                 50                 |   42.36   | 52.14 |   34.51   |   48.28   |   39.83   |   61.28   | 59.16 | 83.82 |
-|                 60                 | **43.17** | 52.02 | **35.92** | **48.81** | **40.26** | **61.97** | 58.80 | 83.82 |
-|                100                 |   39.47   | 51.84 |   30.12   |   43.00   |   35.44   |   54.67   | 57.44 | 83.85 |
-|                150                 |   35.24   | 51.98 |   23.98   |   37.16   |   30.60   |   47.30   | 55.15 | 83.82 |
-|                200                 |   33.04   | 51.95 |   21.06   |   34.34   |   28.27   |   43.73   | 54.25 | 83.82 |
-|                250                 |   30.69   | 51.76 |   18.25   |   31.50   |   25.91   |   40.15   | 53.45 | 83.84 |
-|                300                 |   29.72   | 51.70 |   17.14   |   30.57   |   25.14   |   39.00   | 52.99 | 83.83 |
-|                350                 |   29.63   | 51.62 |   17.06   |   30.58   |   25.13   |   39.04   | 52.89 | 83.82 |
-|                400                 |   28.36   | 51.68 |   15.61   |   28.43   |   23.36   |   36.29   | 52.46 | 83.80 |
-|                450                 |   28.32   | 51.59 |   15.59   |   28.47   |   23.39   |   36.37   | 51.89 | 83.83 |
-|                500                 |   27.73   | 51.52 |   14.98   |   27.52   |   22.59   |   35.19   | 51.56 | 83.81 |
+| Mask Range |         HOTA          | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------------------------: | :-------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|   None(Vanilla one<sup>*</sup>)   |         22.92         | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+|                35                 |         43.33         | 50.83 | 37.07 | 51.00 | 42.10 | 64.69 | 59.46 | 81.99 |
+|                50                  |         45.19         | 50.51 | 40.61 | 52.12 | 43.04 | 66.07 | 59.05 | 81.98 |
+|                60                 |    :red_circle:    |       |       |       |       |       |       |       |
+|                100                |    :red_circle:    |       |       |       |       |       |       |       |
+|                150                |    :red_circle:    |       |       |       |       |       |       |       |
+|                200                |         36.47         | 50.33 | 26.61 | 39.49 | 32.58 | 50.10 | 56.69 | 81.95 |
+|                250                |         35.09         | 50.26 | 24.69 | 37.80 | 31.18 | 47.99 | 56.26 | 81.98 |
+|                300                |    :white_circle:     |       |       |       |       |       |       |       |
+|                350                | :white_circle:Titanxp​ |       |       |       |       |       |       |       |
+|                400                |    :white_circle:     |       |       |       |       |       |       |       |
+|                450                |    :white_circle:     |       |       |       |       |       |       |       |
+|                500                | :white_circle: |       |       |       |       |       |       |       |
 
  In order to more intuition comparison, I plot a line chart based on the above two tables : [without **row None (Vanilla one<sup>*</sup>)** ]
 
 ![Kfamily_metrics](./.assert/mask.png)
 
-Although deep learning is famous for its uninterpretability, we can also try to understand the model\`s logic using our engine experience. So here is the my humble understanding about this unusual performance of different experimental settings. For example, the `Distance Mask Technique` can be viewed as `a magic tool (like GPT-4)`, which is quite helpful for programmers to coding. And here are two freshmen in python. Both of them learn python in a completely different way — the first person`(Trained with mask)` relies heavily on this tool for learning and blindly trusts whatever this tool output. In contrast, the second person`(Trained without mask)` never use this tool for learning but applies it during practical tasks. As time goes by, the first person gradually developed a strong dependence on this tool and the other become a experienced and brilliant programmer :)
 
-All in all, the previous performance comparison shows that **the position of applying distance mask technique matters.** So in the following exploration, I will only use distance mask technique only in evaluation phase.
 
-### 4.4 After Different K [:tada:]
+### 4.5 After Different K [:tada:]
 
 According to the descriptions about construction graph in [[Sec 1. Brief Introduction about My Model]](#1. Brief Introduction about My Model), there is a hyperparameter `k` in KNN algorithm. And k is set to 2 in my vanilla model, so let`s search for best k.
 
-Inspired by the discovery in the previous section, I also design two experimental settings of different K:
-
-1. retrain the models of different k (first table);
-2. use different k but same model (Vanilla one<sup>*</sup>) in evaluation phase.
-
-|             Different K              |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|     k=2(Vanilla one<sup>*</sup>)     |   25.29   | 51.08 |   12.57   |   25.02   |   20.49   |   32.13   | 50.01 | 83.86 |
-|                 k=3                  |   27.29   | 51.14 |   14.61   |   27.84   |   22.83   |   35.67   | 52.56 | 83.82 |
-|                 k=4                  |   28.87   | 51.33 |   16.30   |   30.06   |   24.67   |   38.46   | 53.53 | 83.85 |
-|                 k=5                  |   29.87   | 51.27 |   17.45   |   30.59   |   25.08   |   39.20   | 53.46 | 83.82 |
-|                 k=6                  |   29.25   | 51.56 |   16.64   |   30.33   |   24.91   |   38.76   | 53.76 | 83.81 |
-|                 k=7                  |   28.79   | 51.10 |   16.27   |   29.28   |   24.00   |   37.54   | 53.00 | 83.81 |
-|                 k=8                  |   29.86   | 51.46 |   17.36   |   30.80   |   25.30   |   39.38   | 54.10 | 83.81 |
-|                 k=12                 | **30.33** | 51.09 | **18.06** | **32.34** | **26.53** | **41.41** | 53.21 | 83.82 |
-|                 k=16                 |   29.99   | 51.20 |   17.50   |   31.74   |   26.04   |   40.64   | 52.63 | 83.79 |
-| k=999(INF)<br>(Full Connected Graph) |   25.40   | 46.24 |   13.99   |   25.89   |   20.37   |   35.40   | 42.60 | 83.76 |
-|              k=5(6-dim)              |   27.75   | 50.37 |   15.32   |   27.78   |   22.60   |   36.02   | 51.06 | 83.84 |
-|              k=6(6-dim)              | **31.47** | 50.82 | **19.54** | **32.69** | **26.71** | **42.12** | 54.23 | 83.80 |
-
-| Different K <br>[only in Evaluation phases] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-----------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|        k=2(Vanilla one<sup>*</sup>)         | 25.29 | 51.08 | 12.57 | 25.02 | 20.49 | 32.13 | 50.01 | 83.86 |
-|                     k=3                     | 25.60 | 51.09 | 12.87 | 24.24 | 19.85 | 31.12 | 50.24 | 83.86 |
-|                     k=4                     | 26.11 | 50.99 | 13.41 | 24.87 | 20.36 | 31.93 | 50.28 | 83.86 |
-|                     k=5                     | 26.80 | 51.13 | 14.08 | 25.06 | 20.52 | 32.20 | 50.08 | 83.86 |
-|                     k=6                     | 27.00 | 51.03 | 14.33 | 26.00 | 21.28 | 33.43 | 49.81 | 83.86 |
-|                     k=7                     | 27.00 | 51.12 | 14.30 | 26.36 | 21.57 | 33.87 | 50.03 | 83.87 |
-|                     k=8                     | 26.99 | 51.02 | 14.30 | 26.04 | 21.31 | 33.46 | 50.01 | 83.84 |
-
-Obviously, it\`s not effective way to apply different k in the vanilla model<sup>*</sup>, whose k is 2 in training. Actually, it should have been like this. **In my opinion,the models of different K, when training, can learn different inductive bias , which make model prioritise solutions with certain properties, or have a different capability of feature extraction**
-
-Besides, here is a picture to visually illustrates the process of graph construction with the increase of K. ( Due to the shape of each figure, the relative positions of every nodes are distorted to some extent. And **the following graph construction is based on true coordinates in original image plane**) P.S.  Confront with some common but special situations, like **only  objects (maybe less than K value)**, my model will **adaptively adjust the K value** (make K equal to `number of object - 1` ). If K is set to a infinite number, like 999, the KNN graph will be converted into full connected graph.
+Here is a picture to visually illustrates the process of graph construction with the increase of K. ( Due to the shape of each figure, the relative positions of every nodes are distorted to some extent. And **the following graph construction is based on true coordinates in original image plane**) P.S.  In  some common but special cases, like **few objects (maybe less than K value)**, my model will **adaptively adjust the K value** (make K equal to `number of object - 1` ). If K is set to a infinite number, like 999, the KNN graph will be converted into a  full connected graph.
 
 ![evolutionK](./.assert/evolutionK.bmp)
 
-And here is a line chart which shows the trend of performance with increasing K : (data from first table)
+|             Different K              |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+|     k=2(Vanilla one<sup>*</sup>)     |   22.92   | 49.66 |   10.67   |   22.53   |   18.49   |   28.81   | 51.65 | 82.00 |
+|                 k=3                  |   24.58   | 49.92 |   12.20   |   25.82   |   21.23   |   32.94   | 51.99 | 81.98 |
+|                 k=4                  |   27.89   | 50.02 |   15.66   |   29.33   |   24.13   |   37.38   | 54.52 | 81.98 |
+|                 k=5                  |   29.58   | 50.14 |   17.56   |   30.84   |   25.40   |   39.26   | 55.35 | 81.95 |
+|                 k=6                  |   30.40   | 50.20 |   18.54   |   32.79   |   27.01   |   41.70   | 55.47 | 81.98 |
+|                 k=7                  |   32.60   | 50.25 |   21.27   |   34.86   |   28.75   |   44.26   | 56.53 | 81.99 |
+|                 k=8                  |   35.09   | 50.05 |   24.75   |   39.01   |   32.14   |   49.61   | 56.89 | 82.00 |
+|                 k=12                 |   33.85   | 50.18 |   22.96   |   37.12   |   30.60   |   47.19   | 56.72 | 82.00 |
+|                 k=16                 |   32.37   | 50.40 |   20.90   |   35.49   |   29.24   |   45.12   | 57.11 | 82.03 |
+|                 k=32                 | **36.11** | 50.24 | **26.09** | **40.01** | **32.97** | **50.88** | 56.66 | 82.02 |
+|                 k=64                 |   33.65   | 50.30 |   22.65   |   36.37   |   29.96   |   46.26   | 56.46 | 82.04 |
+| k=999(INF)<br>(Full Connected Graph) |   35.02   | 50.51 |   24.43   |   38.64   |   31.85   |   49.13   | 56.85 | 82.06 |
+
+And here is a line chart which shows the trend of performance with increasing K : 
 
 ![Kfamily_metrics](./.assert/Kfamily_metrics.png)
 
-### 4.5 After Edge Embeddings
+### 4.6 After Edge Embeddings
 
 The reason why I wanna change the weight of edge is **the week connection between similar objects or closely positioned objects.** In other words, for similar objects in close positions, **the current model has week differentiation capability (i.e. insufficient feature discriminability).** More details in the following picture.
 
@@ -330,30 +316,68 @@ Curious about the influences of edge embedding , I design several variants of Ed
    Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-5. **4-dim** Edge embedding (normalized by the **mean height of nodes**):
+5. **4-dim** Edge embedding (normalized by **length and width of smallest enclosing bbox**):
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_{converx}},\frac{y_j-y_i}{h_{converx}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
+
+6. **4-dim** Edge embedding(normalized by **maximum shape of nodes**):
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
+
+7. **4-dim** Edge embedding (normalized by the **mean height of nodes**):
    $$
    Edge~emb := f([\frac{2(x_j - x_i)}{h_i+h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-6. **4-dim** Edge embedding (normalized by the **mean width of nodes**):
+8. **4-dim** Edge embedding (normalized by the **mean width of nodes**):
    $$
    Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{w_i+w_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-7. **5-dim** Edge embedding (add **IOU distance** as another dimension to supply more information):
+9. **5-dim** Edge embedding (add **IOU distance** as another dimension to supply more information):
    $$
    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),iouDist(i,j)])
    $$
 
-8. **5-dim** Edge embedding (add **DIOU distance** as another dimension to supply more information): [Actually, the same as `Vanilla model`]
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j)])
-   $$
+10. **5-dim** Edge embedding (add  **IOU ** rather than **IOU distance** ):
+$$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),IOU(i,j)])
+$$
 
-9. **6-dim** Edge embedding (add **Cosine distance** as another dimension to supply more information):
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
-   $$
+11. **5-dim** Edge embedding (add  **GIOU distance ** as another dimension to supply more information):
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),giouDist(i,j)])
+    $$
+
+12. **5-dim** Edge embedding (add  **GIOU ** rather than **GIOU distance** ):
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),GIOU(i,j)])
+    $$
+
+13. **5-dim** Edge embedding (add **DIOU distance** as another dimension to supply more information): [Actually, the same as `Vanilla model`]
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j)])
+    $$
+
+14. **5-dim** Edge embedding (add **DIOU** rather than **DIOU distance**):
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diou(i,j)])
+    $$
+
+15. **6-dim** Edge embedding (add **Cosine distance** as another dimension to supply more information):
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),diouDist(i,j),cosineDist(i,j))])
+    $$
+
+16. **8-dim** Edge embedding (Motivated by **IOU Family -- GIOU , DIOU , CIOU , EIOU, SIOU**):
+    $$
+    Edge~emb := &f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},GIOU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),widthDist(i,j),heightDist(i,j))])
+    $$
+
+    * The reason why I calculate the edge embedding is that **this 4 original items reveals more information about directions** rather than more precise quantitative information. After making a simple research and code implementation on IOU Family, I design this 8-dim edge embedding. And the only thing puzzles me that relativity of each item — **the 4 original items with some directional info is relative by mean height of paired bounding box ,while the other is relative by smallest enclosing bounding box ( the same as EIOU )**. And waiting to see :eyes:
+    * And I also wanna figure it out that the how these two items, `widthDist` and `heightDist` , impact the model when squared versus unsquared.
 
 In order to better  organize and manage these experiments, it is necessary to rename these experiments:
 
@@ -365,9 +389,16 @@ In order to better  organize and manage these experiments, it is necessary to re
 |         4          |   MeanSizeNorm4   |
 |         5          |  MeanHeightNorm4  |
 |         6          |  MeanWidthNorm4   |
-|         7          |       IOU5        |
-|         8          |       DIOU5       |
-|         9          |     DIOU-Cos6     |
+|         7          |   CorverxNorm4    |
+|         8          |     MaxNorm4      |
+|         9          |       IOUd5       |
+|         10         |       IOU5        |
+|         11         |      GIOUd5       |
+|         12         |       GIOU5       |
+|         13         |      DIOUd5       |
+|         14         |       DIOU5       |
+|         15         |    DIOUd-Cos6     |
+|         16         |    IouFamily8     |
 
 ----
 
@@ -375,70 +406,67 @@ Cuz I make a small optimization on KNN algorithm, where I **remove all the self 
 
 And here are the summary results.
 
-| Experiment<br>[*w/o*  loop] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|          ImgNorm4           | 20.69 | 49.48 | 8.71  | 18.39 | 15.07 | 23.59 | 48.11 | 81.98 |
-|          SrcNorm4           | 21.53 | 49.69 | 9341  | 19.67 | 16.14 | 25.18 | 48.94 | 81.98 |
-|          TgtNorm4           | 23.21 | 49.67 | 10.93 | 22.76 | 18.69 | 29.09 | 51.39 | 81.96 |
-|        MeanSizeNorm4        | 21.35 | 49.70 | 9.25  | 19.97 | 16.39 | 25.57 | 49.43 | 82.02 |
-|       MeanHeightNorm4       | 22.62 | 49.80 | 10.37 | 21.69 | 17.81 | 27.73 | 51.29 | 81.97 |
-|       MeanWidthNorm4        | 22.19 | 49.74 | 9.97  | 21.49 | 17.67 | 27.49 | 51.00 | 81.96 |
-|            IOU5             | 23.48 | 49.91 | 11.13 | 23.48 | 19.29 | 29.98 | 52.76 | 81.96 |
-|            DIOU5            | 22.50 | 49.63 | 10.27 | 21.85 | 17.92 | 27.98 | 50.33 | 81.93 |
-|          DIOU-Cos6          | 20.88 | 49.50 | 8.88  | 19.30 | 15.82 | 24.72 | 47.82 | 81.95 |
-
-| Experiment<br>[*w/* loop] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-----------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|         ImgNorm4          | 18.63 | 49.25 | 7.12  | 16.54 | 13.53 | 21.28 | 44.09 | 82.01 |
-|         SrcNorm4          | 20.83 | 49.46 | 8.84  | 19.86 | 16.28 | 25.47 | 48.32 | 81.97 |
-|         TgtNorm4          | 20.32 | 49.65 | 8.39  | 19.27 | 15.81 | 24.67 | 49.06 | 81.99 |
-|       MeanSizeNorm4       | 21.06 | 49.57 | 9.02  | 20.22 | 16.58 | 25.90 | 49.61 | 81.95 |
-|      MeanHeightNorm4      | 21.73 | 49.51 | 9.61  | 21.25 | 17.44 | 27.20 | 50.46 | 81.97 |
-|      MeanWidthNorm4       | 23.08 | 49.63 | 10.83 | 22.32 | 18.30 | 28.60 | 50.89 | 81.96 |
-|           IOU5            | 22.68 | 49.84 | 10.40 | 21.92 | 17.99 | 28.03 | 50.86 | 82.00 |
-|     DIOU5 (Retrained)     | 27.84 | 50.10 | 15.54 | 28.69 | 23.60 | 36.56 | 54.67 | 81.97 |
-|         DIOU-Cos6         | 25.32 | 50.05 | 12.89 | 25.39 | 20.87 | 32.41 | 51.54 | 82.08 |
+|     Experiment     |      HOTA      | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
+| :----------------: | :------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+|      ImgNorm4      |                |      |      |      |      |      |      |      |
+|      SrcNorm4      | :white_circle: |      |      |      |      |      |      |      |
+|      TgtNorm4      |                |      |      |      |      |      |      |      |
+|   MeanSizeNorm4    |                |      |      |      |      |      |      |      |
+|  MeanHeightNorm4   |                |      |      |      |      |      |      |      |
+|   MeanWidthNorm4   |                |      |      |      |      |      |      |      |
+|    CorverxNorm4    |                |      |      |      |      |      |      |      |
+|      MaxNorm4      |                |      |      |      |      |      |      |      |
+|       IOUd5        |                |      |      |      |      |      |      |      |
+|        IOU5        |                |      |      |      |      |      |      |      |
+|       GIOUd5       |                |      |      |      |      |      |      |      |
+|       GIOU5        |                |      |      |      |      |      |      |      |
+| DIOUd5 (Retrained) |                |      |      |      |      |      |      |      |
+|       DIOU5        |                |      |      |      |      |      |      |      |
+|     DIOUd-Cos6     |                |      |      |      |      |      |      |      |
+|     IouFamily8     |                |      |      |      |      |      |      |      |
 
 #### 4.5.2 Attention Mechanism [:eyes:]
 
 
 
-### 4.6 After more Graph Neural Network
+### 4.7 After more Graph Neural Network
 
 Motivated by the influence of self loop, I wanna explore more about variants graph convolution operations. Although all of these variants are based on `MessagePassing` paradigm, there is no any paper about graph-based trackers to figure out the best model in MOT. And I will attempt to change the structure of `vanilla model`  and do experiments to find the best, with my limited knowledge of GNN and MOT. Here are several variants of `vanilla model` that I wanna try:
 
-1. reimplement graph convolutions: (which is similar to Graphconv )
+1. Reimplement graph convolutions: (which is similar to Graphconv )
 
 $$
-^{s}g^{l+1}_i:= f_1(g_i^l) +\max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~(^s g_j^{l} - ^s g_i^{l})~\cdot ~Edge~emb])}\\
-^{d}g^{l+1}_i:= f_1(g_i^l) +\max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})~])}
+^{s}g^{l+1}_i:= f_1(^{s}g_i^l) +\Phi (\max _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])})\\
+^{d}g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
 $$
 
-2. change aggregation `max` to `avg`:
+Cuz  
+
+2. Change aggregation `max` to `avg`:
    $$
-   ^{s}g^{l+1}_i:= f_1(g_i^l) +\frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~(^s g_j^{l} - ^s g_i^{l})~\cdot ~Edge~emb])}\\
-   ^{d}g^{l+1}_i:= f_1(g_i^l) +\frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})~])}
+   ^{s}g^{l+1}_i:=  \Phi (\frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])})\\
+   ^{d}g^{l+1}_i:= \frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
    $$
 
-3. Add edge embedding in dynamic graph:
+3. Add edge embedding in dynamic graph: ( Because my model will construct the dynamic graph in higher feature space, it\`s of necessity to **recalculate the edge embedding**  [ marks as $Edge~emb^*$ ] )
    $$
-   ^{s}g^{l+1}_i:=& \max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~(^s g_j^{l} - ^s g_i^{l})~\cdot ~Edge~emb])}\\
-   ^{d}g^{l+1}_i:=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})~\cdot ~Edge~emb^*])}
+   ^{s}g^{l+1}_i:= f_1(^{s}g_i^l) +\Phi (\max _{j \in \mathbb{N}_i}{f([Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ])})\\
+   ^{d}g^{l+1}_i:= f_1(^{d}g_i^l) +\max _{j \in \mathbb{N}_i}{f([Edge~emb^* ~\cdot ~(^d g_j^{l} - ^d g_i^{l})])}
    $$
 
 4. Add 
 
-5. Oops,there is a big drop compared with previous results, which is beyond my expectations.
 
-|          Conditions           |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    | MOTP  |
-| :---------------------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :---: |
-|    Vanilla one<sup>*</sup>    | **25.29** |   51.08   | **12.57** | **25.02** | **20.49** | **32.13** | **50.01** | 83.86 |
-| Graphconv<br>[*w/* self loop] |   20.83   | **51.12** |   8.52    |   18.45   |   15.09   |   23.73   |   42.72   | 83.86 |
-|   Graphconv<br>[*w/o* loop]   |           |           |           |           |           |           |           |       |
+
+|     Model Variants      | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
+| :---------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| Vanilla one<sup>*</sup> |      |      |      |      |      |      |      |      |
+|        Graphconv        |      |      |      |      |      |      |      |      |
+|                         |      |      |      |      |      |      |      |      |
 
 <img src="./.assert/graphconv-index.bmp" alt="dataAug" style="zoom:25%;" />
 
-### 4.7 After the same GCN opts in sGraph and dGraph [:eyes:]
+### 4.8 After the same GCN opts in sGraph and dGraph [:eyes:]
 
 Suddenly, a idea comes up to my brain — why I **do different GCN operations in static graph and dynamic graph separately**, **and why not do the same opts in both graphs??**
 
@@ -449,22 +477,22 @@ $$
 $$
 And waiting to see :eyes:
 
-### 4.8 After Cosine-based Dynamic Graph [:sob:]
+### 4.9 After Cosine-based Dynamic Graph [:sob:]
 
 Considering that the measurement based on cosine similarity in the graph match, I change the dynamic graph based Euclidean distance to cosine distance based , just hoping my model can learn more discriminative features in the feature space based on cosine distance. However,  my expectations shattered upon witnessing such poor results. Oh my godness :pray:
 
-|       Conditions        |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    |   MOTA    |   MOTP    |
-| :---------------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: |
-| Vanilla one<sup>*</sup> | **25.29** | **51.08** | **12.57** | **25.02** | **20.49** | **32.13** | **50.01** | **83.86** |
-|      Cosine-based       |   22.27   |   51.00   |   9.78    |   20.41   |   16.68   |   26.29   |   45.91   |   83.83   |
+|       Conditions        |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> |     22.92      | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+|      Cosine-based       | :white_circle: |       |       |       |       |       |       |       |
 
 <img src="./.assert/cosinegraph-index.bmp" alt="cosinegraph-index" style="zoom:25%;" />
 
-### 4.9 After Superior Appearance Feature Extractor [:eyes:]
+### 4.10 After Superior Appearance Feature Extractor [:eyes:]
 
 
 
-### 4.10 After Enlarge Dataset [:tada:]
+### 4.11 After Larger Dataset [:tada:]
 
 One of the core and useful experience or intuition in the era of deep learning is that `if you have a large big dataset and you train a very big neural network, then success is guaranted` (quoted from [llya`s speech at NeurlPS conference in 2024](https://www.bilibili.com/video/BV1cSBGYkE9w/?spm_id_from=333.337.search-card.all.click&vd_source=812705912b7abe259d54d8593a97a8b3)) , like CLIP model trained in 400 million dataset.
 
@@ -474,7 +502,7 @@ P.S. the model structure of Larger Dataset is slightly different Vanilla one<sup
 
 |       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  |   MOTP    |
 | :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :-------: |
-| Vanilla one<sup>*</sup> |   25.29   | 51.08 |   12.57   |   25.02   |   20.49   |   32.13   | 50.01 |   83.86   |
+| Vanilla one<sup>*</sup> |           |       |           |           |           |           |       |           |
 |     Larger Dataset      | **43.19** | 39.26 | **47.78** | **45.18** | **33.01** | **71.60** | 41.55 | **88.47** |
 
 ## 5. Experimental Records [Track Management]

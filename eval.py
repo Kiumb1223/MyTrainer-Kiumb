@@ -29,7 +29,7 @@ def main():
 
 
     cfg   = get_config()
-    model = GraphModel(cfg['MODEL_YAML_PATH'])
+    model = GraphModel(cfg.MODEL_YAML_PATH)
     trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,
                     cfg.RESIZE_TO_CNN,cfg.MATCH_THRESH,cfg.Det2Tra_CONF,
                     cfg.CNT_TO_ACTIVE,cfg.CNT_TO_SLEEP,cfg.MAX_CNT_TO_DEAD,cfg.FEATURE_LIST_SIZE)
@@ -49,7 +49,7 @@ def main():
 
 
     seq_name_list    = data_json['valid_seq'][dataset_name]['seq_name']
-    for seq in seq_name_list:
+    for cnt, seq in enumerate(seq_name_list):
         # seq_det_path  = os.path.join(test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
         if dataset_name in ['MOT17','MOT20']:
             test_root_dir = data_json['Trackeval']['GT_FOLDER']+os.sep+f"{dataset_name}-{data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}"
@@ -82,7 +82,9 @@ def main():
             start = time.perf_counter()
             img_data  = I.read_image(os.path.join(seq_img_dir,f'{frame_id:06d}.jpg'))
             img_cv    = img_data.clone().permute(1,2,0).numpy()[...,::-1].astype(np.uint8)
+            
             trackers_list = trackManager.update(frame_id,frame_det[:,2:],img_data) # need to be careful with the input format
+            
             end = time.perf_counter()
             elapsed_times.append(end-start)
             # print(datetime.timedelta(seconds=end-start))
@@ -105,6 +107,8 @@ def main():
             f.writelines(txt_res)
 
         move_to_folder = os.path.join(data_json['Trackeval']['TRACKERS_FOLDER'],f"{dataset_name}-{data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}",tracker_name,'data')
+        if cnt == 0 :
+            shutil.rmtree(move_to_folder,ignore_errors=True)
         os.makedirs(move_to_folder,exist_ok=True)
         shutil.copy(output_txt+os.sep+f'{seq}.txt',move_to_folder)
         trackManager.clean_cache()

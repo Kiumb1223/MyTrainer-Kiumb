@@ -42,6 +42,7 @@ class Tracker:
         self.state      = LifeSpan.Born
 
         self.start_frame   = start_frame 
+        self.frame_idx     = start_frame
 
         self.conf = conf
         # self.tlwh = tlwh # (top left x, top left y, width, height)
@@ -185,49 +186,67 @@ class TrackManager:
         '''
         current_detections =np.ndarray(tlwh,conf)  and have already filtered by conf > 0.1 
         '''
-        output_track_list = []
-        first_tracks_list = [track for track in self.tracks_list if track.is_Active ]
-        # first_tracks_list = [track for track in self.tracks_list if track.is_Active or track.is_Sleep]
-        tra_graph  = self.construct_tra_graph(first_tracks_list)
+        if frame_idx == 93:
+            print(1)
+            pass 
+        output_track_list  = []
+        active_tracks_list = [ track for track in self.tracks_list if track.is_Active ]
+        born_tracks_list   = [ track for track in self.tracks_list if track.is_Born   ]
+        sleep_tracks_list  = [ track for track in self.tracks_list if track.is_Sleep  ]
+
+        #------------------------------------------------------------------#
+        #                       First matching phase
+        #------------------------------------------------------------------#
+        tra_graph  = self.construct_tra_graph(active_tracks_list)
         det_graph  = self.construct_det_graph(current_detections,img_date)
         match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph)
-
         # The input `det_graph` is modified inside `self.model`, 
         # so its state changes after the function call.
         if match_idx != []:         # matched tras and dets 
             tra_idx ,det_idx = match_idx
             for tra_id, det_id in zip(tra_idx,det_idx):
-                first_tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
+                active_tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
                                 current_detections[det_id][4],det_graph.location_info[det_id].cpu().numpy())
-                if not first_tracks_list[tra_id].is_Born:
-                    output_track_list.append(first_tracks_list[tra_id])        
+                if not active_tracks_list[tra_id].is_Born:
+                    output_track_list.append(active_tracks_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
-            first_tracks_list[tra_id].to_sleep()
+            active_tracks_list[tra_id].to_sleep()
 
-        second_tracks_list = [track for track in self.tracks_list if track.is_Born]
+        #------------------------------------------------------------------#
+        #                       Second matching phase
+        #------------------------------------------------------------------#
         highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
         highconf_to_global_det_idx = {i: unmatch_det[i] for i in range(len(highconf_unmatch_dets))}
 
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(second_tracks_list,highconf_unmatch_dets.copy())
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(born_tracks_list,highconf_unmatch_dets.copy())
         if match_idx != []:         # matched tras and dets 
             tra_idx ,det_idx = match_idx
             for tra_id, det_id in zip(tra_idx,det_idx):
                 global_id = highconf_to_global_det_idx[det_id]
-                second_tracks_list[tra_id].to_active(frame_idx,det_graph.x[global_id],
+                born_tracks_list[tra_id].to_active(frame_idx,det_graph.x[global_id],
                                 highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy())
-                if not second_tracks_list[tra_id].is_Born:
-                    output_track_list.append(second_tracks_list[tra_id])
+                if not born_tracks_list[tra_id].is_Born:
+                    output_track_list.append(born_tracks_list[tra_id])
         for tra_id in unmatch_tra:# unmatched tras 
-            second_tracks_list[tra_id].to_sleep()
+            born_tracks_list[tra_id].to_sleep()
         for det_id in unmatch_det:
             global_id = highconf_to_global_det_idx[det_id]
-            second_tracks_list.append(
+            born_tracks_list.append(
                 Tracker(frame_idx,det_graph.x[global_id],
                         highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy(),
                         self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
             )
-        
-        self.tracks_list = self.remove_dead_tracks(first_tracks_list + second_tracks_list)
+
+        #------------------------------------------------------------------#
+        #                       Third matching phase
+        #           #TODO 
+        #           what opts for sleep_tracks_list
+        #           ??????
+        #------------------------------------------------------------------#
+
+
+
+        self.tracks_list = self.remove_dead_tracks(active_tracks_list + born_tracks_list +  sleep_tracks_list)
         return output_track_list
 
     def construct_tra_graph(self,tracks_list:List[Tracker]) -> Data:

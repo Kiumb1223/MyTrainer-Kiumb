@@ -13,18 +13,18 @@ OMP_NUM_THREADS=2 CUDA_VISIBLE_DEVICES=1 python -m torch.distributed.launch --np
 
 import torch
 from loguru import logger
-from torch.optim import AdamW
+from torch.optim import AdamW,SGD
 from configs.config import get_config
 from utils.logger import setup_logger
 from models.lossFunc import GraphLoss
 from torch.utils.data import DataLoader
 from utils.graphTrainer import GraphTrainer
 from models.graphModel import TrainingGraphModel
-from torch.optim.lr_scheduler import MultiStepLR
 from torch.nn.parallel import DistributedDataParallel
 from utils.distributed import get_rank,init_distributed
 from torch.utils.data.distributed import DistributedSampler
 from utils.graphDataset import GraphDataset, graph_collate_fn
+from torch.optim.lr_scheduler import MultiStepLR,ExponentialLR
 from utils.misc import collect_env,get_exp_info,set_random_seed,get_model_configuration
 
 
@@ -58,13 +58,16 @@ def main():
     valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
-    model = TrainingGraphModel(cfg['MODEL_YAML_PATH']).to(cfg.DEVICE)
+    model = TrainingGraphModel(cfg.MODEL_YAML_PATH).to(cfg.DEVICE)
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model) .to(cfg.DEVICE)
     if is_distributed:
         model = DistributedDataParallel(model,device_ids=[local_rank])
         
-    optimizer = AdamW(model.parameters(), lr=cfg.LR,weight_decay=cfg.WEIGHT_DECAY)
-    lr_scheduler = MultiStepLR(optimizer,milestones=cfg.MILLESTONES)
+    # optimizer = AdamW(model.parameters(), lr=cfg.LR,weight_decay=cfg.WEIGHT_DECAY)
+    # lr_scheduler = MultiStepLR(optimizer,milestones=cfg.MILLESTONES)
+    optimizer = SGD(model.parameters(), lr=cfg.LR,momentum=cfg.MOMENTUM,weight_decay=cfg.WEIGHT_DECAY)
+    lr_scheduler = ExponentialLR(optimizer,gamma=cfg.GAMMA)
+
     loss_func = GraphLoss()
 
     graphTrainer = GraphTrainer(

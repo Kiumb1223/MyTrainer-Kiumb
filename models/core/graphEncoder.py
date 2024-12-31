@@ -138,8 +138,8 @@ class EdgeEncoder(nn.Module):
     def __init__(self, edge_model_dict :dict,
                 ):
         super(EdgeEncoder, self).__init__()
-        assert edge_model_dict['edge_type'] in ["ImgNorm4","SrcNorm4","TgtNorm4", "MeanSizeNorm4", "MeanHeightNorm4",
-                "MeanWidthNorm4","IOU5", "DIOU5", "DIOU-Cos6", "GSM8", "meanGSM8"]
+        # assert edge_model_dict['edge_type'] in ["ImgNorm4","SrcNorm4","TgtNorm4", "MeanSizeNorm4", "MeanHeightNorm4",
+        #         "MeanWidthNorm4","CorverxNorm4","MaxNorm4","IOU5", "DIOU5", "DIOU-Cos6", "IouFamily8"]
         in_dim , *mid_dim , out_dim = edge_model_dict['dims_list']
         
         self.edge_type    = edge_model_dict['edge_type']
@@ -265,21 +265,65 @@ class EdgeEncoder(nn.Module):
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             return torch.stack([feat1,feat2,feat3,feat4],dim =1)
+        if self.edge_type == 'CorverxNorm4':
+            converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
+            converx_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])
+            converx_bbox_wh = torch.clamp((converx_bbox_lt - converx_bbox_rb), min=0)  # smallest enclosing bbox 
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            return torch.stack([feat1,feat2,feat3,feat4],dim =1)
+        if self.edge_type == 'MaxNorm4':
+            max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
+            feat1 = source_info[:,6] - target_info[:,6] /  max_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  max_bbox_wh[:, 1]
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            return torch.stack([feat1,feat2,feat3,feat4],dim =1)
+        if self.edge_type == 'IOUd5':
+            feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='iou')
+            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         if self.edge_type == 'IOU5':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
-            feat5 = 1 - self._calc_iou(source_info,target_info)
+            feat5 = calc_iouFamily(source_info,target_info,iou_type='iou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-        if self.edge_type == 'DIOU5':
+        if self.edge_type == 'GIOUd5':
+            feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
+            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
+        if self.edge_type == 'GIOU5':
+            feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            feat5 = calc_iouFamily(source_info,target_info,iou_type='giou')
+            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
+        if self.edge_type == 'DIOUd5':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1- calc_iouFamily(source_info,target_info,iou_type='diou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-        if self.edge_type == 'DIOU-Cos6':
+        if self.edge_type == 'DIOU5':
+            feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            feat5 = calc_iouFamily(source_info,target_info,iou_type='diou')
+            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
+        if self.edge_type == 'DIOUd-Cos6':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
@@ -287,16 +331,6 @@ class EdgeEncoder(nn.Module):
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='diou')
             feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
             return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
-        if self.edge_type == 'GSM8':
-            feat1 = (source_info[:,6] - target_info[:,6]) /  target_info[:,5]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  target_info[:,6]
-            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
-            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
-            feat5 = (source_info[:,6] - target_info[:,6]) /  source_info[:,8]
-            feat6 = (source_info[:,7] - target_info[:,7]) /  source_info[:,9]
-            feat7 = (source_info[:,4] - target_info[:,4]) /  source_info[:,8]
-            feat8 = (source_info[:,5] - target_info[:,5]) /  source_info[:,9]
-            return torch.stack([feat1,feat2,feat3,feat4,
-                                feat5,feat6,feat7,feat8],dim =1)
-        if self.edge_type == 'meanGSM8':
-            pass
+        if self.edge_type == 'IouFamily8':
+            pass 
+

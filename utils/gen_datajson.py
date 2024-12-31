@@ -14,6 +14,8 @@ def main():
     cfg = get_config()
     data_construct_type = 'mot_challenge'
     subfolder = 'eval_datasets'
+
+    seqmap_dict = {}
     save_json = {
         'train_seq':{},
         'valid_seq':{},
@@ -24,9 +26,11 @@ def main():
         }
     }
 
-    which_to_train_list = ['MOT20']
+    which_to_train_list = ['MOT17']
     # which_to_train_list = ['MOT17','MOT20','DanceTrack']
-    save_json_path      = r'configs\train_MOT20.json'
+    save_json_path      = r'configs\train_MOT17.json'
+    
+    
     for dataset_name in which_to_train_list:
 
         save_json['train_seq'][dataset_name] = {'seq_name':[],'start_frame':[],'end_frame':[],}
@@ -35,8 +39,11 @@ def main():
             'SPLIT_TO_EVAL':None,
             
         }}
-
         if dataset_name in ['MOT17','MOT20']:
+            seqmap_dict[dataset_name] = {
+                'path' : None,
+                'items':['name\n',]
+            }
             for seq in os.listdir(os.path.join(cfg.DATA_DIR,dataset_name,'train')):
                 if not os.path.isdir(os.path.join(cfg.DATA_DIR,dataset_name,'train',seq)):
                     continue
@@ -63,11 +70,16 @@ def main():
                 track_seqname_folder = os.path.join(save_json['Trackeval']['TRACKERS_FOLDER'],seqmap_name)
                 os.makedirs(gt_seqmap_folder,exist_ok=True)
                 os.makedirs(track_seqname_folder,exist_ok=True)
-                # for seqmap
-                with open(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),'a+') as f:
-                    if os.path.getsize(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt')) == 0:
-                        f.write('name\n')
-                    f.write(seq+'\n')
+
+                seqmap_dict[dataset_name]['path'] = os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),
+                seqmap_dict[dataset_name]['items'].append(seq + '\n')
+
+                # # for seqmap
+                # with open(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),'a+') as f:
+                #     if os.path.getsize(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt')) == 0:
+                #         f.write('name\n')
+                #     f.write(seq+'\n')
+                
                 # move some necessary file for evalution
                 gt_seq_folder = os.path.join(gt_dataname_folder,seq)
                 gt_seq_subfolder = os.path.join(gt_seq_folder,'gt')
@@ -124,6 +136,11 @@ def main():
                     shutil.copy(img_path,new_img_path)
                     cnt+=1
         elif dataset_name in ['DanceTrack']:
+            seqmap_dict[dataset_name] = {
+                'path' : None,
+                'items':['name\n',]
+            }
+
             for train_seq in os.listdir(os.path.join(cfg.DATA_DIR,dataset_name,'train')):
                 if not os.path.isdir(os.path.join(cfg.DATA_DIR,dataset_name,'train',train_seq)):
                     continue
@@ -160,11 +177,15 @@ def main():
                 os.makedirs(gt_seqmap_folder,exist_ok=True)
                 os.makedirs(track_seqname_folder,exist_ok=True)
 
+                seqmap_dict[dataset_name]['path'] = os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),
+                seqmap_dict[dataset_name]['items'].append(valid_seq + '\n')
+
                 # for seqmap
-                with open(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),'a+') as f:
-                    if os.path.getsize(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt')) == 0:
-                        f.write('name\n')
-                    f.write(valid_seq+'\n')
+                # with open(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt'),'a+') as f:
+                #     if os.path.getsize(os.path.join(gt_seqmap_folder,f'{seqmap_name}.txt')) == 0:
+                #         f.write('name\n')
+                #     f.write(valid_seq+'\n')
+                
                 # move some necessary file for evalution
                 gt_seq_folder = os.path.join(gt_dataname_folder,valid_seq)
                 gt_seq_subfolder = os.path.join(gt_seq_folder,'gt')
@@ -184,6 +205,11 @@ def main():
         else:
             raise ValueError('dataset_name not supported')
         
+
+        for path , items in seqmap_dict.items():
+            with open(path,'w') as f:
+                f.writelines(items)
+
         with open(save_json_path,'w') as json_file:
             json.dump(save_json, json_file,indent=4)
         print(f'json file saved to {save_json_path}')

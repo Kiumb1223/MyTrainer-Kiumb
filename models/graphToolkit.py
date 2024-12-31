@@ -30,9 +30,9 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
     num_node = x.shape[0]
 
     if num_node <= k :
-        # raise ValueError("The number of points is less than k, please set k smaller than the number of points.")
         k = num_node - 1
         logger.warning(f"SPECIAL SITUATIONS: The number of points[{num_node}] is less than k, set k to {x.shape[0] -1}")
+            
     if k > 0:
         if bt_cosine:   # cosine distance
             x_normalized = F.normalize(x, p=2, dim=1)
@@ -156,12 +156,12 @@ def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
 
 
 
-def calc_iouFamily(source_Info: torch.Tensor, target_Info: torch.Tensor, iou_type: str = 'iou' ,eps = 1e-8) -> torch.Tensor:
+def calc_iouFamily(source_info: torch.Tensor, target_info: torch.Tensor, iou_type: str = 'iou' ,eps = 1e-8) -> torch.Tensor:
     """
     This is specially designed for my project and not so uniformed
     Calculate the Intersection over Union (IoU) or its variants between two sets of bounding boxes.
 
-    This function computes IoU and its related metrics (GIoU, DIoU, CIoU, EIoU, SIoU) between two sets of boxes.
+    This function computes IoU and its related metrics (GIoU, DIoU, CIoU, EIoU) between two sets of boxes.
     The IoU type can be specified through the `iou_type` argument.
 
     Args:
@@ -176,8 +176,7 @@ def calc_iouFamily(source_Info: torch.Tensor, target_Info: torch.Tensor, iou_typ
                 - 'giou' (Generalized IoU)
                 - 'diou' (Distance IoU)
                 - 'ciou' (Complete IoU)
-                - 'eiou' (Efficient IoU)
-                - 'siou' (Scylla IoU).
+                - 'eiou' (Efficient IoU).
             Default is 'iou'.
 
     Returns:
@@ -189,15 +188,15 @@ def calc_iouFamily(source_Info: torch.Tensor, target_Info: torch.Tensor, iou_typ
     """
 
     iou_type = iou_type.lower()
-    assert iou_type in ['iou', 'giou', 'diou', 'ciou', 'eiou' ,'siou'], 'iou_type must be iou, giou, diou, ciou, eiou or siou'
+    assert iou_type in ['iou', 'giou', 'diou', 'ciou', 'eiou' ], 'iou_type must be iou, giou, diou, ciou, eiou or siou'
 
-    assert source_Info.shape[0] == target_Info.shape[0] ,f'The number of source_Info and target_Info must be the same, but got {source_Info.shape[0]} and {target_Info.shape[0]}'
+    assert source_info.shape[0] == target_info.shape[0] ,f'The number of source_Info and target_Info must be the same, but got {source_info.shape[0]} and {target_info.shape[0]}'
 
     # cal the box's area of boxes1 and boxess
-    boxes1Area = source_Info[:, 4] * source_Info[:, 5]
-    boxes2Area = target_Info[:, 4] * target_Info[:, 5]
-    lt = torch.max(source_Info[:, :2], target_Info[:, :2])  # [M,2]
-    rb = torch.min(source_Info[:, 2:4], target_Info[:, 2:4])  # [M,2]
+    boxes1Area = source_info[:, 4] * source_info[:, 5]
+    boxes2Area = target_info[:, 4] * target_info[:, 5]
+    lt = torch.max(source_info[:, :2], target_info[:, :2])  # [M,2]
+    rb = torch.min(source_info[:, 2:4], target_info[:, 2:4])  # [M,2]
     wh = torch.clamp(rb - lt, min=0)  # [M,2]
     inter_area = wh[:, 0] * wh[:, 1]  # [M]
 
@@ -207,16 +206,16 @@ def calc_iouFamily(source_Info: torch.Tensor, target_Info: torch.Tensor, iou_typ
     if iou_type == 'iou':
         return iou
     
-    source_w, source_h, source_center= source_Info[:, 4],source_Info[:, 5],source_Info[:, 6:8]
-    target_w, target_h, target_center= target_Info[:, 4],target_Info[:, 5],target_Info[:, 6:8]
+    source_w, source_h, source_center= source_info[:, 4],source_info[:, 5],source_info[:, 6:8]
+    target_w, target_h, target_center= target_info[:, 4],target_info[:, 5],target_info[:, 6:8]
 
-    converx_bbox_lt = torch.max(source_Info[:, 2:4], target_Info[:, 2:4])
-    converx_bbox_rb = torch.min(source_Info[:, :2], target_Info[:, :2])# [M, 2]
+    converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
+    converx_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])# [M, 2]
     converx_bbox_wh = torch.clamp((converx_bbox_lt - converx_bbox_rb), min=0)  # converx bbox 
     converx_area = converx_bbox_wh[:, 0] * converx_bbox_wh[:, 1]      
     #---------------------------------#
     if iou_type == 'giou':
-        return iou - (converx_area - union_area) / (converx_area+ eps)
+        return iou - (converx_area - union_area) / (converx_area + eps)
     outer_diag = (converx_bbox_wh[:, 0] ** 2) + (converx_bbox_wh[:, 1] ** 2)  # convex diagonal squard length
     inter_diag = (source_center[:, 0] - target_center[:, 0]) ** 2 + (source_center[:, 1] - target_center[:, 1]) ** 2
     #---------------------------------#
@@ -242,7 +241,6 @@ def calc_iouFamily(source_Info: torch.Tensor, target_Info: torch.Tensor, iou_typ
         converx_bbox_h_square = converx_bbox_wh[:,1] ** 2 
         eiou = iou - (u + dis_w / (converx_bbox_w_square + eps) + dis_h / (converx_bbox_h_square + eps))
         return eiou
-    #---------------------------------#
     
 '''
 Extracted from https://github.com/marvin-eisenberger/implicit-sinkhorn, with minor modifications

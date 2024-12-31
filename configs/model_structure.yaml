@@ -1,11 +1,22 @@
-# hyper parameters
+#---------------------------------#
+#       Hyper Parameters        
+#---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
 BT_DIST_MASK: False
-DIST_THRESH: 450
+DIST_THRESH: 350
 
 
-# model structure
+#---------------------------------#
+#     Model Structure
+#   1. Node_Encoder
+#   2. Edge_Encoder
+#   3. Static_Graph_Model
+#   4. Dynamic_Graph_Model
+#   5. Fuse_Model
+#---------------------------------#
+
+#---------------------------------#
 node_encoder:
   backbone: 'densenet121'
   wight_path: null
@@ -16,19 +27,26 @@ node_encoder:
   activate_func: 'relu'
   lrelu_slope: 0.0
 
+
+#---------------------------------#
 edge_encoder:
-  edge_type: 'DIOU5'
+  edge_type: 'DIOUd5'
   dims_list: [5,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True
   activate_func: 'relu'
   lrelu_slope: 0.0
-  # static graph construction
+  # static graph construction settings
   bt_cosine: False 
   bt_self_loop: True
   bt_directed: True
 
+#---------------------------------#
+#   3. Static_Graph_Model
+# There are three GCN , and the dimension of each layer
+# is defined in the following list.
+#---------------------------------#
 static_graph_model:
   layer:
   # [msg_in,msg_out,update_out]
@@ -43,6 +61,7 @@ static_graph_model:
   activate_func: 'lrelu'
   lrelu_slope: 0.1
 
+#---------------------------------#
 dynamic_graph_model:
   layer:
   # [msg_in,msg_mid,msg_out]
@@ -50,16 +69,18 @@ dynamic_graph_model:
     - [128,96,96]
     - [192,128,128]
   aggr: 'max'
+  # module layer settings 
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True
   activate_func: 'lrelu'
   lrelu_slope: 0.1
-  # dynamic graph construction
+  # dynamic graph construction settings
   bt_cosine: False 
   bt_self_loop: True
   bt_directed: True
 
+#---------------------------------#
 fuse_model:
   # [in_dim , mid_dim, out_dim]
   fuse1_dims: [512,1024]

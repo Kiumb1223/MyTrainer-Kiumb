@@ -22,13 +22,21 @@ def get_config():
         EMABLE_AMP        = True,
         WORK_DIR          = "experiments",
 
-        LR                = 3.5e-4,
-        WEIGHT_DECAY      = 1e-4,
         BATCH_SIZE        = 2,
         MAXEPOCH          = 2,
+
+        LR                = 1e-2,
+        # Optimizer Adamw
+        # WEIGHT_DECAY      = 1e-4,
+        # Optimizer SGD
+        MOMENTUM          = 0.937,
+        WEIGHT_DECAY      = 5e-4,
         
+
         # lr scheduler(MultiStepLR)
         MILLESTONES       = [50,80],
+        # lr scheduler(ExponentialLR)
+        GAMMA             = 0.98,
         # warmup settings
         # see: https://core-pytorch-utils.readthedocs.io/en/latest/
         BY_EPOCH          = True,
@@ -37,10 +45,12 @@ def get_config():
         WARMUP_MODE       = "auto",
         WARMUP_INIT_LR    = 0.0,
         WARMUP_FACTOR     = 0.05,
+        
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
         MODEL_YAML_PATH   = 'configs/model_structure.yaml',
+        
         #---------------------------------#
         #  3. Dataset related
         #---------------------------------#
@@ -49,7 +59,7 @@ def get_config():
         TRACKBACK_WINDOW  = 10,
         ACCEPTABLE_OBJ_TYPE   = [1,2,7],
 
-        RESIZE_TO_CNN     = [256, 128],
+        RESIZE_TO_CNN     = [256, 128],  # [height , width]
         # data augumentation
         MIN_IDS_TO_DROP_PERC  = 0,     # Minimum percentage of ids s.t. all of its detections will be dropped
         MAX_IDS_TO_DROP_PERC  = 0.1,   # Maximum percentage of ids s.t. all of its detections will be dropped
@@ -59,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\DIOU5\diou5_120.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\DA_120epoch.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

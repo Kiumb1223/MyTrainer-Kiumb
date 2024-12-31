@@ -181,18 +181,14 @@ class GraphModel(nn.Module):
         #   2. perform matrix augumentation 
         #---------------------------------#
 
-        # Slice node features for the current graph 
-        tra_feats = tra_node_feats  
-        det_feats = det_node_feats  
-
         # 1. Compute affinity matrix for the current graph 
-        n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
-        n2   = torch.norm(det_feats,dim=-1,keepdim=True)
+        n1   = torch.norm(tra_node_feats,dim=-1,keepdim=True)
+        n2   = torch.norm(det_node_feats,dim=-1,keepdim=True)
         if self.bt_mask: # compute mask to filter out some unmatched nodes
             dist_mask = ( torch.cdist(tra_graph.location_info[:,-2:],det_graph.location_info[:,-2:]) <= self.dist_thresh ).float()
-            corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
+            corr = ( torch.mm(tra_node_feats,det_node_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
         else:
-            corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+            corr = torch.mm(tra_node_feats,det_node_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
 
         # 2. Prepare the augmented affinity matrix for Sinkhorn
         m , n = corr.shape
