@@ -30,6 +30,12 @@ node_encoder:
 
 #---------------------------------#
 edge_encoder:
+#---------------------------------#
+#  ImgNorm4 SrcNorm4 TgtNorm4 MeanSizeNorm4 
+#  MeanHeightNorm4 MeanWidthNorm4 CorverxNorm4 MaxNorm4 
+#  IOUd5 IOU5  GIOUd5 GIOU5 
+#  DIOUd5 DIOU5  DIOU-Cos6 IouFamily8
+#---------------------------------#
   edge_type: 'DIOUd5'
   dims_list: [5,16,16]
   layer_type: 'linear'
