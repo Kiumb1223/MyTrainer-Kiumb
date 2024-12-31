@@ -129,7 +129,7 @@ class GraphDataset(torch.utils.data.Dataset):
                 prev_frame_idx = frame_idx
                 im_path = os.path.join(imgs_dir, f"{frame_idx:06d}.jpg" if date_type in ['MOT17','MOT20'] else f"{frame_idx:08d}.jpg")
                 im_tensor = I.read_image(im_path).to(torch.float32)
-                # im_tensor = F.normalize(im_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+                H , W = im_tensor.shape[1:] 
             
             if x < 0:
                 w = w + x  
@@ -145,7 +145,7 @@ class GraphDataset(torch.utils.data.Dataset):
             patch = T.crop(im_tensor,y,x,h,w)
             patch = T.resize(patch,self.resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append(det[2:])   # STORE x,y,x2,y2,w,h,xc,yc
+            location_info.append(det[2:] + [W,H])   # STORE x,y,x2,y2,w,h,xc,yc ,W,H
         raw_node_attr = torch.stack(raw_node_attr,dim=0)
         location_info = torch.as_tensor(location_info,dtype=torch.float32)
         return Data(x=raw_node_attr,location_info=location_info)

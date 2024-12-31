@@ -180,7 +180,8 @@ class TrackManager:
                 self.model.load_state_dict(torch.load(path_to_weights,map_location='cpu'))
             finally:
                 logger.info(f"Load weights from {path_to_weights} successfully")
-                
+        else:
+            logger.info(f"No weights loaded, use default weights")
     @torch.no_grad()
     def update(self,frame_idx:int,current_detections:np.ndarray,img_date:torch.Tensor) -> List[Tracker]:
         '''
@@ -227,7 +228,7 @@ class TrackManager:
                                 highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy())
                 if not born_tracks_list[tra_id].is_Born:
                     output_track_list.append(born_tracks_list[tra_id])
-        for tra_id in unmatch_tra:# unmatched tras 
+        for tra_id in unmatch_tra:  # unmatched tras 
             born_tracks_list[tra_id].to_sleep()
         for det_id in unmatch_det:
             global_id = highconf_to_global_det_idx[det_id]
@@ -264,6 +265,7 @@ class TrackManager:
     
     def construct_det_graph(self,current_detections:np.ndarray,img_date:torch.Tensor) -> Data:
         '''construct raw graph of detections'''
+        H,W = img_date.shape[1:]
         img_tensor  = img_date.to(self.device).to(torch.float32) / 255.0
         raw_node_attr , location_info = [] , []
         im_tensor = T.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -285,7 +287,7 @@ class TrackManager:
             patch = T.crop(im_tensor,y,x,h,w)
             patch = T.resize(patch,self._resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append([x,y,x2,y2,w,h,xc,yc])  # STORE x,y,x2,y2,w,h,xc,yc
+            location_info.append([x,y,x2,y2,w,h,xc,yc,W,H])  # STORE x,y,x2,y2,w,h,xc,yc, W,H
         raw_node_attr = torch.stack(raw_node_attr,dim=0).to(self.device)
         location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
         return Data(x=raw_node_attr,location_info=location_info)

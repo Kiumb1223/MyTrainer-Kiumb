@@ -183,7 +183,7 @@ class EdgeEncoder(nn.Module):
         """
 
         if not hasattr(batch,'num_graphs'): # Date Type
-            edge_index = knn(batch.location_info[:,-2:],k, bt_cosine=bt_cosine,bt_self_loop= bt_self_loop,bt_directed=bt_directed)
+            edge_index = knn(batch.location_info[:,6:8],k, bt_cosine=bt_cosine,bt_self_loop= bt_self_loop,bt_directed=bt_directed)
             return edge_index
         
         # Batch Type
@@ -191,7 +191,7 @@ class EdgeEncoder(nn.Module):
         for i in range(batch.num_graphs):
             start, end = batch.ptr[i:i+2]
             
-            sub_positions = batch.location_info[start:end,-2:]
+            sub_positions = batch.location_info[start:end,6:8]
             
             edge_index = knn(sub_positions, k, bt_cosine= bt_cosine,bt_self_loop= bt_self_loop,bt_directed= bt_directed)
             
