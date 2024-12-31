@@ -99,7 +99,7 @@ And it is also essential to record the time consumption of training and inferenc
   | :-------------: | :--------------------: | :----------------------: | :--------------------------------: | :-----------------------: |
   |   4090(Linux)   |        0.000 s         |          0.1 s           |               0.45 s               |        3 h 38 min         |
   |   3090(Linux)   |        0.000 s         |          0.05 s          |               0.34 s               |        2 h 15 min         |
-  | Titan XP(Linux) |        0.000 s         |         0.088 s          |                2 s                 |                           |
+  | Titan XP(Linux) |        0.000 s         |         0.088 s          |                2 s                 |        3 h 10 min         |
 
   P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 and BATCH SIZE is 16. Plus, whole model is trained in a single GPU, not in distributed training, except Titan XP. NUM WORKER is set to 6 in 4090 and 2 in 3090 and Titan XP.  My model is trained on 4 GPUs in Titan XP.
 
@@ -167,7 +167,7 @@ Noted that the f1 curve in evaluation phase surges to 0.9 or so and then slowly 
 
 As we all known, the MOT problem can be viewed as a problem of **maximizing a posteriori probability** —— the tracking result of each timestamp is quite dependent on the results of previous moment. It\`s reasonable to infer that the worse tracking results from previous moment, the worse tracking results from current moment. Actually, the performance of my model is indeed like this.
 
-### 4.1 After data Augmentation [🎉]
+### 4.1 After Data Augmentation [🎉]
 
 > In order to avoid overfitting, it\`s overwhelmingly necessary to find out the various and valid data augmentation techniques.
 
@@ -245,10 +245,10 @@ The following two tables present **different experimental settings**, both of wh
 |                150                |    :red_circle:    |       |       |       |       |       |       |       |
 |                200                |         36.47         | 50.33 | 26.61 | 39.49 | 32.58 | 50.10 | 56.69 | 81.95 |
 |                250                |         35.09         | 50.26 | 24.69 | 37.80 | 31.18 | 47.99 | 56.26 | 81.98 |
-|                300                |    :white_circle:     |       |       |       |       |       |       |       |
-|                350                | :white_circle:Titanxp​ |       |       |       |       |       |       |       |
-|                400                |    :white_circle:     |       |       |       |       |       |       |       |
-|                450                |    :white_circle:     |       |       |       |       |       |       |       |
+|                300                |    :red_circle:    |       |       |       |       |       |       |       |
+|                350                | :red_circle: |       |       |       |       |       |       |       |
+|                400                |   :red_circle:   |       |       |       |       |       |       |       |
+|                450                |    :red_circle:    |       |       |       |       |       |       |       |
 |                500                | :white_circle: |       |       |       |       |       |       |       |
 
  In order to more intuition comparison, I plot a line chart based on the above two tables : [without **row None (Vanilla one<sup>*</sup>)** ]
@@ -400,30 +400,26 @@ In order to better  organize and manage these experiments, it is necessary to re
 |         15         |    DIOUd-Cos6     |
 |         16         |    IouFamily8     |
 
-----
-
-Cuz I make a small optimization on KNN algorithm, where I **remove all the self loop**. However, I neglect the function of self loop, which causes a big drop in the evaluation results. And I still keep all those results which is marked as `w/o loop`. Additionally, I will do experiments which include self loop of each nodes, and mark them as `w/ loop`.
-
 And here are the summary results.
 
-|     Experiment     |      HOTA      | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
-| :----------------: | :------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-|      ImgNorm4      |                |      |      |      |      |      |      |      |
-|      SrcNorm4      | :white_circle: |      |      |      |      |      |      |      |
-|      TgtNorm4      |                |      |      |      |      |      |      |      |
-|   MeanSizeNorm4    |                |      |      |      |      |      |      |      |
-|  MeanHeightNorm4   |                |      |      |      |      |      |      |      |
-|   MeanWidthNorm4   |                |      |      |      |      |      |      |      |
-|    CorverxNorm4    |                |      |      |      |      |      |      |      |
-|      MaxNorm4      |                |      |      |      |      |      |      |      |
-|       IOUd5        |                |      |      |      |      |      |      |      |
-|        IOU5        |                |      |      |      |      |      |      |      |
-|       GIOUd5       |                |      |      |      |      |      |      |      |
-|       GIOU5        |                |      |      |      |      |      |      |      |
-| DIOUd5 (Retrained) |                |      |      |      |      |      |      |      |
-|       DIOU5        |                |      |      |      |      |      |      |      |
-|     DIOUd-Cos6     |                |      |      |      |      |      |      |      |
-|     IouFamily8     |                |      |      |      |      |      |      |      |
+|          Experiment           |          HOTA           | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------------: | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|           ImgNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
+|           SrcNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
+|           TgtNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
+|         MeanSizeNorm4         |     :white_circle:      |       |       |       |       |       |       |       |
+|        MeanHeightNorm4        |     :white_circle:      |       |       |       |       |       |       |       |
+|        MeanWidthNorm4         | :white_circle: TiTan XP |       |       |       |       |       |       |       |
+|         CorverxNorm4          |                         |       |       |       |       |       |       |       |
+|           MaxNorm4            |                         |       |       |       |       |       |       |       |
+|             IOUd5             |                         |       |       |       |       |       |       |       |
+|             IOU5              |                         |       |       |       |       |       |       |       |
+|            GIOUd5             |                         |       |       |       |       |       |       |       |
+|             GIOU5             |                         |       |       |       |       |       |       |       |
+| DIOUd5 <br> (`Vanilla model`) |          22.92          | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+|             DIOU5             |                         |       |       |       |       |       |       |       |
+|          DIOUd-Cos6           |                         |       |       |       |       |       |       |       |
+|          IouFamily8           |                         |       |       |       |       |       |       |       |
 
 #### 4.5.2 Attention Mechanism [:eyes:]
 
@@ -502,7 +498,7 @@ P.S. the model structure of Larger Dataset is slightly different Vanilla one<sup
 
 |       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  |   MOTP    |
 | :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :-------: |
-| Vanilla one<sup>*</sup> |           |       |           |           |           |           |       |           |
+| Vanilla one<sup>*</sup> |   22.92   | 49.66 |   10.67   |   22.53   |   18.49   |   28.81   | 51.65 |   82.00   |
 |     Larger Dataset      | **43.19** | 39.26 | **47.78** | **45.18** | **33.01** | **71.60** | 41.55 | **88.47** |
 
 ## 5. Experimental Records [Track Management]
