@@ -99,9 +99,9 @@ And it is also essential to record the time consumption of training and inferenc
   | :-------------: | :--------------------: | :----------------------: | :--------------------------------: | :-----------------------: |
   |   4090(Linux)   |        0.000 s         |          0.1 s           |               0.45 s               |        3 h 38 min         |
   |   3090(Linux)   |        0.000 s         |          0.05 s          |               0.34 s               |        2 h 15 min         |
-  | Titan XP(Linux) |        0.000 s         |         0.088 s          |                2 s                 |        3 h 10 min         |
+  | Titan XP(Linux) |        0.000 s         |         0.088 s          |                2 s                 |  2 h 39 min <br>(5 GPUs)  |
 
-  P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 and BATCH SIZE is 16. Plus, whole model is trained in a single GPU, not in distributed training, except Titan XP. NUM WORKER is set to 6 in 4090 and 2 in 3090 and Titan XP.  My model is trained on 4 GPUs in Titan XP.
+  P.S. TOTAL EPOCH is set to 120 , TOTAL NUMBER of TRAIN DATASET is 2650 and BATCH SIZE is 16. Plus, whole model is trained in a single GPU, not in distributed training, except Titan XP. NUM WORKER is set to 6 in 4090 and 2 in 3090 and Titan XP.  My model is trained on 5 GPUs in Titan XP.
 
 - **Inference Time Analysis:**
 
@@ -254,8 +254,6 @@ The following two tables present **different experimental settings**, both of wh
  In order to more intuition comparison, I plot a line chart based on the above two tables : [without **row None (Vanilla one<sup>*</sup>)** ]
 
 ![Kfamily_metrics](./.assert/mask.png)
-
-
 
 ### 4.5 After Different K [:tada:]
 
@@ -410,16 +408,16 @@ And here are the summary results.
 |         MeanSizeNorm4         |     :white_circle:      |       |       |       |       |       |       |       |
 |        MeanHeightNorm4        |     :white_circle:      |       |       |       |       |       |       |       |
 |        MeanWidthNorm4         | :white_circle: TiTan XP |       |       |       |       |       |       |       |
-|         CorverxNorm4          |                         |       |       |       |       |       |       |       |
-|           MaxNorm4            |                         |       |       |       |       |       |       |       |
-|             IOUd5             |                         |       |       |       |       |       |       |       |
-|             IOU5              |                         |       |       |       |       |       |       |       |
-|            GIOUd5             |                         |       |       |       |       |       |       |       |
-|             GIOU5             |                         |       |       |       |       |       |       |       |
+|         CorverxNorm4          |     :white_circle:      |       |       |       |       |       |       |       |
+|           MaxNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
+|             IOUd5             |     :white_circle:      |       |       |       |       |       |       |       |
+|             IOU5              |     :white_circle:      |       |       |       |       |       |       |       |
+|            GIOUd5             |     :white_circle:      |       |       |       |       |       |       |       |
+|             GIOU5             |     :white_circle:      |       |       |       |       |       |       |       |
 | DIOUd5 <br> (`Vanilla model`) |          22.92          | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
-|             DIOU5             |                         |       |       |       |       |       |       |       |
-|          DIOUd-Cos6           |                         |       |       |       |       |       |       |       |
-|          IouFamily8           |                         |       |       |       |       |       |       |       |
+|             DIOU5             |     :white_circle:      |       |       |       |       |       |       |       |
+|          DIOUd-Cos6           |     :white_circle:      |       |       |       |       |       |       |       |
+|          IouFamily8           |      Not implement      |       |       |       |       |       |       |       |
 
 #### 4.5.2 Attention Mechanism [:eyes:]
 
@@ -438,7 +436,7 @@ $$
 
 Cuz  
 
-2. Change aggregation `max` to `avg`:
+2. Change aggregation `max` to `mean`:
    $$
    ^{s}g^{l+1}_i:=  \Phi (\frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])})\\
    ^{d}g^{l+1}_i:= \frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
@@ -454,11 +452,11 @@ Cuz
 
 
 
-|     Model Variants      | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
-| :---------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-| Vanilla one<sup>*</sup> |      |      |      |      |      |      |      |      |
-|        Graphconv        |      |      |      |      |      |      |      |      |
-|                         |      |      |      |      |      |      |      |      |
+|     Model Variants      |   HOTA   | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
+| :---------------------: | :------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| Vanilla one<sup>*</sup> |          |      |      |      |      |      |      |      |
+|        Graphconv        |          |      |      |      |      |      |      |      |
+|          mean           | Titan XP |      |      |      |      |      |      |      |
 
 <img src="./.assert/graphconv-index.bmp" alt="dataAug" style="zoom:25%;" />
 

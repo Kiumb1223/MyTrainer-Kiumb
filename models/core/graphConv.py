@@ -19,20 +19,12 @@ class StaticConv(MessagePassing):
         super().__init__(aggr=aggr) 
 
         msg_in , msg_out , update_out = dims_list
-        self.msg_func = SequentialBlock(in_dim=msg_in, out_dim=msg_out, hidden_dim= [],layer_type =layer_type, layer_bias=layer_bias,
+        self.msg_func    = SequentialBlock(in_dim=msg_in, out_dim=msg_out, hidden_dim= [],layer_type =layer_type, layer_bias=layer_bias,
                          use_batchnorm=use_batchnorm, activate_func=activate_func, lrelu_slope=lrelu_slope)
 
         self.update_func = SequentialBlock(in_dim=msg_out, out_dim=update_out, hidden_dim= [],layer_type =layer_type,layer_bias=layer_bias,
                          use_batchnorm=use_batchnorm, activate_func=activate_func, lrelu_slope=lrelu_slope)
 
-        self._initialize_weights(lrelu_slope)
-
-    def _initialize_weights(self,lrelu_slope):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
 
     def forward(self,node_emb :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
         # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
@@ -61,18 +53,11 @@ class DynamicGonv(MessagePassing):
         self.bt_self_loop = bt_self_loop
         self.bt_directed = bt_directed
         
-        msg_in , msg_mid , msg_out = dims_list
-        self.msg_func = SequentialBlock(in_dim=msg_in, out_dim=msg_out, hidden_dim= [msg_mid], layer_type = layer_type, layer_bias=layer_bias,
-                         use_batchnorm=use_batchnorm, activate_func=activate_func, lrelu_slope=lrelu_slope)
+        msg_in , *msg_mid , msg_out = dims_list
 
-        self._initialize_weights(lrelu_slope)
+        self.msg_func = SequentialBlock(in_dim=msg_in, out_dim=msg_out, hidden_dim= msg_mid, layer_type = layer_type, layer_bias=layer_bias,
+                        use_batchnorm=use_batchnorm, activate_func=activate_func, lrelu_slope=lrelu_slope)
 
-    def _initialize_weights(self,lrelu_slope):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
     def forward(self,node_emb :torch.Tensor,graph :Union[Batch,Data],k:int) -> torch.Tensor:
         graph.x = node_emb
         edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
