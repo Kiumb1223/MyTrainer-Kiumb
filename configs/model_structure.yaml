@@ -36,8 +36,8 @@ edge_encoder:
 #  IOUd5 IOU5  GIOUd5 GIOU5 
 #  DIOUd5 DIOU5  DIOU-Cos6 IouFamily8
 #---------------------------------#
-  edge_type: 'ImgNorm4'
-  dims_list: [4,16,16]
+  edge_type: 'DIOUd5'
+  dims_list: [5,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True
@@ -45,7 +45,7 @@ edge_encoder:
   lrelu_slope: 0.0
   # static graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 #---------------------------------#
@@ -74,11 +74,12 @@ static_graph_model:
 
 #---------------------------------#
 dynamic_graph_model:
+#----------DoubleEdgeEmb----------#
   layer:
   # [msg_in,msg_mid,msg_out]
-  # and msg_in equals to (node emb size *2)
-    - [128,96,96]
-    - [192,128,128]
+  # and msg_in equals to (node emb size *2) + edge emb
+    - [144,120,96,96]     # 128 + 16 // midchannel - (144+120) /2
+    - [208,168,128,128]   # 192 + 16 // midchannel - (208+128) /2
   aggr: 'max'
   # module layer settings 
   layer_type: 'linear'
@@ -88,7 +89,7 @@ dynamic_graph_model:
   lrelu_slope: 0.1
   # dynamic graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 #---------------------------------#

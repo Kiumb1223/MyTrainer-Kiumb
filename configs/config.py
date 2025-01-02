@@ -20,10 +20,10 @@ def get_config():
         DEVICE            = 'cuda',
         NUM_WORKS         = 0,
         EMABLE_AMP        = True,
-        WORK_DIR          = "experiments",
+        WORK_DIR          = "DoubleEdgeEmb",
 
-        BATCH_SIZE        = 2,
-        MAXEPOCH          = 2,
+        BATCH_SIZE        = 16,
+        MAXEPOCH          = 120,
 
         LR                = 1e-2,
         # Optimizer Adamw

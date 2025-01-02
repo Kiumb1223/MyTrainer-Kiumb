@@ -20,6 +20,7 @@ class StaticConv(MessagePassing):
         
 
         msg_in , *msg_out , update_out = dims_list
+        
         self.msg_func    = SequentialBlock(
             in_dim=msg_in, out_dim=None, hidden_dim= msg_out,
             layer_type =layer_type, layer_bias=layer_bias,
@@ -58,7 +59,8 @@ class StaticConv(MessagePassing):
     
 
 class DynamicGonv(MessagePassing):
-    def __init__(self,dims_list :list,aggr :str, layer_type :str,layer_bias:bool,
+    def __init__(self,edge_model_dict :dict,
+                dims_list :list,aggr :str, layer_type :str,layer_bias:bool,
                 use_batchnorm :bool,activate_func :str,lrelu_slope :float=0.0,
                 bt_cosine :bool=False, bt_self_loop :bool=True,bt_directed :bool=True
                 ):
@@ -71,6 +73,9 @@ class DynamicGonv(MessagePassing):
         
         msg_in , *msg_mid , msg_out = dims_list
 
+
+        self.dg_edgeEncoder = EdgeEncoder(edge_model_dict)
+
         self.msg_func = SequentialBlock(
             in_dim=msg_in, out_dim=msg_out, hidden_dim= msg_mid, 
             layer_type = layer_type, layer_bias=layer_bias,
@@ -80,21 +85,24 @@ class DynamicGonv(MessagePassing):
 
     def forward(self,node_emb :torch.Tensor,graph :Union[Batch,Data],k:int) -> torch.Tensor:
         graph.x = node_emb
-        edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
-        
-        node_emb = self.propagate(edge_index,x=node_emb)
+        # edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
+        # edge_attr  = EdgeEncoder.compute_edge_attr(graph,k) 
+        graph = self.dg_edgeEncoder(graph,k)
+
+        node_emb = self.propagate(graph.edge_index,edge_attr=graph.edge_attr,x=node_emb)
         return node_emb
     
-    def message(self, x_i:torch.Tensor,x_j:torch.Tensor) -> torch.Tensor:
+    def message(self, x_i:torch.Tensor,x_j:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
         '''
         x_i : target nodes 
         x_j : source nodes
         '''
-        return self.msg_func(torch.cat([x_i,x_j-x_i],dim=1))
+        return self.msg_func(torch.cat([x_i,edge_attr,x_j-x_i],dim=1))
     
 
 class SDgraphConv(Module):
-    def __init__(self,static_graph_model_dict :dict, dynamic_graph_model_dict :dict,fuse_model_dict :dict):
+    def __init__(self,edge_Encoder_dict:dict,
+                static_graph_model_dict :dict, dynamic_graph_model_dict :dict,fuse_model_dict :dict):
 
         super().__init__()
 
@@ -108,11 +116,13 @@ class SDgraphConv(Module):
                         static_graph_model_dict['aggr'],static_graph_model_dict['layer_type'],static_graph_model_dict['layer_bias'],
                         static_graph_model_dict['use_batchnorm'],static_graph_model_dict['activate_func'],static_graph_model_dict['lrelu_slope'])
 
-        self.dg1conv  = DynamicGonv(dynamic_graph_model_dict['layer'][0],dynamic_graph_model_dict['aggr'],dynamic_graph_model_dict['layer_type'],dynamic_graph_model_dict['layer_bias'],
+        self.dg1conv  = DynamicGonv(edge_Encoder_dict,
+                        dynamic_graph_model_dict['layer'][0],dynamic_graph_model_dict['aggr'],dynamic_graph_model_dict['layer_type'],dynamic_graph_model_dict['layer_bias'],
                         dynamic_graph_model_dict['use_batchnorm'],dynamic_graph_model_dict['activate_func'],dynamic_graph_model_dict['lrelu_slope'],
                         dynamic_graph_model_dict['bt_cosine'],dynamic_graph_model_dict['bt_self_loop'],dynamic_graph_model_dict['bt_directed'])
         
-        self.dg2conv  = DynamicGonv(dynamic_graph_model_dict['layer'][1],dynamic_graph_model_dict['aggr'],dynamic_graph_model_dict['layer_type'],dynamic_graph_model_dict['layer_bias'],
+        self.dg2conv  = DynamicGonv(edge_Encoder_dict,
+                        dynamic_graph_model_dict['layer'][1],dynamic_graph_model_dict['aggr'],dynamic_graph_model_dict['layer_type'],dynamic_graph_model_dict['layer_bias'],
                         dynamic_graph_model_dict['use_batchnorm'],dynamic_graph_model_dict['activate_func'],dynamic_graph_model_dict['lrelu_slope'],
                         dynamic_graph_model_dict['bt_cosine'],dynamic_graph_model_dict['bt_self_loop'],dynamic_graph_model_dict['bt_directed'])
         
