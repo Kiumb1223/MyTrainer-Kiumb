@@ -35,6 +35,7 @@ class TrainingGraphModel(nn.Module):
 
         # Graph Layer
         self.graphconvLayer = SDgraphConv(
+            edge_Encoder_dict = model_dict['edge_encoder'],
             static_graph_model_dict  = model_dict['static_graph_model'],
             dynamic_graph_model_dict = model_dict['dynamic_graph_model'],
             fuse_model_dict = model_dict['fuse_model']

@@ -139,8 +139,7 @@ class NodeEncoder(nn.Module):
         
 class EdgeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
-    def __init__(self, edge_model_dict :dict,
-                ):
+    def __init__(self, edge_model_dict :dict):
         super(EdgeEncoder, self).__init__()
         # assert edge_model_dict['edge_type'] in ["ImgNorm4","SrcNorm4","TgtNorm4", "MeanSizeNorm4", "MeanHeightNorm4",
         #         "MeanWidthNorm4","CorverxNorm4","MaxNorm4","IOU5", "DIOU5", "DIOU-Cos6", "IouFamily8"]
