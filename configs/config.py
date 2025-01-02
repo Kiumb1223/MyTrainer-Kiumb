@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\DA_120epoch.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\MaskZoo\Mask60_120.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

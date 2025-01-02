@@ -187,9 +187,6 @@ class TrackManager:
         '''
         current_detections =np.ndarray(tlwh,conf)  and have already filtered by conf > 0.1 
         '''
-        if frame_idx == 93:
-            print(1)
-            pass 
         output_track_list  = []
         active_tracks_list = [ track for track in self.tracks_list if track.is_Active ]
         born_tracks_list   = [ track for track in self.tracks_list if track.is_Born   ]

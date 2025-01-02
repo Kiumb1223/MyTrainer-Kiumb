@@ -3,8 +3,8 @@
 #---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
-BT_DIST_MASK: False
-DIST_THRESH: 350
+BT_DIST_MASK: True
+DIST_THRESH: 60
 
 
 #---------------------------------#

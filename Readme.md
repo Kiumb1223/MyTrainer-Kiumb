@@ -75,7 +75,7 @@ Here is the original quantitative results of my model without **any modification
 
 | Validation set  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| MOT17-half(SDP) | 24.25 | 48.98 | 12.09 | 24.04 | 19.59 | 31.11 | 50.95 | 81.98 |
+| MOT17-half(SDP) | 24.25 | 49.21 | 12.03 | 24.24 | 19.79 | 31.27 | 51.34 | 81.96 |
 
 Obviously, my model still have a long way to go. However, what makes me proud is that my model has **a relatively fast inference speed**, which can reach up to 15 fps or so to process a 30fps, 1080p video.
 
@@ -178,7 +178,7 @@ There are three data augmentation techniques — **Low framerate, missed detecti
 |    Conditions     |   HOTA    |   DetA    |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :---------------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
 |    Vanilla one    | **24.25** | **49.21** | **12.03** | **24.24** | **19.79** | **31.27** | 51.34 | 81.96 |
-| Data Augmentation |   22.92   |   49.66   |   10.67   |   22.53   |   18.49   |   28.81   | 51.65 | 82.00 |
+| Data Augmentation |   22.92   |   49.69   |   10.66   |   22.14   |   18.17   |   28.31   | 51.74 | 82.00 |
 
 <img src="./.assert/dataAug-index.bmp" alt="dataAug" style="zoom:25%;" />
 
@@ -196,7 +196,7 @@ Unfortunately, it doesn`t seem to have a significant improvement, but rather a s
 
 |       Conditions        |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one<sup>*</sup> |     22.92      | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+| Vanilla one<sup>*</sup> |     22.92      | 49.69 | 10.66 | 22.14 | 18.17 | 28.31 | 51.74 | 82.00 |
 |    Undirected Graph     | :white_circle: |       |       |       |       |       |       |       |
 
 <img src="./.assert/UndirectedGraph-index.bmp" alt="UndirectedGraph-index" style="zoom: 25%;" />
@@ -209,7 +209,7 @@ Here is the simple example to show the graph with or without self loop. A specia
 
 |   Conditions    |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  Vanilla one*   |     22.92      | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+|  Vanilla one*   |     22.92      | 49.69 | 10.66 | 22.14 | 18.17 | 28.31 | 51.74 | 82.00 |
 | *w/o* self loop | :white_circle: |       |       |       |       |       |       |       |
 
 
@@ -232,18 +232,18 @@ It seems that **the speed of object moving poses the bigger influence on the sta
 
 | Mask Range |         HOTA          | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------------------------: | :-------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|   None(Vanilla one<sup>*</sup>)   |         22.92         | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
-|                35                 |         43.33         | 50.83 | 37.07 | 51.00 | 42.10 | 64.69 | 59.46 | 81.99 |
+|   None(Vanilla one<sup>*</sup>)   |      22.92      | 49.69 | 10.66 | 22.14 | 18.17 | 28.31 | 51.74 | 82.00 |
+|                35                 |         43.33         | 50.84 | 37.11 | 51.01 | 42.11 | 64.70 | 59.46 | 81.99 |
 |                50                  |         45.19         | 50.51 | 40.61 | 52.12 | 43.04 | 66.07 | 59.05 | 81.98 |
-|                60                 |    :red_circle:    |       |       |       |       |       |       |       |
+|                60                 |    PYH:red_circle:    |       |       |       |       |       |       |       |
 |                100                |    :red_circle:    |       |       |       |       |       |       |       |
 |                150                |    :red_circle:    |       |       |       |       |       |       |       |
 |                200                |         36.47         | 50.33 | 26.61 | 39.49 | 32.58 | 50.10 | 56.69 | 81.95 |
 |                250                |         35.09         | 50.26 | 24.69 | 37.80 | 31.18 | 47.99 | 56.26 | 81.98 |
 |                300                |    :red_circle:    |       |       |       |       |       |       |       |
 |                350                | :red_circle: |       |       |       |       |       |       |       |
-|                400                |   :red_circle:   |       |       |       |       |       |       |       |
-|                450                |    :red_circle:    |       |       |       |       |       |       |       |
+|                400                |   25.93   | 50.02 | 13.55 | 26.42 | 21.76 | 33.63 | 54.25 | 81.97 |
+|                450（retrained :warning:)                |    27.53    | 50.19 | 15.23 | 28.67 | 23.62 | 36.49 | 54.68 | 81.98 |
 |                500                | :white_circle: |       |       |       |       |       |       |       |
 
  In order to more intuition comparison, I plot a line chart based on the above two tables : [without **row None (Vanilla one<sup>*</sup>)** ]
@@ -260,8 +260,8 @@ Here is a picture to visually illustrates the process of graph construction with
 
 |             Different K              |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|     k=2(Vanilla one<sup>*</sup>)     |   22.92   | 49.66 |   10.67   |   22.53   |   18.49   |   28.81   | 51.65 | 82.00 |
-|                 k=3                  |   24.58   | 49.92 |   12.20   |   25.82   |   21.23   |   32.94   | 51.99 | 81.98 |
+|     k=2(Vanilla one<sup>*</sup>)     |   22.92   | 49.69 |   10.66   |   22.14   |   18.17   |   28.31   | 51.74 | 82.00 |
+|                 k=3                  |   24.58   | 49.92 |   12.20   |   25.82   |   21.23   |   32.94   | 52.99 | 81.98 |
 |                 k=4                  |   27.89   | 50.02 |   15.66   |   29.33   |   24.13   |   37.38   | 54.52 | 81.98 |
 |                 k=5                  |   29.58   | 50.14 |   17.56   |   30.84   |   25.40   |   39.26   | 55.35 | 81.95 |
 |                 k=6                  |   30.40   | 50.20 |   18.54   |   32.79   |   27.01   |   41.70   | 55.47 | 81.98 |
@@ -399,24 +399,24 @@ In order to better  organize and manage these experiments, it is necessary to re
 
 And here are the summary results.
 
-|          Experiment           |          HOTA           | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :---------------------------: | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|           ImgNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
-|           SrcNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
-|           TgtNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
-|         MeanSizeNorm4         |     :white_circle:      |       |       |       |       |       |       |       |
-|        MeanHeightNorm4        |     :white_circle:      |       |       |       |       |       |       |       |
-|        MeanWidthNorm4         | :white_circle: TiTan XP |       |       |       |       |       |       |       |
-|         CorverxNorm4          |     :white_circle:      |       |       |       |       |       |       |       |
-|           MaxNorm4            |     :white_circle:      |       |       |       |       |       |       |       |
-|             IOUd5             |     :white_circle:      |       |       |       |       |       |       |       |
-|             IOU5              |     :white_circle:      |       |       |       |       |       |       |       |
-|            GIOUd5             |     :white_circle:      |       |       |       |       |       |       |       |
-|             GIOU5             |     :white_circle:      |       |       |       |       |       |       |       |
-| DIOUd5 <br> (`Vanilla model`) |          22.92          | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
-|             DIOU5             |     :white_circle:      |       |       |       |       |       |       |       |
-|          DIOUd-Cos6           |     :white_circle:      |       |       |       |       |       |       |       |
-|          IouFamily8           |      Not implement      |       |       |       |       |       |       |       |
+|          Experiment           |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|           ImgNorm4            | :white_circle: |       |       |       |       |       |       |       |
+|           SrcNorm4            | :white_circle: |       |       |       |       |       |       |       |
+|           TgtNorm4            |     27.39      | 50.09 | 15.10 | 28.37 | 23.37 | 36.09 | 54.81 | 81.95 |
+|         MeanSizeNorm4         | :white_circle: |       |       |       |       |       |       |       |
+|        MeanHeightNorm4        | :white_circle: |       |       |       |       |       |       |       |
+|        MeanWidthNorm4         |     22.83      | 49.27 | 10.67 | 22.17 | 18.15 | 28.49 | 50.58 | 81.95 |
+|         CorverxNorm4          |     27.87      | 49.84 | 15.67 | 30.92 | 25.44 | 39.41 | 53.53 | 81.98 |
+|           MaxNorm4            | :white_circle: |       |       |       |       |       |       |       |
+|             IOUd5             | :white_circle: |       |       |       |       |       |       |       |
+|             IOU5              | :white_circle: |       |       |       |       |       |       |       |
+|            GIOUd5             | :white_circle: |       |       |       |       |       |       |       |
+|             GIOU5             | :white_circle: |       |       |       |       |       |       |       |
+| DIOUd5 <br> (`Vanilla model`) |     22.92      | 49.69 | 10.66 | 22.14 | 18.17 | 28.31 | 51.74 | 82.00 |
+|             DIOU5             |     29.15      | 50.12 | 17.09 | 30.44 | 25.06 | 38.75 | 55.13 | 81.97 |
+|          DIOUd-Cos6           |     29.54      | 50.14 | 17.51 | 31.09 | 25.63 | 39.51 | 55.31 | 81.96 |
+|          IouFamily8           | Not implement  |       |       |       |       |       |       |       |
 
 #### 4.5.2 Attention Mechanism [:eyes:]
 
@@ -461,14 +461,14 @@ $$
 
    - The reason why I wanna deepen my message function of vanilla model is that there is only one full connected layer $f(\cdot )$ to fuse the feature $Edge~emb$ and $g_j -g_i$, which has not enougn ability to align the feature space, thus harmful to my model. So I wanna deepen my message function.:pray:
 
-|     Model Variants      |   HOTA   | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
-| :---------------------: | :------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-| Vanilla one<sup>*</sup> |          |      |      |      |      |      |      |      |
-|        Graphconv        |          |      |      |      |      |      |      |      |
-|        meanAggr         | Titan XP |      |      |      |      |      |      |      |
-|      DouleEdgeEmb       |          |      |      |      |      |      |      |      |
-|       selfConcat        |          |      |      |      |      |      |      |      |
-|         deepMsg         |          |      |      |      |      |      |      |      |
+|     Model Variants      | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> | 22.92 | 49.69 | 10.66 | 22.14 | 18.17 | 28.31 | 51.74 | 82.00 |
+|        Graphconv        |       |       |       |       |       |       |       |       |
+|        meanAggr         | 23.91 | 49.66 | 11.60 | 23.76 | 19.50 | 30.39 | 52.10 | 81.93 |
+|      DouleEdgeEmb       |       |       |       |       |       |       |       |       |
+|       selfConcat        |       |       |       |       |       |       |       |       |
+|         deepMsg         |       |       |       |       |       |       |       |       |
 
 <img src="./.assert/graphconv-index.bmp" alt="dataAug" style="zoom:25%;" />
 
@@ -478,7 +478,7 @@ Considering that the measurement based on cosine similarity in the graph match, 
 
 |       Conditions        |      HOTA      | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------: | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one<sup>*</sup> |     22.92      | 49.66 | 10.67 | 22.53 | 18.49 | 28.81 | 51.65 | 82.00 |
+| Vanilla one<sup>*</sup> |     22.92      | 49.69 | 10.66 | 22.14 | 18.17 | 28.31 | 51.74 | 82.00 |
 |      Cosine-based       | :white_circle: |       |       |       |       |       |       |       |
 
 <img src="./.assert/cosinegraph-index.bmp" alt="cosinegraph-index" style="zoom:25%;" />
@@ -497,7 +497,7 @@ P.S. the model structure of Larger Dataset is slightly different Vanilla one<sup
 
 |       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  |   MOTP    |
 | :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :-------: |
-| Vanilla one<sup>*</sup> |   22.92   | 49.66 |   10.67   |   22.53   |   18.49   |   28.81   | 51.65 |   82.00   |
+| Vanilla one<sup>*</sup> |   22.92   | 49.69 |   10.66   |   22.14   |   18.17   |   28.31   | 51.74 |   82.00   |
 |     Larger Dataset      | **43.19** | 39.26 | **47.78** | **45.18** | **33.01** | **71.60** | 41.55 | **88.47** |
 
 ## 5. Experimental Records [Track Management]
