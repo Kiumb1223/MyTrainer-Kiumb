@@ -65,8 +65,8 @@
         }
     },
     "Trackeval": {
-        "GT_FOLDER": "datasets\\eval_datasets\\gt\\mot_challenge",
-        "TRACKERS_FOLDER": "datasets\\eval_datasets\\trackers\\mot_challenge",
+        "GT_FOLDER": "datasets/eval_datasets/gt/mot_challenge",
+        "TRACKERS_FOLDER": "datasets/eval_datasets/trackers/mot_challenge",
         "SKIP_SPLIT_FOL": true
     }
 }

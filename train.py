@@ -60,7 +60,6 @@ def main():
         # warmup settings
         by_epoch = cfg.BY_EPOCH,warmup_t = cfg.WARMUP_T,warmup_by_epoch = cfg.WARMUP_BY_EPOCH,
         warmup_mode = cfg.WARMUP_MODE,warmup_init_lr = cfg.WARMUP_INIT_LR,warmup_factor = cfg.WARMUP_FACTOR,
-    
     )
     #---------------------------------#
     #  start Training

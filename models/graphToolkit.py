@@ -224,7 +224,12 @@ def calc_iouFamily(source_info: torch.Tensor, target_info: torch.Tensor, iou_typ
     #---------------------------------#
     if iou_type == 'ciou':
         arctan = torch.atan(target_w / (target_h + eps)) - torch.atan(source_w / (source_h + eps))
-        v = (4 / (torch.pi ** 2)) * torch.pow(arctan, 2)
+        try:
+            v = (4 / (torch.pi ** 2)) * torch.pow(arctan, 2)
+        except AttributeError:
+            # https://github.com/ourownstory/neural_prophet/discussions/584
+            import math 
+            v = (4 / (math.pi ** 2)) * torch.pow(arctan, 2)
         S = 1 - iou
         with torch.no_grad():
             alpha = v / (S + v + eps)

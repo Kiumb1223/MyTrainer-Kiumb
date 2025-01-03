@@ -7,6 +7,7 @@
 :Author     :Kiumb
 '''
 
+import copy
 import yaml
 import torch 
 import torch.nn as nn 
@@ -29,12 +30,16 @@ class TrainingGraphModel(nn.Module):
         self.k = model_dict['K_NEIGHBOR']
         self.bt_mask = model_dict['BT_DIST_MASK'] 
         self.dist_thresh = model_dict['DIST_THRESH']
+
         # Encoder Layer
         self.nodeEncoder = NodeEncoder(model_dict['node_encoder'])
-        self.edgeEncoder = EdgeEncoder(model_dict['edge_encoder'])
+        self.edgeEncoder = EdgeEncoder(model_dict['Edge_mode'],model_dict['edge_encoder'])
 
         # Graph Layer
         self.graphconvLayer = SDgraphConv(
+            edge_mode = model_dict['Edge_mode'],
+            graphModel_type = model_dict['GraphModel_type'],
+            edge_model_dict = model_dict['edge_encoder'],
             static_graph_model_dict = model_dict['static_graph_model'],
             dynamic_graph_model_dict = model_dict['dynamic_graph_model'],
             fuse_model_dict = model_dict['fuse_model']
@@ -125,10 +130,13 @@ class GraphModel(nn.Module):
         self.dist_thresh = model_dict['DIST_THRESH']
         # Encoder Layer
         self.nodeEncoder = NodeEncoder(model_dict['node_encoder'])
-        self.edgeEncoder = EdgeEncoder(model_dict['edge_encoder'])
+        self.edgeEncoder = EdgeEncoder(model_dict['Edge_mode'],model_dict['edge_encoder'])
 
         # Graph Layer
         self.graphconvLayer = SDgraphConv(
+            edge_mode = model_dict['Edge_mode'],
+            graphModel_type = model_dict['GraphModel_type'],
+            edge_model_dict = copy.deepcopy(model_dict['edge_encoder']),
             static_graph_model_dict = model_dict['static_graph_model'],
             dynamic_graph_model_dict = model_dict['dynamic_graph_model'],
             fuse_model_dict = model_dict['fuse_model']

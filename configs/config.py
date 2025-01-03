@@ -18,12 +18,12 @@ def get_config():
         LOG_PERIOD        = 10,       # Iteration 
         CHECKPOINT_PERIOD = 1,        # Epoch
         DEVICE            = 'cuda',
-        NUM_WORKS         = 0,
+        NUM_WORKS         = 2,
         EMABLE_AMP        = True,
-        WORK_DIR          = "experiments",
+        WORK_DIR          = "Edge_mode_exps/FixedEdgeDim/vanillaModel[GIoUd5]",
 
-        BATCH_SIZE        = 2,
-        MAXEPOCH          = 2,
+        BATCH_SIZE        = 16,
+        MAXEPOCH          = 120,
 
         LR                = 1e-2,
         # Optimizer Adamw
@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = 'configs/model_structure.yaml',
+        MODEL_YAML_PATH   = r'configs/Edge_mode/FixedEdgeDim/vanillaModel_FixedEdgeDim[GIoUd5].yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\MaskZoo\Mask60_120.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\ModelZoo\selfConcat.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,
