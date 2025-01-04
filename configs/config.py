@@ -20,7 +20,7 @@ def get_config():
         DEVICE            = 'cuda',
         NUM_WORKS         = 2,
         EMABLE_AMP        = True,
-        WORK_DIR          = "Edge_mode_exps/FixedEdgeDim/vanillaModel[GIoUd5]",
+        WORK_DIR          = "Edge_mode_exps/FixedProgressiveEdgeDimEdgeDim/vanillaModel[IoUFamily8-convex-seq]",
 
         BATCH_SIZE        = 16,
         MAXEPOCH          = 120,
@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs/Edge_mode/FixedEdgeDim/vanillaModel_FixedEdgeDim[GIoUd5].yaml',
+        MODEL_YAML_PATH   = r'configs/Edge_mode/ProgressiveEdgeDim/VanillaModel_ProgressiveEdgeDim[IoUFamily8-convex-seq].yaml',
         
         #---------------------------------#
         #  3. Dataset related
