@@ -18,9 +18,9 @@ def get_config():
         LOG_PERIOD        = 10,       # Iteration 
         CHECKPOINT_PERIOD = 1,        # Epoch
         DEVICE            = 'cuda',
-        NUM_WORKS         = 2,
+        NUM_WORKS         = 0,
         EMABLE_AMP        = True,
-        WORK_DIR          = "Edge_mode_exps/FixedProgressiveEdgeDimEdgeDim/vanillaModel[IoUFamily8-convex-seq]",
+        WORK_DIR          = "largeDataset",
 
         BATCH_SIZE        = 16,
         MAXEPOCH          = 120,
@@ -49,13 +49,13 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs/Edge_mode/ProgressiveEdgeDim/VanillaModel_ProgressiveEdgeDim[IoUFamily8-convex-seq].yaml',
+        MODEL_YAML_PATH   = r'configs\model_structure.yaml',
         
         #---------------------------------#
         #  3. Dataset related
         #---------------------------------#
         DATA_DIR          = 'datasets',
-        JSON_PATH         = 'configs/train_MOT17.json',
+        JSON_PATH         = 'configs/train_Mix.json',
         TRACKBACK_WINDOW  = 10,
         ACCEPTABLE_OBJ_TYPE   = [1,2,7],
 
@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\ModelZoo\selfConcat.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\ModelZoo\dynamic-smooth.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

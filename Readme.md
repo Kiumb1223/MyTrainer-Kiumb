@@ -29,14 +29,14 @@ Additionally, let\`s talk about my **graph convolutional operations**, which is 
 
 
 $$
-g^{l+1}_i:= \Phi(\max _{j \in \mathbb{N}_i}{f([Edge~emb~\cdot~(g_j^{l} - g_i^{l}) ])})
+g^{l+1}_i= \Phi(\max _{j \in \mathbb{N}_i}{f([Edge~emb~\cdot~(g_j^{l} - g_i^{l}) ])})
 $$
 
 And in order to **capture high-order discriminative features**, I rebuild the graph, which I call the `dynamic graph`, while the old one is referred to as the `static graph` to keep things clear. And I also perform the edgeconv operations on dynamic graph:
 
 
 $$
-g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})])}
+g^{l+1}_i= \max _{j \in \mathbb{N}_i}{f([g_i^{l}~\cdot~(g_j^{l} - g_i^{l})])}
 $$
 
 ----
@@ -49,29 +49,31 @@ There are four states in the trajectory management strategy — **Born,Active,Sl
 
 ----
 
-Supplemental Details about my whole neural network, which is quite important to understand following experiment concerning [Sec 4.7 After more Graph Neural Network](###4.7 After more Graph Neural Network). 
+Supplemental Details about my whole neural network, which is quite important to understand following experiments concerning **MODEL STRUCTURE**, e.g. [Sec 4.7 After more Graph Neural Network](###4.7 After more Graph Neural Network) . 
 
 There are 5 parts of my whole model:
 
 1. **Node Encoder**: The backbone of Node Encoder is [DenseNet121](https://arxiv.org/abs/1608.06993), initialized with pretrained weights from ImageNet, the same as `GCNNMatch`. All layers are frozen except for the last two. Additionally, I also add some extra fc layers to reduce 1024 dimensional tensor to a 32 dimensional space for the sake of addressing feature space misalignment.
 
-   <img src="./.assert/NodeEncoder.bmp" alt="NodeEncoder" style="zoom:50%;" />
+   <img src="./.assert/NodeEncoder.bmp" alt="NodeEncoder" style="zoom: 33%;" />
 
 2. **Edge Encoder**: 
 
-   <img src="./.assert/EdgeEncoder.bmp" alt="EdgeEncoder" style="zoom:50%;" />
+   <img src="./.assert/EdgeEncoder.bmp" alt="EdgeEncoder" style="zoom: 33%;" />
 
 3. **Static Graph Model**: When stacking more layers in GCN may lead to over-smoothing and over-squeezing, which instead makes the performance of network drop sharply. And here I simply stack three layers GCN to extract features from static graph.
 
-   
+   <img src="./.assert/StaticGCN.bmp" alt="StaticGCN" style="zoom: 50%;" />
 
-4. **Dynamic Graph Model**:
+   And plz pay your attention to the feature dimension and detailed parts of each static GCN layer, which are some key points of some experiments.
 
-   
+4. **Dynamic Graph Model**: After 1st DGCN layer , I reutilize the KNN algorithm based on **Euclidean distance** to **reconstruct** the graph in 64-dim feature space and apply DGCN layer to extract more higher-level features.
+
+   <img src="./.assert/DynamicGCN.bmp" alt="DynamicGCN" style="zoom:50%;" />
 
 5. **Fuse Model**:
 
-   
+   <img src="./.assert/fuseModel.bmp" alt="fuseModel" style="zoom:50%;" />
 
 ## 2. Experimental Settings
 
@@ -163,7 +165,7 @@ And it is also essential to record the time consumption of training and inferenc
 
   - [x] I can also statistically calculate the moving distances of different time span , framerates and resolutions
 
-- [ ] change the weight of edge 
+- [x] change the weight of edge 
 
   I can encode the some info of graph structure into the embeddings(maybe cant be so sufficient)
 
@@ -171,7 +173,7 @@ And it is also essential to record the time consumption of training and inferenc
 
 - [x] Simplify the logic of KNN — make KNN more adaptive . It seems that variable `bt_self_loop`  is relatively useless, because self-loop only matters when there is only one object, which will lead to fatal error in my project. And this maybe save more time expense. 
 
-- [ ] do some statistical experiment about the density of the crowds in benchmarks, which is maybe helpful for the choice of best K
+- [x] do some statistical experiment about the density of the crowds in benchmarks, which is maybe helpful for the choice of best K
 
 ## 4. Experimental Records [Technique & Hyperparameters]
 
@@ -221,8 +223,6 @@ Here is the simple illustration about the undirected graph:
 
 <img src="./.assert/UndirectedGraph-index.bmp" alt="UndirectedGraph-index" style="zoom: 25%;" />
 
-
-
 ### 4.3 After without Self-Loop [:tada:]
 
 ![](./.assert/self-loop.bmp)
@@ -234,9 +234,18 @@ Here is the simple example to show the graph with or without self loop. A specia
 |  Vanilla one*   |   23.31   | 49.68 |   11.03   |   22.87   |   18.76   |   29.28   | 51.74 | 81.89 |
 | *w/o* self loop | **28.39** | 50.06 | **16.21** | **29.87** | **24.61** | **38.00** | 55.42 | 81.96 |
 
+### 4.4 After Cosine-based Dynamic Graph [:tada:]
 
+Considering that **the measurement based on cosine similarity in the graph match**, I change the dynamic graph based Euclidean distance to **cosine distance based** , just hoping my model can learn more discriminative features in the feature space based on cosine distance.  
 
-### 4.4 After Distance Mask [:tada:]
+|       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+| Vanilla one<sup>*</sup> |   23.31   | 49.68 |   11.03   |   22.87   |   18.76   |   29.28   | 51.74 | 81.89 |
+|      Cosine-based       | **27.19** | 50.33 | **14.81** | **28.39** | **23.40** | **36.08** | 55.34 | 81.93 |
+
+<img src="./.assert/cosinegraph-index.bmp" alt="cosinegraph-index" style="zoom:25%;" />
+
+### 4.5 After Distance Mask [:tada:]
 
 ![distanceMask](./.assert/distanceMask.bmp)
 
@@ -272,7 +281,7 @@ It seems that **the speed of object moving poses the bigger influence on the sta
 
 ![Kfamily_metrics](./.assert/mask.png)
 
-### 4.5 After Different K [:tada:]
+### 4.6 After Different K [:tada:]
 
 According to the descriptions about construction graph in [[Sec 1. Brief Introduction about My Model]](#1. Brief Introduction about My Model), there is a hyperparameter `k` in KNN algorithm. And k is set to 2 in my vanilla model, so let`s search for best k.
 
@@ -303,7 +312,111 @@ And here is a line chart which shows the trend of performance with increasing K 
 
 In my opinion, the value of K plays a crucial role in enhancing the robustness of my model, particularly in scenarios where missed detections or false positives lead to a big change in graph structure.
 
-### 4.6 After more Edge Embeddings
+And here are some statistical information about people count per frame in several benchmark:
+
+| MOT17-train |   mean    |  max   |  min  |
+| :---------: | :-------: | :----: | :---: |
+|  MOT17-02   |   42.3    |   48   |  32   |
+|  MOT17-04   | **49.86** | **56** |  45   |
+|  MOT17-05   |   8.64    |   15   |   4   |
+|  MOT17-09   |   11.12   |   14   |   6   |
+|  MOT17-10   |   21.74   |   29   |  15   |
+|  MOT17-11   |   10.58   |   19   |   7   |
+|  MOT17-13   |   15.52   |   32   | **2** |
+|             |   22.83   |   56   |   2   |
+
+![MOT17_train_seq_stats](./.assert/MOT17_train_seq_stats.png)
+
+| MOT20-train |   mean    |   max   |  min   |
+| :---------: | :-------: | :-----: | :----: |
+|  MOT20-01   |   52.3    |   61    |   42   |
+|  MOT20-02   |   59.6    |   101   | **33** |
+|  MOT20-03   |   139.7   |   205   |   84   |
+|  MOT20-05   | **222.4** | **248** |  190   |
+|             |   118.5   |   248   |   33   |
+
+![MOT20_train_seq_stats](./.assert/MOT20_train_seq_stats.png)
+
+| DanceTrack-train |   mean   |  max   |  min  |
+| :--------------: | :------: | :----: | :---: |
+|  dancetrack0001  |   7.0    |   7    |   6   |
+|  dancetrack0002  |   7.7    |   8    |   5   |
+|  dancetrack0006  |   8.8    |   9    |   4   |
+|  dancetrack0008  |   7.8    |   8    |   4   |
+|  dancetrack0012  |   10.8   |   12   |   4   |
+|  dancetrack0015  |   8.9    |   9    |   7   |
+|  dancetrack0016  |   5.8    |   6    |   4   |
+|  dancetrack0020  | **34.6** | **40** |  27   |
+|  dancetrack0023  |   8.8    |   9    |   7   |
+|  dancetrack0024  |   5.9    |   6    |   3   |
+|  dancetrack0027  |   8.5    |   12   |   5   |
+|  dancetrack0029  |   6.2    |   7    |   5   |
+|  dancetrack0032  |   5.6    |   6    |   2   |
+|  dancetrack0033  |   7.8    |   8    |   5   |
+|  dancetrack0037  |   6.9    |   7    |   5   |
+|  dancetrack0039  |   4.9    |   5    |   1   |
+|  dancetrack0044  |   11.1   |   13   |   7   |
+|  dancetrack0045  |   13.2   |   14   |  10   |
+|  dancetrack0049  |   7.9    |   8    |   6   |
+|  dancetrack0051  |   9.0    |   9    |   8   |
+|  dancetrack0052  |   3.7    |   4    |   2   |
+|  dancetrack0053  |   4.9    |   5    |   3   |
+|  dancetrack0055  |   4.8    |   5    |   3   |
+|  dancetrack0057  |   4.8    |   6    |   3   |
+|  dancetrack0061  |   5.0    |   5    |   5   |
+|  dancetrack0062  |   5.2    |   6    |   5   |
+|  dancetrack0066  |   5.0    |   5    |   5   |
+|  dancetrack0068  |   5.0    |   5    |   3   |
+|  dancetrack0069  |   5.9    |   6    |   4   |
+|  dancetrack0072  |   4.9    |   5    |   3   |
+|  dancetrack0074  |   4.4    |   5    | **1** |
+|  dancetrack0075  |   6.8    |   7    |   5   |
+|  dancetrack0080  |   10.0   |   16   |   6   |
+|  dancetrack0082  |   20.5   |   24   |  12   |
+|  dancetrack0083  |   24.9   |   25   |  22   |
+|  dancetrack0086  |   15.7   |   16   |  13   |
+|  dancetrack0087  |   10.7   |   11   |   9   |
+|  dancetrack0096  |   26.2   |   40   |  17   |
+|  dancetrack0098  |   7.0    |   8    |   4   |
+|  dancetrack0099  |   10.3   |   11   |   5   |
+|                  |   9.3    |   40   |   1   |
+
+![DanceTrack-train](./.assert/DanceTrack-train.png)
+
+| DanceTrack-val |   mean   |  max   |  min  |
+| :------------: | :------: | :----: | :---: |
+| dancetrack0004 |   3.8    |   4    | **1** |
+| dancetrack0005 |   3.9    |   4    |   3   |
+| dancetrack0007 |   7.9    |   8    |   6   |
+| dancetrack0010 |   5.8    |   6    |   4   |
+| dancetrack0014 |   10.5   |   12   |   3   |
+| dancetrack0018 |   5.8    |   8    |   5   |
+| dancetrack0019 |   6.9    |   7    |   5   |
+| dancetrack0025 |   8.8    |   9    |   7   |
+| dancetrack0026 |   13.2   |   18   |   7   |
+| dancetrack0030 |   6.0    |   6    |   5   |
+| dancetrack0034 |   12.1   |   14   |   7   |
+| dancetrack0035 |   7.5    |   8    |   5   |
+| dancetrack0041 |   16.7   |   22   |   8   |
+| dancetrack0043 |   9.2    |   12   |   7   |
+| dancetrack0047 |   7.8    |   8    |   5   |
+| dancetrack0058 |   6.9    |   7    |   6   |
+| dancetrack0063 |   7.6    |   8    |   2   |
+| dancetrack0065 |   5.0    |   5    |   4   |
+| dancetrack0073 |   12.0   |   14   |   8   |
+| dancetrack0077 |   9.0    |   9    |   9   |
+| dancetrack0079 |   12.1   |   18   |   7   |
+| dancetrack0081 |   19.1   |   20   |  15   |
+| dancetrack0090 |   13.1   |   14   |   9   |
+| dancetrack0094 | **19.5** | **23** |  14   |
+| dancetrack0097 |   3.9    |   4    |   2   |
+|                |   9.4    |   23   |   1   |
+
+![DanceTrack-val](./.assert/DanceTrack-val.png)
+
+
+
+### 4.7 After more Edge Embeddings
 
 The reason why I wanna change the weight of edge is **the week connection between similar objects or closely positioned objects.** In other words, for similar objects in close positions, **the current model has week differentiation capability (i.e. insufficient feature discriminability).** More details in the following picture.
 
@@ -311,7 +424,7 @@ The reason why I wanna change the weight of edge is **the week connection betwee
 
 How to alleviate or even solve this problem? Some trial methods are waiting for me to practice.
 
-#### 4.6.1 several Variants of Edge Embedding [:tada:]
+#### 4.7.1 several Variants of Edge Embedding [:tada:]
 
 Curious about the influences of edge embedding , I design several variants of Edge embedding  and do some experiments. And here are some mathematical formulation of my ideas. [The edge embedding of `Vanilla model`  mainly refers [SUSHI(CVPR 2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Cetintas_Unifying_Short_and_Long-Term_Tracking_With_Graph_Hierarchies_CVPR_2023_paper.pdf) , which is a offline and graph-based tracker. And it\` another motivation to encourage me to solve the puzzle ]
 
@@ -464,8 +577,8 @@ And here are the summary results.
 |         MeanSizeNorm4         |   27.52   | 50.12 |   15.22   |   28.19   |   23.22   |   35.86   | 55.01 | 81.97 |
 |        MeanHeightNorm4        |   27.07   | 50.22 |   14.71   |   27.67   |   22.80   |   35.19   | 54.79 | 81.97 |
 |        MeanWidthNorm4         |   23.10   | 49.63 |   10.85   |   23.32   |   19.13   |   29.85   | 51.70 | 81.93 |
-|        **ConvexNorm4**        |   27.87   | 49.84 |   15.67   |   30.92   |   25.44   |   39.41   | 53.53 | 81.98 |
-|         **MaxNorm4**          |   28.29   | 49.66 |   16.21   | **31.26** | **25.70** | **39.88** | 53.06 | 81.97 |
+|        **ConvexNorm4**        |   27.36   | 50.02 |   15.10   |   28.50   |   23.48   |   36.26   | 55.08 | 81.98 |
+|         **MaxNorm4**          |   29.25   | 50.11 |   17.21   |   30.41   |   25.07   |   38.64   | 55.32 | 81.97 |
 |             IOUd5             |   27.95   | 50.33 |   15.64   |   29.46   |   24.28   |   37.44   | 55.58 | 81.96 |
 |             IOU5              |   26.70   | 50.22 |   14.30   |   28.32   |   23.33   |   36.03   | 55.11 | 81.97 |
 |          **GIOUd5**           | **30.11** | 50.22 | **18.20** | **31.36** | **25.85** | **39.85** | 55.24 | 81.99 |
@@ -478,8 +591,8 @@ And here are the summary results.
 |             EIOU5             |   27.72   | 50.25 |   15.41   |   29.28   |   24.13   |   37.23   | 55.27 | 81.95 |
 |          DIOUd-Cos6           |   29.54   | 50.14 |   17.51   |   31.09   |   25.63   |   39.51   | 55.31 | 81.96 |
 |      IouFamily8-vanilla       |   27.54   | 50.09 |   15.27   |   29.77   |   24.52   |   37.86   | 55.25 | 81.95 |
-|       IouFamily8-convex       |   28.58   | 49.81 |   16.50   |   30.65   |   25.21   |   39.09   | 54.35 | 81.99 |
-|      IouFamily8-separate      |   28.39   | 49.69 |   16.29   | **31.20** | **25.67** | **39.75** | 53.75 | 81.96 |
+|     **IouFamily8-convex**     |   29.63   | 50.19 |   17.64   |   30.74   |   25.33   |   39.09   | 55.36 | 82.00 |
+|    **IouFamily8-separate**    |   28.34   | 50.09 |   16.14   |   29.45   |   24.27   |   37.46   | 55.42 | 81.96 |
 
 <a id='weirdPhenomenon'></a>The results are quite beyond my expectation. And In my intuition, the more information edge embedding contains , the better model will be. However, the fact goes away my intuition. But WHAT can I learn from all those results??  Noticed that some directional information maybe impacts more on model, so I plan do some extra experiments —— the sequence of each item in IoUFamily8 and another type of directional information of width and height.
 
@@ -528,61 +641,71 @@ And here are the summary results.
    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},\\ \frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}},CIoU(i,j)])
    $$
 
-|              Experiment              |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | ----- |
-|        IouFamily8-vanilla-seq        |   28.04   | 50.24 |   15.75   |   29.57   |   24.36   |   37.64   | 55.17 | 81.98 |
-|        IouFamily8-convex-seq         | **32.89** | 49.64 |   21.94   | **36.89** | **30.37** | **46.99** | 55.37 | 81.98 |
-| IouFamily8-convex-seq<br>[`deepMsg`] |   37.72   | 49.88 |   28.65   |   43.39   |   35.75   |   55.17   | 57.84 | 82.01 |
-|       IouFamily8-separate-seq        |   29.32   | 49.74 |   17.39   |   31.69   |   26.08   |   40.39   | 54.06 | 81.96 |
-|  **ConvexNorm4-v2**<br>[`deepMsg`]   |   42.18   | 50.24 |   35.55   |   48.97   |   40.36   |   62.24   | 58.53 | 82.01 |
-|    **MaxNorm4-v2**<br>[`deepMsg`]    | **42.68** | 49.96 | **36.60** | **49.09** | **40.48** | **62.38** | 58.72 | 81.96 |
-|            ConvexNorm4-v2            |   29.56   | 49.64 |   17.71   |   32.76   |   26.94   |   41.78   | 53.89 | 81.95 |
-|           **MaxNorm4-v2**            | **31.77** | 49.63 | **20.48** | **34.85** | **28.66** | **44.46** | 53.77 | 82.00 |
-|              GIOUd5-v2               |   28.30   | 49.84 |   16.18   |   30.87   |   25.37   |   39.37   | 53.11 | 82.00 |
-|               GIOU5-v2               |   28.72   | 49.67 |   16.71   |   31.00   |   25.49   |   39.56   | 53.12 | 82.01 |
-|               DIOU5-v2               |   28.06   | 49.62 |   15.96   |   30.17   |   24.82   |   38.47   | 52.62 | 82.00 |
-|               CIOU5-v2               |   25.69   | 49.37 |   13.50   |   25.62   |   20.98   |   32.90   | 51.49 | 81.94 |
+10. **IouFamily6-convex** :
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},\frac{w_j - w_i}{w_{convex}},\frac{h_j-h_i}{h_{convex}},\\1- GIoU(i,j),centerPointDist(i,j)])
+    $$
+    
 
-#### 4.5.2 Attention Mechanism [:eyes:]
+|                 Experiment                 |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :----------------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | ----- |
+|           IouFamily8-vanilla-seq           |   28.04   | 50.24 |   15.75   |   29.57   |   24.36   |   37.64   | 55.17 | 81.98 |
+|     ~~IouFamily8-convex-seq~~<br>4090      | **32.89** | 49.64 |   21.94   | **36.89** | **30.37** | **46.99** | 55.37 | 81.98 |
+| ~~IouFamily8-separate-seq~~<br>[`deepMsg`] |   37.72   | 49.88 |   28.65   |   43.39   |   35.75   |   55.17   | 57.84 | 82.01 |
+|    ~~IouFamily8-separate-seq~~<br>4090     |   29.32   | 49.74 |   17.39   |   31.69   |   26.08   |   40.39   | 54.06 | 81.96 |
+|     ~~ConvexNorm4-v2~~<br>[`deepMsg`]      |   42.18   | 50.24 |   35.55   |   48.97   |   40.36   |   62.24   | 58.53 | 82.01 |
+|       ~~MaxNorm4-v2~~<br>[`deepMsg`]       | **42.68** | 49.96 | **36.60** | **49.09** | **40.48** | **62.38** | 58.72 | 81.96 |
+|         ~~ConvexNorm4-v2~~<br>3090         |   29.56   | 49.64 |   17.71   |   32.76   |   26.94   |   41.78   | 53.89 | 81.95 |
+|          ~~MaxNorm4-v2~~<br>3090           | **31.77** | 49.63 | **20.48** | **34.85** | **28.66** | **44.46** | 53.77 | 82.00 |
+|           ~~GIOUd5-v2~~<br>4090            |   28.30   | 49.84 |   16.18   |   30.87   |   25.37   |   39.37   | 53.11 | 82.00 |
+|                ~~GIOU5-v2~~                |   28.72   | 49.67 |   16.71   |   31.00   |   25.49   |   39.56   | 53.12 | 82.01 |
+|                ~~DIOU5-v2~~                |   28.06   | 49.62 |   15.96   |   30.17   |   24.82   |   38.47   | 52.62 | 82.00 |
+|                ~~CIOU5-v2~~                |   25.69   | 49.37 |   13.50   |   25.62   |   20.98   |   32.90   | 51.49 | 81.94 |
+|             IouFamily6-convex              |           |       |           |           |           |           |       |       |
+
+#### 4.7.2 Attention Mechanism [:eyes:]
 
 <a id='Attention'></a>
 
-### 4.7 After more Graph Neural Network [:tada:]
+### 4.8 After more Graph Neural Network [:tada:]
 
 Motivated by the influence of self loop, I wanna explore more about variants graph convolution operations. Although all of these variants are based on `MessagePassing` paradigm, there is no any paper about graph-based trackers to figure out the best model in MOT. And I will attempt to change the structure of `vanilla model`  and do experiments to find the best, with my limited knowledge of GNN and MOT. Here are several variants of `vanilla model` that I wanna try:
 
 1. Deepen message function of my graph neural network in `Vanilla model`.(marked as `deepMsg`)
    $$
-   ^{s}g^{l+1}_i:= \Phi\{\max _{j \in \mathbb{N}_i}{f([~Edge~emb ~\cdot~(^{s}g_j^{l} - ^{s}g_i^{l})~ ]\}})\\
-   ^{s}g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([^{s}g_i^{l}~\cdot~(^{s}g_j^{l} - ^{s}g_i^{l})~]})\\
+   ^{s}g^{l+1}_i=& \Phi\{\max _{j \in \mathbb{N}_i}{f([~Edge~emb ~\cdot~(^{s}g_j^{l} - ^{s}g_i^{l})~ ]\}})\\
+   ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^{d}g_i^{l}~\cdot~(^{d}g_j^{l} - ^{d}g_i^{l})~]})\\
    $$
 
    - The reason why I wanna deepen my message function of vanilla model is that there is only one full connected layer $f(\cdot )$ to fuse the feature $Edge~emb$ and $g_j -g_i$, which has not enough ability to align the feature space, thus harmful to my model. So I wanna deepen my message function.:pray:
 
+   ![deepMsg](./.assert/deepMsg.bmp)
+
 2. Change aggregation `max` to `mean`: (marked as `meanAggr`)
    $$
-   ^{s}g^{l+1}_i:=  \Phi (\frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])})\\
-   ^{d}g^{l+1}_i:= \frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
+   ^{s}g^{l+1}_i=&  \Phi (\frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])})\\
+   ^{d}g^{l+1}_i=& \frac{1}{N_i}\sum _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
    $$
+   ![meanAggr](./.assert/meanAggr.bmp)
 
 3. Reimplement graph convolutions: (which is similar to Graphconv  || marked as `Graphconv`)
    $$
-   ^{s}g^{l+1}_i:= \Phi \{~f_1(^{s}g_i^l) +\max _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])}~\}\\
-   ^{d}g^{l+1}_i:= \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
+   ^{s}g^{l+1}_i=& \Phi \{~f_1(^{s}g_i^l) +\max _{j \in \mathbb{N}_i}{f([Edge~emb\cdot~(^s g_j^{l} - ^s g_i^{l}) ])}~\}\\
+   ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~(^d g_j^{l} - ^d g_i^{l})])}
    $$
 
    - Let\`s consider an extremely special case that there is only one object detected. In such cases, the graph contains only one nodes and only one edge , i.e. its self loop. The node features extracted by `NodeEncoder` are normal, while edge features generated by `EdgeEncoder` become a extremely sparse tensor. After my model calculating, the output node features also become a extremely sparse tensor, whose essential features, like appearance features, are lost in the calculation of static graph convolution network. So inspired by the idea of `Graphconv` and residual connection , I propose this formulation which can keep some inherent features rather than differences. And hoping it can improve the robustness of my model :pray: 
 
 4. Add edge embedding in dynamic graph: ( Because my model will construct the dynamic graph in higher feature space, it\`s of necessity to **recalculate the edge embedding** ,recorded as $Edge~emb^*$ || marked as `DoubleEdgeEmb`) 
    $$
-   ^{s}g^{l+1}_i:=& \Phi \{~f_1(^{s}g_i^l) +\max _{j \in \mathbb{N}_i}{f([Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ])}~\}\\
-   ^{d}g^{l+1}_i:=& \max _{j \in \mathbb{N}_i}{f([^{d}g_i^l~ \cdot ~Edge~emb^* ~\cdot ~(^d g_j^{l} - ^d g_i^{l})])}
+   ^{s}g^{l+1}_i=& \Phi \{~f_1(^{s}g_i^l) +\max _{j \in \mathbb{N}_i}{f([Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ])}~\}\\
+   ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^{d}g_i^l~ \cdot ~Edge~emb^* ~\cdot ~(^d g_j^{l} - ^d g_i^{l})])}
    $$
 
 5. Extra concatenate of node\`s own features: (marked as `selfConcat`)]
    $$
-   ^{s}g^{l+1}_i:=& \Phi \{~\max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ]~\}} \\
-   ^{d}g^{l+1}_i:=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~Edge~emb^* \cdot ~(^d g_j^{l} - ^d g_i^{l})~ ])}
+   ^{s}g^{l+1}_i=& \Phi \{~\max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ]~\}} \\
+   ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~Edge~emb^* \cdot ~(^d g_j^{l} - ^d g_i^{l})~ ])}
    $$
 
 |          Model Variants          |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
@@ -596,6 +719,27 @@ Motivated by the influence of self loop, I wanna explore more about variants gra
 | DouleEdgeEmb<br/>*w/o* self-loop |   24.59   | 49.65 |   12.27   |   24.92   |   20.47   |   31.86   | 52.55 | 81.94 |
 |          **selfConcat**          | **28.64** | 50.05 | **16.55** | **29.99** | **24.70** | **38.15** | 54.89 | 81.92 |
 
+Noted that the method of adding up to enhance one\`s own features is not quite effective, i.e. `GraphConv` and `DoubleEdgeEmb`. Instead, the method of concatenation seems to perform better, i.e. `selfConcat`. So let me dig further out the potentiality of concatenation.
+
+1. Just concatenate of node\`s own feature in the static graph convolution network: (marked as `StatiSelfConcat`)
+   $$
+   ^{s}g^{l+1}_i=& \Phi \{~\max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ]~\}} \\
+   ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot(^d g_j^{l} - ^d g_i^{l})~ ])}
+   $$
+
+2. Swap two graph convolution methods: (marked as `SwapConv`)
+   $$
+   ^{s}g^{l+1}_i=& \Phi\{\max _{j \in \mathbb{N}_i}{f([^{s}g_i^{l}~\cdot~(^{s}g_j^{l} - ^{s}g_i^{l})~]\}})\\
+   ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([~Edge~emb ~\cdot~(^{d}g_j^{l} - ^{d}g_i^{l})~ ]})\\
+   $$
+
+|            Model Variants            |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+|  StaticSelfConcat<br>*w/* self-loop  |   25.12   | 50.09 |   12.71   |   25.67   |   21.13   |   32.70   | 53.94 | 81.95 |
+| StaticSelfConcat<br/>*w/o* self-loop |   26.45   | 50.14 |   14.07   |   26.78   |   22.05   |   34.10   | 54.28 | 81.98 |
+|      SwapConv<br>*w/* self-loop      |   29.74   | 50.18 |   17.76   |   30.79   |   25.37   |   39.14   | 55.50 | 81.96 |
+|     SwapConv<br/>*w/o* self-loop     | **30.73** | 50.35 | **18.91** | **32.32** | **26.64** | **41.07** | 56.33 | 81.98 |
+
 ----
 
 Noticed that the big improvement by `deepMsg`, I think the misalignment of edge embedding feature space and node embedding feature space is quite harmful to my model. And this problem becomes more serious with increasing stacking GNN layers.  :confused: In my opinion, this problem also leads to the weird and counterintuitive, at least for me , phenomenon in [Sec 4.6.1 several Variants of Edge Embedding](#weirdPhenomenon). More specifically, the more information the original edge embedding contains , the more complicated the original edge embedding feature space is. And it is quite impossible for fewer fc layers to align the edge feature space and node feature space. And it is necessary to redo some experiments concerning variants of edge embedding by utilizing some fc layers to transform edge embedding into a suitable feature space. And there are two measures I wanna take:
@@ -605,60 +749,106 @@ Noticed that the big improvement by `deepMsg`, I think the misalignment of edge 
 
 Now let\`s focus on **Simple Strategy** in this Section. Considering the size of edge embedding, this can further be divided into three approaches: the first is to always maintain consistency in the feature dimensions, i.e. 16 dimensions , the second is to allow the dimension of edge embedding to increase progressively as GCNN layers are stacked, in parallel with the increasing dimensions of node features., while the last one is to utilize raw edge attribute , like the formulations in [Sec 4.6.1 ](#weirdPhenomenon), without any fc layers to  elevate dimension to 16-dim. Named separately as `FixedEdgeDim` , `ProgressiveEdgeDim` and `RawEdgeAttr` .
 
+![simpleStrategy](./.assert/simpleStrategy.bmp)
+
 P.S. the following experiments will not apply `deepMsg`, for fair comparison.
 
 | Vanilla Model<br>[ConvexNorm4-v2] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|            FixedEdgeDim             |       |       |       |       |       |       |       |       |
-|         ProgressiveEdgeDim          | 31.93 | 49.62 | 20.66 | 35.31 | 29.07 | 44.96 | 55.65 | 89.50 |
-|             RawEdgeAttr             |       |       |       |       |       |       |       |       |
+|          ~~FixedEdgeDim~~           | 30.14 | 49.61 | 18.42 | 33.11 | 27.25 | 42.18 | 55.04 | 82.01 |
+|       ~~ProgressiveEdgeDim~~        | 31.93 | 49.62 | 20.66 | 35.31 | 29.07 | 44.96 | 55.65 | 89.50 |
+|           ~~RawEdgeAttr~~           | 33.38 | 49.54 | 22.60 | 37.62 | 30.98 | 47.88 | 55.26 | 81.96 |
 
 | Vanilla Model<br>[MaxNorm4-v2] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|           FixedEdgeDim           | 30.01 | 49.71 | 18.23 | 33.07 | 27.21 | 42.15 | 53.97 | 81.93 |
-|        ProgressiveEdgeDim        | 28.73 | 49.64 | 16.71 | 31.80 | 26.15 | 40.55 | 53.98 | 82.00 |
-|           RawEdgeAttr            |       |       |       |       |       |       |       |       |
+|         ~~FixedEdgeDim~~         | 30.01 | 49.71 | 18.23 | 33.07 | 27.21 | 42.15 | 53.97 | 81.93 |
+|      ~~ProgressiveEdgeDim~~      | 28.73 | 49.64 | 16.71 | 31.80 | 26.15 | 40.55 | 53.98 | 82.00 |
+|         ~~RawEdgeAttr~~          | 29.26 | 49.80 | 17.28 | 32.87 | 27.04 | 41.89 | 51.88 | 82.00 |
 
 | Vanilla Model[DIoUd5] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|      FixedEdgeDim       |       |       |       |       |       |       |       |       |
-|   ProgressiveEdgeDim    |       |       |       |       |       |       |       |       |
+|      FixedEdgeDim       | 29.41 | 50.29 | 17.33 | 31.01 | 25.57 | 39.40 | 55.81 | 81.95 |
+|   ProgressiveEdgeDim    | 30.69 | 50.30 | 18.76 | 32.68 | 26.95 | 41.51 | 55.73 | 81.97 |
 |       RawEdgeAttr       | 25.98 | 49.85 | 13.68 | 26.18 | 21.53 | 33.40 | 52.82 | 81.90 |
 
 | Vanilla Model[GIoUd5] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |      FixedEdgeDim       | 23.20 | 49.50 | 10.96 | 22.70 | 18.62 | 29.07 | 51.29 | 81.94 |
 |   ProgressiveEdgeDim    | 23.33 | 49.66 | 11.05 | 23.53 | 19.32 | 30.10 | 51.72 | 81.94 |
-|       RawEdgeAttr       |       |       |       |       |       |       |       |       |
+|       RawEdgeAttr       | 26.18 | 50.03 | 13.85 | 27.20 | 22.39 | 34.66 | 53.48 | 81.95 |
 
-| Vanilla Model<br>[IoUFamily8-convex-v2] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :---------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|               FixedEdgeDim                | 30.47 | 49.59 | 18.81 | 34.08 | 28.03 | 43.47 | 55.15 | 81.99 |
-|            ProgressiveEdgeDim             |       |       |       |       |       |       |       |       |
-|                RawEdgeAttr                |       |       |       |       |       |       |       |       |
+| Vanilla Model<br>[IoUFamily8-convex-seq] + |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :----------------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+|              ~~FixedEdgeDim~~              |   30.47   | 49.59 |   18.81   |   34.08   |   28.03   |   43.47   | 55.15 | 81.99 |
+|           ~~ProgressiveEdgeDim~~           |   29.67   | 49.38 |   17.95   |   30.73   |   25.19   |   39.41   | 53.92 | 82.01 |
+|              ~~RawEdgeAttr~~               | **39.76** | 50.00 | **31.73** | **47.00** | **38.71** | **59.81** | 58.51 | 81.99 |
 
-### 4.8 After Cosine-based Dynamic Graph [:tada:]
+What surprises me is that there is a slight improvement in most experiments. After in-depth thinking, there is indeed an issue of feature space misalignment here, one space represents the  edge embedding space , while the other corresponds to the node embedding space. More specifically, One is position feature space,while the other is appearance feature space.
 
-Considering that **the measurement based on cosine similarity in the graph match**, I change the dynamic graph based Euclidean distance to **cosine distance based** , just hoping my model can learn more discriminative features in the feature space based on cosine distance. 
+<a id='sec4.7'></a>And in the view of multi-modal fusion or multi-view fusion, what I should focus more on is the **fusion** rather than alignment. It also explains well why the model `deepMsg` performs better — due to the added a fully connected layer, which fuses the appearance features and position features better. 
 
-|       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-| Vanilla one<sup>*</sup> |   23.31   | 49.68 |   11.03   |   22.87   |   18.76   |   29.28   | 51.74 | 81.89 |
-|      Cosine-based       | **27.19** | 50.33 | **14.81** | **28.39** | **23.40** | **36.08** | 55.34 | 81.93 |
+### 4.9 After Bigger Model
 
-<img src="./.assert/cosinegraph-index.bmp" alt="cosinegraph-index" style="zoom:25%;" />
+Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct some experiments concerning the depth of model.
 
-### 4.9 After Superior Appearance Feature Extractor [:eyes:]
+#### 4.9.1 About Message Layer
+
+![deepmsg2](./.assert/deepmsg2.bmp)
+
+|      Model Variant      | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> | 23.31 | 49.68 | 11.03 | 22.87 | 18.76 | 29.28 | 51.74 | 81.89 |
+|      **DeepMsg-1**      | 28.85 | 50.37 | 16.66 | 30.05 | 24.78 | 38.17 | 55.63 | 81.97 |
+|        DeepMsg-2        | 28.92 | 50.21 | 16.81 | 30.40 | 25.05 | 38.66 | 55.36 | 81.98 |
+
+<img src="./.assert/smoothFamily.bmp" alt="smoothFamily" style="zoom:50%;" />
+
+|   Model Variant    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|    Vanilla one*    | 23.31 | 49.68 | 11.03 | 22.87 | 18.76 | 29.28 | 51.74 | 81.89 |
+| **Static-smooth**  | 27.71 | 50.24 | 15.39 | 28.51 | 23.50 | 36.23 | 55.57 | 81.94 |
+| **Dynamic-smooth** | 28.38 | 50.12 | 16.21 | 29.73 | 24.49 | 37.82 | 54.89 | 81.96 |
+
+#### 4.9.2 About Update Layer
+
+![upd-2](./.assert/upd-2.bmp)
+
+| Model Variant | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one*  | 23.31 | 49.68 | 11.03 | 22.87 | 18.76 | 29.28 | 51.74 | 81.89 |
+|   DeepUpd-2   | 26.85 | 50.21 | 14.48 | 27.76 | 22.88 | 35.29 | 54.79 | 81.97 |
+
+#### 4.9.3 About Fuse Model
+
+![deepFuse](./.assert/deepFuse.bmp)
+
+| Model Variant | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one*  | 23.31 | 49.68 | 11.03 | 22.87 | 18.76 | 29.28 | 51.74 | 81.89 |
+|  DeepFuse-1   |       |       |       |       |       |       |       |       |
+|  DeepFuse-2   |       |       |       |       |       |       |       |       |
+|  DeepFuse-3   |       |       |       |       |       |       |       |       |
+
+#### 4.9.4 Summary
 
 
 
-### 4.10 After Larger Dataset [:tada:]
+| Model Variant | Mode Size (MB) | Params (M) | FLOPS (G) |
+| :-----------: | :------------: | :--------: | :-------: |
+| Vanilla one*  |     38.26      |    9.85    |   29.98   |
+| Bigger Model  |                |            |           |
+
+![flops-para(vanilla)](./.assert/flops-para(vanilla).bmp)
+
+### 4.10 After Superior Appearance Feature Extractor [:eyes:]
+
+
+
+### 4.11 After Larger Dataset [:tada:]
 
 One of the core and useful experience or intuition in the era of deep learning is that `if you have a large big dataset and you train a very big neural network, then success is guaranted` (quoted from [llya`s speech at NeurlPS conference in 2024](https://www.bilibili.com/video/BV1cSBGYkE9w/?spm_id_from=333.337.search-card.all.click&vd_source=812705912b7abe259d54d8593a97a8b3)) , like CLIP model trained in 400 million dataset.
 
 So I also attempt to add more benchmark, like MOT20 and DanceTrack, to enlarge the training dataset. Finally, the number of data is reached to **48856**, which is **20x times than before**. And the time expense is also huge , which maybe cost **3 days** to complete the whole training, **3x times than before.**
-
-P.S. the model structure of Larger Dataset is slightly different Vanilla one<sup>*</sup>, where I **add another dim into edge embedding , replace edgeconv into graphconv and change dynamic graph based on Euclidean distance to Cosine distance based**. All of modifications **poses negative influences** on model performance according to the experimental results in this documentation. **Therefore, the impact of data volume on model performance is quite evident.**
 
 |       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  |   MOTP    |
 | :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :-------: |

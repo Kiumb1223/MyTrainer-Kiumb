@@ -26,9 +26,9 @@ def main():
         }
     }
 
-    which_to_train_list = ['MOT17']
-    # which_to_train_list = ['MOT17','MOT20','DanceTrack']
-    save_json_path      = r'configs\train_MOT17.json'
+    # which_to_train_list = ['MOT17']
+    which_to_train_list = ['MOT17','MOT20','DanceTrack']
+    save_json_path      = r'configs\train_Mix.json'
     
     
     for dataset_name in which_to_train_list:

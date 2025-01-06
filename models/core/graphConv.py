@@ -34,8 +34,12 @@ class StaticConv(MessagePassing):
         self.graphModel_type = graphModel_type
         if self.graphModel_type in  ['vanilla','graphConv','doubleEdgeEmb']:
             assert nodeEmb_size + edgeEmb_size == msgLayer_dims[0]
-        elif self.graphModel_type == 'selfConcat':
+        elif self.graphModel_type in ['selfConcat','StaticSelfConcat']:
             assert nodeEmb_size*2 + edgeEmb_size == msgLayer_dims[0]
+        elif self.graphModel_type in ['SwapConv']:
+            assert nodeEmb_size*2 == msgLayer_dims[0]
+        elif self.graphModel_type in ['pureAppear']:
+            assert nodeEmb_size == msgLayer_dims[0]
         else:
             AttributeError(f'graphModel_type {self.graphModel_type} is not supported')
 
@@ -54,14 +58,14 @@ class StaticConv(MessagePassing):
             )
 
         self.msg_func    = SequentialBlock(
-                in_dim=msg_in, out_dim=msg_out, hidden_dim= msg_hidden,
+                in_dim=msg_in, out_dim=msg_out, hidden_dim=msg_hidden,
                 layer_type =layer_type, layer_bias=layer_bias,
                 use_batchnorm=use_batchnorm, 
                 activate_func=activate_func, lrelu_slope=lrelu_slope
             )
 
         self.update_func = SequentialBlock(
-                in_dim=upd_in, out_dim=upd_out, hidden_dim= upd_hidden,
+                in_dim=upd_in, out_dim=upd_out, hidden_dim=upd_hidden,
                 layer_type =layer_type,layer_bias=layer_bias,
                 use_batchnorm=use_batchnorm, 
                 activate_func=activate_func, lrelu_slope=lrelu_slope
@@ -79,11 +83,15 @@ class StaticConv(MessagePassing):
         '''
         if self.graphModel_type in  ['vanilla','graphConv','doubleEdgeEmb']:
             return self.msg_func(torch.cat([edge_attr,x_j - x_i], dim=1))
-        elif self.graphModel_type == 'selfConcat':
+        elif self.graphModel_type in ['selfConcat','StaticSelfConcat']:
             return self.msg_func(torch.cat([x_i,edge_attr,x_j - x_i], dim=1))
-    
+        elif self.graphModel_type in ['SwapConv']:
+            return self.msg_func(torch.cat([x_i,x_j - x_i], dim=1))
+        elif self.graphModel_type in ['pureAppear']:
+            return self.msg_func(x_j - x_i)
+
     def update(self, msg:torch.Tensor,x:torch.Tensor) -> torch.Tensor:
-        if self.graphModel_type in ['vanilla','selfConcat']:
+        if self.graphModel_type in ['vanilla','selfConcat','StaticSelfConcat','SwapConv','pureAppear']:
             return self.update_func(msg)
         elif self.graphModel_type in ['graphConv','doubleEdgeEmb']:
             return self.update_func(self.res_node_func(x) + msg)
@@ -108,7 +116,7 @@ class DynamicGonv(MessagePassing):
         
         self.graphModel_type = graphModel_type
 
-        if self.graphModel_type in ['vanilla','graphConv']:
+        if self.graphModel_type in ['vanilla','graphConv','StaticSelfConcat','pureAppear']:
             assert 2 * nodeEmb_size == msgLayer_dims[0]
             self.bt_cosine     = bt_cosine
             self.bt_self_loop  = bt_self_loop
@@ -122,7 +130,15 @@ class DynamicGonv(MessagePassing):
             edge_model_dict['bt_directed']   = bt_directed
 
             self.dg_edgeEncoder = EdgeEncoder(edge_mode,edge_model_dict)
+            
+        elif self.graphModel_type in ['SwapConv']:
+            assert nodeEmb_size + edgeEmb_size == msgLayer_dims[0]
 
+            edge_model_dict['bt_cosine']     = bt_cosine
+            edge_model_dict['bt_self_loop']  = bt_self_loop
+            edge_model_dict['bt_directed']   = bt_directed
+
+            self.dg_edgeEncoder = EdgeEncoder(edge_mode,edge_model_dict)
     
 
         msg_in , msg_hidden , msg_out = parse_layer_dimension(msgLayer_dims)
@@ -147,10 +163,10 @@ class DynamicGonv(MessagePassing):
     def forward(self,node_emb :torch.Tensor,graph :Union[Batch,Data],k:int) -> torch.Tensor:
         graph.x = node_emb
 
-        if self.graphModel_type in ['vanilla','graphConv']:
+        if self.graphModel_type in ['vanilla','graphConv','StaticSelfConcat','pureAppear']:
             edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_directed=self.bt_directed) 
             edge_attr  = None
-        elif self.graphModel_type in ['doubleEdgeEmb','selfConcat']:
+        elif self.graphModel_type in ['doubleEdgeEmb','selfConcat','SwapConv']:
             graph = self.dg_edgeEncoder(graph,k)
             edge_index = graph.edge_index            
             edge_attr  = graph.edge_attr
@@ -162,11 +178,13 @@ class DynamicGonv(MessagePassing):
         x_i : target nodes 
         x_j : source nodes
         '''
-        if self.graphModel_type in ['vanilla','graphConv']:
+        if self.graphModel_type in ['vanilla','graphConv','StaticSelfConcat','pureAppear']:
             return self.msg_func(torch.cat([x_i,x_j-x_i],dim=1))
         elif self.graphModel_type in ['doubleEdgeEmb','selfConcat']:
             return self.msg_func(torch.cat([x_i,edge_attr,x_j-x_i],dim=1))
-   
+        elif self.graphModel_type in ['SwapConv']:
+            return self.msg_func(torch.cat([edge_attr,x_j-x_i],dim=1))
+        
     def update(self, msg:torch.Tensor,x:torch.Tensor) -> torch.Tensor:
         return self.update_func(msg)    
 
