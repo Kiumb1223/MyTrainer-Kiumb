@@ -93,7 +93,7 @@ And the GCNNMatch is :warning:**extremely time-consuming**, which takes about 2 
 ----
 
 - For the purpose of  **fast training  and relatively fair comparison** , my own model also **trains on half data  of MOT17 and tests on MOT17-half**. Besides, **max epoch is set to 40, batch size is set to 16, warmup iterations are set to 500**.
-- And **random seed is set to 3407 ** || **k is set to 2 **
+- And **random seed is set to 3407** || **k is set to 2**
 
 Here is the original quantitative results of my model without **any modification on model structure or the use of any data augmentation techniques**. 
 
@@ -650,18 +650,19 @@ And here are the summary results.
 |                 Experiment                 |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :----------------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | ----- |
 |           IouFamily8-vanilla-seq           |   28.04   | 50.24 |   15.75   |   29.57   |   24.36   |   37.64   | 55.17 | 81.98 |
-|     ~~IouFamily8-convex-seq~~<br>4090      | **32.89** | 49.64 |   21.94   | **36.89** | **30.37** | **46.99** | 55.37 | 81.98 |
+|           IouFamily8-convex-seq            |   28.45   | 50.20 |   16.24   |   29.97   |   24.70   |   38.06   | 55.53 | 81.93 |
+|    IouFamily8-convex-seq<br>[`deepMsg`]    |           |       |           |           |           |           |       |       |
 | ~~IouFamily8-separate-seq~~<br>[`deepMsg`] |   37.72   | 49.88 |   28.65   |   43.39   |   35.75   |   55.17   | 57.84 | 82.01 |
-|    ~~IouFamily8-separate-seq~~<br>4090     |   29.32   | 49.74 |   17.39   |   31.69   |   26.08   |   40.39   | 54.06 | 81.96 |
-|     ~~ConvexNorm4-v2~~<br>[`deepMsg`]      |   42.18   | 50.24 |   35.55   |   48.97   |   40.36   |   62.24   | 58.53 | 82.01 |
-|       ~~MaxNorm4-v2~~<br>[`deepMsg`]       | **42.68** | 49.96 | **36.60** | **49.09** | **40.48** | **62.38** | 58.72 | 81.96 |
-|         ~~ConvexNorm4-v2~~<br>3090         |   29.56   | 49.64 |   17.71   |   32.76   |   26.94   |   41.78   | 53.89 | 81.95 |
-|          ~~MaxNorm4-v2~~<br>3090           | **31.77** | 49.63 | **20.48** | **34.85** | **28.66** | **44.46** | 53.77 | 82.00 |
-|           ~~GIOUd5-v2~~<br>4090            |   28.30   | 49.84 |   16.18   |   30.87   |   25.37   |   39.37   | 53.11 | 82.00 |
-|                ~~GIOU5-v2~~                |   28.72   | 49.67 |   16.71   |   31.00   |   25.49   |   39.56   | 53.12 | 82.01 |
-|                ~~DIOU5-v2~~                |   28.06   | 49.62 |   15.96   |   30.17   |   24.82   |   38.47   | 52.62 | 82.00 |
-|                ~~CIOU5-v2~~                |   25.69   | 49.37 |   13.50   |   25.62   |   20.98   |   32.90   | 51.49 | 81.94 |
-|             IouFamily6-convex              |           |       |           |           |           |           |       |       |
+|          IouFamily8-separate-seq           |   26.67   | 50.25 |   14.26   |   28.04   |   23.10   |   35.66   | 55.10 | 81.96 |
+|       ConvexNorm4-v2<br>[`deepMsg`]        |   27.21   | 50.24 |   14.87   |   28.28   |   23.31   |   35.93   | 55.22 | 81.93 |
+|         MaxNorm4-v2<br>[`deepMsg`]         |   27.94   | 50.14 |   15.71   |   28.91   |   23.82   |   36.75   | 54.95 | 81.94 |
+|               ConvexNorm4-v2               |   28.16   | 50.22 |   15.91   |   29.74   |   24.51   |   37.80   | 55.53 | 81.97 |
+|                MaxNorm4-v2                 |   27.24   | 50.09 |   14.93   |   28.33   |   23.33   |   36.06   | 54.84 | 81.94 |
+|                 GIOUd5-v2                  |   26.41   | 50.12 |   14.02   |   26.94   |   22.18   |   34.29   | 54.85 | 81.96 |
+|    ~~GIOU5-v2~~<br>:small_red_triangle:    |   28.72   | 49.67 |   16.71   |   31.00   |   25.49   |   39.56   | 53.12 | 82.01 |
+|                  DIOU5-v2                  |   27.09   | 50.18 |   14.74   |   28.25   |   23.27   |   35.95   | 54.96 | 81.97 |
+|                  CIOU5-v2                  |   26.71   | 50.09 |   14.37   |   27.84   |   22.93   |   35.43   | 54.69 | 81.96 |
+|             IouFamily6-convex              | **29.95** | 50.29 | **18.00** | **31.39** | **25.89** | **39.87** | 55.87 | 81.95 |
 
 #### 4.7.2 Attention Mechanism [:eyes:]
 
@@ -763,7 +764,7 @@ P.S. the following experiments will not apply `deepMsg`, for fair comparison.
 | :------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |         ~~FixedEdgeDim~~         | 30.01 | 49.71 | 18.23 | 33.07 | 27.21 | 42.15 | 53.97 | 81.93 |
 |      ~~ProgressiveEdgeDim~~      | 28.73 | 49.64 | 16.71 | 31.80 | 26.15 | 40.55 | 53.98 | 82.00 |
-|         ~~RawEdgeAttr~~          | 29.26 | 49.80 | 17.28 | 32.87 | 27.04 | 41.89 | 51.88 | 82.00 |
+|           RawEdgeAttr            | 25.70 | 49.90 | 13.37 | 26.58 | 21.88 | 33.86 | 53.69 | 81.91 |
 
 | Vanilla Model[DIoUd5] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -777,11 +778,11 @@ P.S. the following experiments will not apply `deepMsg`, for fair comparison.
 |   ProgressiveEdgeDim    | 23.33 | 49.66 | 11.05 | 23.53 | 19.32 | 30.10 | 51.72 | 81.94 |
 |       RawEdgeAttr       | 26.18 | 50.03 | 13.85 | 27.20 | 22.39 | 34.66 | 53.48 | 81.95 |
 
-| Vanilla Model<br>[IoUFamily8-convex-seq] + |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :----------------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|              ~~FixedEdgeDim~~              |   30.47   | 49.59 |   18.81   |   34.08   |   28.03   |   43.47   | 55.15 | 81.99 |
-|           ~~ProgressiveEdgeDim~~           |   29.67   | 49.38 |   17.95   |   30.73   |   25.19   |   39.41   | 53.92 | 82.01 |
-|              ~~RawEdgeAttr~~               | **39.76** | 50.00 | **31.73** | **47.00** | **38.71** | **59.81** | 58.51 | 81.99 |
+| Vanilla Model<br>[IoUFamily8-convex-seq] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|              ~~FixedEdgeDim~~              | 30.47 | 49.59 | 18.81 | 34.08 | 28.03 | 43.47 | 55.15 | 81.99 |
+|           ~~ProgressiveEdgeDim~~           | 29.67 | 49.38 | 17.95 | 30.73 | 25.19 | 39.41 | 53.92 | 82.01 |
+|                RawEdgeAttr                 | 25.45 | 50.09 | 13.04 | 26.90 | 22.13 | 34.28 | 53.75 | 81.92 |
 
 What surprises me is that there is a slight improvement in most experiments. After in-depth thinking, there is indeed an issue of feature space misalignment here, one space represents the  edge embedding space , while the other corresponds to the node embedding space. More specifically, One is position feature space,while the other is appearance feature space.
 

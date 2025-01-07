@@ -22,8 +22,8 @@ def get_config():
         EMABLE_AMP        = True,
         WORK_DIR          = "largeDataset",
 
-        BATCH_SIZE        = 16,
-        MAXEPOCH          = 120,
+        BATCH_SIZE        = 2,
+        MAXEPOCH          = 121,
 
         LR                = 1e-2,
         # Optimizer Adamw
@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\ModelZoo\dynamic-smooth.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\EdgeZoo\ConvexNorm4-v2-wrongButWorthy.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

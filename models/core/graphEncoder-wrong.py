@@ -10,21 +10,90 @@ from torch_geometric.data import Batch,Data
 import torchvision.transforms.functional as T
 from models.graphToolkit import knn,calc_iouFamily
 from models.core.fastReid import load_fastreid_model
-from models.core.layerToolkit import SequentialBlock,parse_layer_dimension
 
-__all__ = ['NodeEncoder','EdgeEncoder']
 
+__all__ = ['SequentialBlock','NodeEncoder','EdgeEncoder']
+
+class SequentialBlock(nn.Module):
+    '''
+    A dynamic module constructor that uses `layer_type` to dynamically select layer types 
+    and build a configurable network.
+    '''
+    def __init__(self, in_dim :int, out_dim :int, hidden_dim:Union[list,tuple], 
+                 layer_type :str, layer_bias :bool,
+                 use_batchnorm :bool ,activate_func :str, lrelu_slope:float =0.0,
+                 final_activation :bool=True):
+        '''
+        :param in_dim: Input dimension of the first layer.
+        :param out_dims: A list of output dimensions for each layer (supports multiple layers).
+        :param layer_type: The type of layer to use, e.g., 'linear' (fully connected), 'conv1d'.
+        :param layer_bias: Whether to use bias in Conv1d or Linear layers.        
+        :param batch_norm: Whether to add BatchNorm after each layer.
+        :param activate_func: Activation function type, e.g., 'relu', 'lrelu', 'sigmoid', 'tanh', etc.
+        :param lrelu_slope: Negative slope for LeakyReLU activation.
+        :param final_activation: Whether to add activation after the last layer (default is True).
+        '''
+        super(SequentialBlock, self).__init__()
+
+        layer_type = layer_type.lower()
+        activate_func = activate_func.lower()
+
+        activation_map = {
+            'relu': nn.ReLU(inplace=True),
+            'lrelu': nn.LeakyReLU(negative_slope=lrelu_slope, inplace=True),
+        }
+        
+        assert isinstance(hidden_dim, (list, tuple)), 'modules_dims must be either a list or a tuple, but got {}'.format(type(hidden_dim))
+        assert layer_type in ['linear','conv1d'] , f"Unsupported layer type: {layer_type}. "
+        assert activate_func in activation_map , f"Unsupported activation function: {activate_func}. " + f"Supported functions are: {list(activation_map.keys())}"
+        
+        layers = []
+        if out_dim is None:
+            # If out_dim is None, use the last element of hidden_dim as the output dimension
+            dims_list = hidden_dim
+        else:
+            dims_list = hidden_dim + [out_dim]
+        activate_layer = activation_map[activate_func]
+        length = len(dims_list)
+        for cnt,dim in enumerate(dims_list):
+            if layer_type == 'conv1d':
+                layers.append(nn.Conv1d(in_dim, dim, kernel_size=1, bias=layer_bias))
+            elif layer_type == 'linear':
+                layers.append(nn.Linear(in_dim, dim, bias=layer_bias))
+
+            if cnt < length - 1 or final_activation:
+                if use_batchnorm:
+                    layers.append(nn.BatchNorm1d(dim))
+                layers.append(activate_layer)
+            in_dim = dim
+        self.layers = nn.Sequential(*layers)
+
+        self._initialize_weights(lrelu_slope)
+
+    def _initialize_weights(self,lrelu_slope):
+        for m in self.layers:
+            if isinstance(m,nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            if isinstance(m,nn.Conv1d):
+                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope,mode='fan_out')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, input):
+        return self.layers(input)
 
 class NodeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
     def __init__(self, node_model_dict :dict):
         
         super(NodeEncoder, self).__init__()
-
-        assert node_model_dict['dims_list'] is not [] , '[node_encoder] dims_list is empty'
-
-        in_dim , mid_dim , out_dim = parse_layer_dimension(node_model_dict['dims_list'])
-
+        in_dim , *mid_dim , out_dim = node_model_dict['dims_list']
+        self.head = nn.ModuleList()
         self.backbone = self.gen_backbone(node_model_dict['backbone'],node_model_dict['wight_path'])
         if node_model_dict['backbone'] == 'densenet121':
             self.head = nn.Sequential(
@@ -36,16 +105,14 @@ class NodeEncoder(nn.Module):
                 SequentialBlock(
                     in_dim, out_dim, mid_dim,
                     node_model_dict['layer_type'], node_model_dict['layer_bias'],
-                    node_model_dict['use_batchnorm'], 
-                    node_model_dict['activate_func'],node_model_dict['lrelu_slope']
+                    node_model_dict['use_batchnorm'], node_model_dict['activate_func']
                 )
             )
         else:
             self.head = SequentialBlock(
                     in_dim, out_dim, mid_dim,
                     node_model_dict['layer_type'], node_model_dict['layer_bias'],
-                    node_model_dict['use_batchnorm'], 
-                    node_model_dict['activate_func'],node_model_dict['lrelu_slope']
+                    node_model_dict['use_batchnorm'], node_model_dict['activate_func']
                 )
         #  freeze model weights
         params = list(self.backbone.parameters())
@@ -69,84 +136,36 @@ class NodeEncoder(nn.Module):
         graph.x = self.head(graph.x)
         
         return graph   
-
-
-
-class EdgeEmbedRefiner(nn.Module):
-    '''graph.attr in and graph.attr out'''
-    def __init__(self, 
-        edge_mode :str,
-        edge_dim_in:int,
-        edge_dim_out:int,
-        edge_model_dict :dict,
-        ):
-        super(EdgeEmbedRefiner, self).__init__()
-
-        if edge_mode in ['vanilla','RawEdgeAttr']:
-            self.edge_refiner = lambda x :x
-        elif edge_mode == 'FixedEdgeDim':
-            assert edge_dim_in ==  edge_dim_out
-            self.edge_refiner = SequentialBlock(
-                    edge_dim_in, edge_dim_out,[],
-                    edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
-                    edge_model_dict['use_batchnorm'],
-                    edge_model_dict['activate_func'],edge_model_dict['lrelu_slope']
-                )
-        elif edge_mode == 'ProgressiveEdgeDim':
-            self.edge_refiner = SequentialBlock(
-                    edge_dim_in, edge_dim_out,[],
-                    edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
-                    edge_model_dict['use_batchnorm'],
-                    edge_model_dict['activate_func'],edge_model_dict['lrelu_slope']
-                )
-    def forward(self,edgeEmb :torch.Tensor):
-
-        return self.edge_refiner(edgeEmb)
-    
+        
 class EdgeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
-    def __init__(self, 
-        edge_mode: str,
-        edge_model_dict :dict,
-        ):
+    def __init__(self, edge_model_dict :dict,
+                ):
         super(EdgeEncoder, self).__init__()
         # assert edge_model_dict['edge_type'] in ["ImgNorm4","SrcNorm4","TgtNorm4", "MeanSizeNorm4", "MeanHeightNorm4",
         #         "MeanWidthNorm4","CorverxNorm4","MaxNorm4","IOU5", "DIOU5", "DIOU-Cos6", "IouFamily8"]
-        
-        
-        self.edge_mode = edge_mode
-        
-        assert not (edge_mode != 'RawEdgeAttr' and edge_model_dict['dims_list'] == []), \
-            "edge_mode is not 'RawEdgeAttr' but dims_list is empty"
-
-
-        in_dim , mid_dim , out_dim = parse_layer_dimension(edge_model_dict['dims_list'])
+        in_dim , *mid_dim , out_dim = edge_model_dict['dims_list']
         
         self.edge_type    = edge_model_dict['edge_type']
         self.bt_cosine    = edge_model_dict['bt_cosine']
         self.bt_self_loop = edge_model_dict['bt_self_loop']
         self.bt_directed  = edge_model_dict['bt_directed']
 
-        if self.edge_mode != 'RawEdgeAttr':
-            self.encoder  = SequentialBlock(
-                    in_dim, out_dim, mid_dim,
-                    edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
-                    edge_model_dict['use_batchnorm'],
-                    edge_model_dict['activate_func'],edge_model_dict['lrelu_slope']
-                )
+        self.encoder = SequentialBlock(in_dim, out_dim, mid_dim,
+                        edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
+                        edge_model_dict['use_batchnorm'],edge_model_dict['activate_func'])
   
     def forward(self,graph:Union[Batch,Data],k:int) -> Union[Batch,Data]:
         
         assert len(graph.x.shape) == 2 , 'Encode node attribute first!'
         
-        graph.edge_index = self.construct_edge_index(graph,k,
-                        bt_cosine=self.bt_cosine,bt_self_loop= self.bt_self_loop,bt_directed=self.bt_directed)
-        raw_edge_attr    = self.compute_edge_attr(graph)
+        with torch.no_grad():
+            graph.edge_index = self.construct_edge_index(graph,k,
+                                bt_cosine=self.bt_cosine,bt_self_loop= self.bt_self_loop,bt_directed=self.bt_directed)
+            raw_edge_attr    = self.compute_edge_attr(graph)
         
-        if self.edge_mode != 'RawEdgeAttr':
-            graph.edge_attr = self.encoder(raw_edge_attr)
-        else:
-            graph.edge_attr = raw_edge_attr
+        graph.edge_attr = self.encoder(raw_edge_attr)
+        
         return graph 
     
     @staticmethod
@@ -214,10 +233,6 @@ class EdgeEncoder(nn.Module):
     def _calc_edge_type(self,source_info,target_info,source_x,target_x):
 
         # location_info = [x,y,x2,y2,w,h,xc,yc,W,H]
-
-        #---------------------------------#
-        #  4-dims
-        #---------------------------------#
         if self.edge_type == 'ImgNorm4':
             feat1 = (source_info[:,6] - target_info[:,6]) /  source_info[:,8]
             feat2 = (source_info[:,7] - target_info[:,7]) /  source_info[:,9]
@@ -258,15 +273,15 @@ class EdgeEncoder(nn.Module):
             converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
             converx_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])
             converx_bbox_wh = torch.clamp((converx_bbox_lt - converx_bbox_rb), min=0)  # smallest enclosing bbox 
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             return torch.stack([feat1,feat2,feat3,feat4],dim =1)
         if self.edge_type == 'MaxNorm4':
             max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
-            feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  max_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  max_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  max_bbox_wh[:, 1]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             return torch.stack([feat1,feat2,feat3,feat4],dim =1)
@@ -274,25 +289,18 @@ class EdgeEncoder(nn.Module):
             converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
             converx_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])
             converx_bbox_wh = torch.clamp((converx_bbox_lt - converx_bbox_rb), min=0)  # smallest enclosing bbox 
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
-            # feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
-            # feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
             feat3 = (source_info[:,4] - target_info[:,4]) /  converx_bbox_wh[:, 0]
             feat4 = (source_info[:,5] - target_info[:,5]) /  converx_bbox_wh[:, 1]
             return torch.stack([feat1,feat2,feat3,feat4],dim =1)
         if self.edge_type == 'MaxNorm4-v2':
             max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
-            feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  max_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  max_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  max_bbox_wh[:, 1]
             feat3 = (source_info[:,4] - target_info[:,4]) /  max_bbox_wh[:, 0]
             feat4 = (source_info[:,5] - target_info[:,5]) /  max_bbox_wh[:, 1]
             return torch.stack([feat1,feat2,feat3,feat4],dim =1)
-    
-        #---------------------------------#
-        #  5-dims
-        #---------------------------------#
-        
         if self.edge_type == 'IOUd5':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
@@ -307,8 +315,6 @@ class EdgeEncoder(nn.Module):
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = calc_iouFamily(source_info,target_info,iou_type='iou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-        
-
         if self.edge_type == 'GIOUd5':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
@@ -322,27 +328,21 @@ class EdgeEncoder(nn.Module):
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = calc_iouFamily(source_info,target_info,iou_type='giou')
-            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)        
-        
+            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         if self.edge_type == 'GIOUd5-v2':
-            max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
-            feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  max_bbox_wh[:, 1]
-            feat3 = (source_info[:,4] - target_info[:,4]) /  max_bbox_wh[:, 0]
-            feat4 = (source_info[:,5] - target_info[:,5]) /  max_bbox_wh[:, 1]
+            feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         if self.edge_type == 'GIOU5-v2':
-            max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
-            feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  max_bbox_wh[:, 1]
-            feat3 = (source_info[:,4] - target_info[:,4]) /  max_bbox_wh[:, 0]
-            feat4 = (source_info[:,5] - target_info[:,5]) /  max_bbox_wh[:, 1]
+            feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
+            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = calc_iouFamily(source_info,target_info,iou_type='giou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-        
-        
-
         if self.edge_type == 'DIOUd5':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
@@ -355,16 +355,6 @@ class EdgeEncoder(nn.Module):
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
-            feat5 = calc_iouFamily(source_info,target_info,iou_type='diou')
-            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-        
-        
-        if self.edge_type == 'DIOU5-v2':
-            max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
-            feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  max_bbox_wh[:, 1]
-            feat3 = (source_info[:,4] - target_info[:,4]) /  max_bbox_wh[:, 0]
-            feat4 = (source_info[:,5] - target_info[:,5]) /  max_bbox_wh[:, 1]
             feat5 = calc_iouFamily(source_info,target_info,iou_type='diou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         if self.edge_type == 'CIOUd5':
@@ -381,14 +371,6 @@ class EdgeEncoder(nn.Module):
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = calc_iouFamily(source_info,target_info,iou_type='ciou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-        if self.edge_type == 'CIOU5-v2':
-            max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
-            feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  max_bbox_wh[:, 1]
-            feat3 = (source_info[:,4] - target_info[:,4]) /  max_bbox_wh[:, 0]
-            feat4 = (source_info[:,5] - target_info[:,5]) /  max_bbox_wh[:, 1]
-            feat5 = calc_iouFamily(source_info,target_info,iou_type='ciou')
-            return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         if self.edge_type == 'EIOUd5':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
@@ -403,12 +385,6 @@ class EdgeEncoder(nn.Module):
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = calc_iouFamily(source_info,target_info,iou_type='eiou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
-
-
-        #---------------------------------#
-        #  6 - dims 
-        #---------------------------------#
-
         if self.edge_type == 'DIOUd-Cos6':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
@@ -417,28 +393,8 @@ class EdgeEncoder(nn.Module):
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='diou')
             feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
             return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
-        if self.edge_type == 'IouFamily6-convex':
-            converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
-            converx_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])   
-            converx_bbox_wh = torch.clamp((converx_bbox_lt - converx_bbox_rb), min=0)   # converx bbox 
-
-            outer_diag = (converx_bbox_wh[:, 0] ** 2) + (converx_bbox_wh[:, 1] ** 2)    # convex diagonal squard length
-            inter_diag = (source_info[:, 6] - target_info[:, 6]) ** 2 + (source_info[:, 7] - target_info[:, 7]) ** 2
-
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
-            feat3 = (source_info[:,4] - target_info[:,4]) /  converx_bbox_wh[:, 0]
-            feat4 = (source_info[:,5] - target_info[:,5]) /  converx_bbox_wh[:, 1]
-            feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
-            feat6 = inter_diag / ( outer_diag + 1e-8 )
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)       
-        
-        
-        #---------------------------------#
-        #  8 -dims
-        #---------------------------------#
-
-        if self.edge_type == 'IouFamily8-vanilla':
+       
+        if self.edge_type == 'IouFamily8_vanilla':
 
             #---------------------------------#
             #  Info about smallest enclosing bbox
@@ -468,7 +424,7 @@ class EdgeEncoder(nn.Module):
             return torch.stack([feat1,feat2,feat3,feat4,
                                 feat5,feat6,feat7,feat8],dim =1)
         
-        if self.edge_type == 'IouFamily8-convex':
+        if self.edge_type == 'IouFamily8_convex':
 
             #---------------------------------#
             #  Info about smallest enclosing bbox
@@ -485,8 +441,8 @@ class EdgeEncoder(nn.Module):
             dis_w =  (source_info[:, 4] - target_info[:, 4]) ** 2
             dis_h =  (source_info[:, 5] - target_info[:, 5]) ** 2
 
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
             feat3 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
             feat4 = inter_diag / ( outer_diag + 1e-8 )
 
@@ -513,8 +469,8 @@ class EdgeEncoder(nn.Module):
             dis_h =  (source_info[:, 5] - target_info[:, 5]) ** 2
             max_bbox_wh_square = torch.max(source_info[:, 4:6], target_info[:, 4:6]) ** 2 
 
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
             feat3 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
             feat4 = inter_diag / ( outer_diag + 1e-8 )
 
@@ -525,7 +481,7 @@ class EdgeEncoder(nn.Module):
             
             return torch.stack([feat1,feat2,feat3,feat4,
                                 feat5,feat6,feat7,feat8],dim =1)
-        if self.edge_type == 'IouFamily8-vanilla-seq':
+        if self.edge_type == 'IouFamily8_vanilla_seq':
 
             #---------------------------------#
             #  Info about smallest enclosing bbox
@@ -555,7 +511,7 @@ class EdgeEncoder(nn.Module):
             return torch.stack([feat1,feat2,feat3,feat4,
                                 feat5,feat6,feat7,feat8],dim =1)
         
-        if self.edge_type == 'IouFamily8-convex-seq':
+        if self.edge_type == 'IouFamily8_convex_seq':
 
             #---------------------------------#
             #  Info about smallest enclosing bbox
@@ -572,8 +528,8 @@ class EdgeEncoder(nn.Module):
             dis_w =  (source_info[:, 4] - target_info[:, 4]) ** 2
             dis_h =  (source_info[:, 5] - target_info[:, 5]) ** 2
 
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
 
@@ -584,7 +540,7 @@ class EdgeEncoder(nn.Module):
             
             return torch.stack([feat1,feat2,feat3,feat4,
                                 feat5,feat6,feat7,feat8],dim =1)
-        if self.edge_type == 'IouFamily8-separate-seq':
+        if self.edge_type == 'IouFamily8-separate_seq':
 
             #---------------------------------#
             #  Info about smallest enclosing bbox
@@ -600,8 +556,8 @@ class EdgeEncoder(nn.Module):
             dis_h =  (source_info[:, 5] - target_info[:, 5]) ** 2
             max_bbox_wh_square = torch.max(source_info[:, 4:6], target_info[:, 4:6]) ** 2 
 
-            feat1 = (source_info[:,6] - target_info[:,6]) /  converx_bbox_wh[:, 0]
-            feat2 = (source_info[:,7] - target_info[:,7]) /  converx_bbox_wh[:, 1]
+            feat1 = source_info[:,6] - target_info[:,6] /  converx_bbox_wh[:, 0]
+            feat2 = source_info[:,7] - target_info[:,7] /  converx_bbox_wh[:, 1]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
 
