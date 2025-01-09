@@ -20,7 +20,7 @@ def get_config():
         DEVICE            = 'cuda',
         NUM_WORKS         = 0,
         EMABLE_AMP        = True,
-        WORK_DIR          = "largeDataset",
+        WORK_DIR          = "Dustbin",
 
         BATCH_SIZE        = 2,
         MAXEPOCH          = 121,
@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\model_structure.yaml',
+        MODEL_YAML_PATH   = r'configs\yamlFamily\BiggerFamily\model_structure[DeepMsg-1].yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\EdgeZoo\ConvexNorm4-v2-wrongButWorthy.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\Bigger\DeepMsg-1.pth',
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

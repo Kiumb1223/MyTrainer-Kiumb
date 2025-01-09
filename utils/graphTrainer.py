@@ -154,6 +154,8 @@ class GraphTrainer:
         logger.info(f"Total training time: {datetime.timedelta(seconds=time.perf_counter() - self._start_train_time)}")
     
     def before_epoch(self):
+        torch.cuda.empty_cache()
+
         '''distributed data parallel setting'''
         if hasattr(self.train_loader.sampler,"set_epoch"):
             self.train_loader.sampler.set_epoch(self.cur_epoch)
@@ -178,8 +180,8 @@ class GraphTrainer:
                 self.eval_save_model()
 
     def before_iter(self):
-        torch.cuda.empty_cache()
-
+        # torch.cuda.empty_cache()
+        pass 
     def train_one_iter(self):
 
         iter_start_time = time.perf_counter()

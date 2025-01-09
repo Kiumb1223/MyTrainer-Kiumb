@@ -31,7 +31,7 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
 
     if num_node <= k :
         k = num_node - 1
-        logger.warning(f"SPECIAL SITUATIONS: The number of points[{num_node}] is less than k, set k to {x.shape[0] -1}")
+        # logger.warning(f"SPECIAL SITUATIONS: The number of points[{num_node}] is less than k, set k to {x.shape[0] -1}")
             
     if k > 0:
         if bt_cosine:   # cosine distance
