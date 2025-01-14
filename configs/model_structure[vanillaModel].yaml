@@ -4,7 +4,7 @@
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
 BT_DIST_MASK: False
-DIST_THRESH: 300
+DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
 Edge_mode: 'vanilla'

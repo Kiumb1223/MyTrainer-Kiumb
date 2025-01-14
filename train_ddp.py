@@ -47,7 +47,7 @@ def main():
     #  prepare training
     #---------------------------------#
     set_random_seed(None if cfg.RANDOM_SEED < 0 else cfg.RANDOM_SEED + rank)
-    train_dataset = GraphDataset(cfg,'Train',False)  # Move tensor to the device specified in cfg.DEVICE
+    train_dataset = GraphDataset(cfg,'Train',True)  # Move tensor to the device specified in cfg.DEVICE
     test_dataset  = GraphDataset(cfg,'Validation')
 
     train_sampler = DistributedSampler(train_dataset) if is_distributed else None
@@ -55,7 +55,7 @@ def main():
     train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,sampler=train_sampler,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
 
-    valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,pin_memory=True,
+    valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
     
     model = TrainingGraphModel(cfg.MODEL_YAML_PATH).to(cfg.DEVICE)

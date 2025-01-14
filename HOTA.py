@@ -31,17 +31,26 @@ if __name__ == '__main__':
     eval_config = {
         'USE_PARALLEL':False,
         'NUM_PARALLEL_CORES':8,
-        'PRINT_RESULTS': False,
-        'PRINT_ONLY_COMBINED': True,
-        'PRINT_CONFIG': False,
-        'TIME_PROGRESS': False,
-        'DISPLAY_LESS_PROGRESS': False,
+        # 'PRINT_RESULTS': True,
+        # 'PRINT_ONLY_COMBINED': True,
+        # 'PRINT_CONFIG': False,
+        # 'TIME_PROGRESS': False,
+        # 'DISPLAY_LESS_PROGRESS': True,
 
-        'OUTPUT_SUMMARY': False,
+        # 'OUTPUT_SUMMARY': True,
+        # 'OUTPUT_EMPTY_CLASSES': True,  # If False, summary files are not output for classes with no detections
+        # 'OUTPUT_DETAILED': True,
+        # 'PLOT_CURVES': True,
+        'PRINT_RESULTS': True,
+        'PRINT_ONLY_COMBINED': False,
+        'PRINT_CONFIG': True,
+        'TIME_PROGRESS': True,
+        'DISPLAY_LESS_PROGRESS': True,
+
+        'OUTPUT_SUMMARY': True,
         'OUTPUT_EMPTY_CLASSES': True,  # If False, summary files are not output for classes with no detections
         'OUTPUT_DETAILED': False,
         'PLOT_CURVES': False,
-
     }
     evaluator = trackeval.Evaluator(eval_config)
 

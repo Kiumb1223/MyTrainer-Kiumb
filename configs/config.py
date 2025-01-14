@@ -18,12 +18,12 @@ def get_config():
         LOG_PERIOD        = 10,       # Iteration 
         CHECKPOINT_PERIOD = 1,        # Epoch
         DEVICE            = 'cuda',
-        NUM_WORKS         = 0,
+        NUM_WORKS         = 2,
         EMABLE_AMP        = True,
-        WORK_DIR          = "Dustbin",
+        WORK_DIR          = "largeDataset",
 
-        BATCH_SIZE        = 2,
-        MAXEPOCH          = 121,
+        BATCH_SIZE        = 16,
+        MAXEPOCH          = 120,
 
         LR                = 1e-2,
         # Optimizer Adamw
@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\yamlFamily\BiggerFamily\model_structure[DeepMsg-1].yaml',
+        MODEL_YAML_PATH   = r'configs\yamlFamily\EdgeFamily[Mask-50]\5-dim\model_structure[EIOU5].yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -69,7 +69,9 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\Bigger\DeepMsg-1.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\edge[mask-50]\5-dim\EIOU5.pth',
+        FUSION_METHOD     = 'DFF', # options DFF CWFF EMAFF
+        EMA_LAMBDA        = 0.9,
         MIN_DET_CONF      = 0.1,
         MATCH_THRESH      = 0.05,
         Det2Tra_CONF      = 0.7,

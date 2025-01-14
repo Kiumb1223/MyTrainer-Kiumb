@@ -14,6 +14,7 @@ from typing import Tuple,List
 from enum import Enum,unique,auto
 from torch_geometric.data import Data
 from models.graphModel import GraphModel
+import torch.nn.functional as F
 import torchvision.transforms.functional as T
 from models.graphToolkit import hungarian,box_iou
 
@@ -156,11 +157,15 @@ class Tracker:
 
 class TrackManager:
     def __init__(self,model :GraphModel,device :str,path_to_weights :str,
-                 resize_to_cnn :list =[224,224],match_thresh :float =0.1,det2tra_conf :float =0.7,
-                 cnt_to_active :int =3,cnt_to_sleep :int=10,max_cnt_to_dead :int =100,feature_list_size :int =10):
+        fusion_method :str,EMA_lambda :float,
+        resize_to_cnn :list =[224,224],match_thresh :float =0.1,det2tra_conf :float =0.7,
+        cnt_to_active :int =3,cnt_to_sleep :int=10,max_cnt_to_dead :int =100,feature_list_size :int =10):
         
         self.device = device
         self.model  = model.eval().to(device)
+
+        self.fusion_method = fusion_method
+        self.EMA_lambda = EMA_lambda
 
         self.tracks_list:List[Tracker] = [] # store all the tracks including Born, Active, Sleep, Dead
 
@@ -191,45 +196,68 @@ class TrackManager:
         active_tracks_list = [ track for track in self.tracks_list if track.is_Active ]
         born_tracks_list   = [ track for track in self.tracks_list if track.is_Born   ]
         sleep_tracks_list  = [ track for track in self.tracks_list if track.is_Sleep  ]
-
+        
+        first_match_list  = active_tracks_list 
+        second_match_list = born_tracks_list
+        third_match_list  = sleep_tracks_list
         #------------------------------------------------------------------#
         #                       First matching phase
         #------------------------------------------------------------------#
-        tra_graph  = self.construct_tra_graph(active_tracks_list)
+        tra_graph  = self.construct_tra_graph(first_match_list)
         det_graph  = self.construct_det_graph(current_detections,img_date)
         match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph)
         # The input `det_graph` is modified inside `self.model`, 
         # so its state changes after the function call.
-        if match_idx != []:         # matched tras and dets 
+        if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
+            # @BUG match_idx = [[],[]]
             tra_idx ,det_idx = match_idx
-            for tra_id, det_id in zip(tra_idx,det_idx):
-                active_tracks_list[tra_id].to_active(frame_idx,det_graph.x[det_id],
-                                current_detections[det_id][4],det_graph.location_info[det_id].cpu().numpy())
-                if not active_tracks_list[tra_id].is_Born:
-                    output_track_list.append(active_tracks_list[tra_id])        
+            tra_feats = tra_graph.x[tra_idx]
+            tra_conf_list = [first_match_list[i].conf for i in tra_idx]
+            det_feats = det_graph.x[det_idx]
+            det_conf_list = [current_detections[i][4] for i in det_idx]
+
+            smooth_features = self.smooth_feature(tra_feats,det_feats,tra_conf_list,det_conf_list)
+            for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
+                first_match_list[tra_id].to_active(frame_idx,smooth_features[i].squeeze(),
+                                det_conf_list[i],det_graph.location_info[det_id].cpu().numpy())
+                if not first_match_list[tra_id].is_Born and not first_match_list[tra_id].is_Sleep:
+                    output_track_list.append(first_match_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
-            active_tracks_list[tra_id].to_sleep()
+            first_match_list[tra_id].to_sleep()
 
         #------------------------------------------------------------------#
         #                       Second matching phase
         #------------------------------------------------------------------#
         highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
-        highconf_to_global_det_idx = {i: unmatch_det[i] for i in range(len(highconf_unmatch_dets))}
+        highconf_to_global_det_idx = [ unmatch_det[i] for i in range(len(highconf_unmatch_dets)) ] 
 
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(born_tracks_list,highconf_unmatch_dets.copy())
-        if match_idx != []:         # matched tras and dets 
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(second_match_list,highconf_unmatch_dets.copy())
+        if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
+            det_feats , det_location_info = [], []
             tra_idx ,det_idx = match_idx
-            for tra_id, det_id in zip(tra_idx,det_idx):
+            if tra_graph.num_nodes > 0: # if tra_graph is not empty
+                tra_feats = tra_graph.x[tra_idx]
+                tra_conf_list = [second_match_list[i].conf for i in tra_idx]
+            else:
+                tra_feats = None
+                tra_conf_list = None
+            for det_id in det_idx:
                 global_id = highconf_to_global_det_idx[det_id]
-                born_tracks_list[tra_id].to_active(frame_idx,det_graph.x[global_id],
-                                highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy())
-                if not born_tracks_list[tra_id].is_Born:
-                    output_track_list.append(born_tracks_list[tra_id])
+                det_feats.append(det_graph.x[global_id])
+                det_location_info.append(det_graph.location_info[global_id].cpu().numpy())
+            det_feats = torch.stack(det_feats,dim=0)
+            det_conf_list = [highconf_unmatch_dets[i][4] for i in det_idx]
+            smooth_features = self.smooth_feature(tra_feats,det_feats,tra_conf_list,det_conf_list)          
+
+            for i,( tra_id, det_id ) in enumerate(zip(tra_idx,det_idx)):
+                second_match_list[tra_id].to_active(frame_idx,smooth_features[i].squeeze(),det_conf_list[i],det_location_info[i])
+                if not second_match_list[tra_id].is_Born:
+                    output_track_list.append(second_match_list[tra_id])
         for tra_id in unmatch_tra:  # unmatched tras 
-            born_tracks_list[tra_id].to_sleep()
+            second_match_list[tra_id].to_sleep()
         for det_id in unmatch_det:
             global_id = highconf_to_global_det_idx[det_id]
-            born_tracks_list.append(
+            second_match_list.append(
                 Tracker(frame_idx,det_graph.x[global_id],
                         highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy(),
                         self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
@@ -244,7 +272,7 @@ class TrackManager:
 
 
 
-        self.tracks_list = self.remove_dead_tracks(active_tracks_list + born_tracks_list +  sleep_tracks_list)
+        self.tracks_list = self.remove_dead_tracks(first_match_list + second_match_list + third_match_list)
         return output_track_list
 
     def construct_tra_graph(self,tracks_list:List[Tracker]) -> Data:
@@ -312,6 +340,19 @@ class TrackManager:
 
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
+    def smooth_feature(self,prev_feats :torch.Tensor,cur_feats :torch.Tensor,prev_conf_list:list,cur_conf_list:list) -> torch.Tensor:
+
+        if self.fusion_method == 'DFF' or prev_feats is None: # Direct Feature Fusion OR EMPTY TRAGRAPH
+            return  cur_feats.split(1,0)
+        if self.fusion_method == 'CWFF': # Confidence-weight Feature Fusion
+            prev_conf_tensor = torch.as_tensor(prev_conf_list).unsqueeze(1).to(prev_feats)
+            cur_conf_tensor  = torch.as_tensor(cur_conf_list).unsqueeze(1).to(prev_feats)
+            smooth_feature   = ( prev_conf_tensor * prev_feats + cur_conf_tensor * cur_feats ) / (prev_conf_tensor + cur_conf_tensor)
+        if self.fusion_method == 'EMAFF': # Expositential Moving Average Feature Fusion
+            smooth_feature = (1 - self.EMA_lambda) * prev_feats + self.EMA_lambda * cur_feats
+        # return F.normalize(smooth_feature,dim=1).split(1,0)
+        return smooth_feature.split(1,0)
+        
     def remove_dead_tracks(self,tracks_list):
         """Remove all trackers whose state is Dead"""
         return [track for track in tracks_list if not track.is_Dead]

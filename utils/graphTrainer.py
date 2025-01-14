@@ -208,7 +208,7 @@ class GraphTrainer:
         # RuntimeError: torch.nn.functional.binary_cross_entropy and torch.nn.BCELoss are unsafe to autocast.
         # Tackle this error by disabling the  Mixed Precision Training 
 
-        losses = self.loss_func(pred_mtx_list,gt_mtx_list)
+            losses = self.loss_func(pred_mtx_list,gt_mtx_list)
         
         #---------------------------------#
         # Calculate gradients

@@ -266,9 +266,14 @@ It seems that **the speed of object moving poses the bigger influence on the sta
 | Mask Range |         HOTA          | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------------------------: | :-------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |   None<br>(Vanilla one<sup>*</sup>)   |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
+| 11 | 19.49 | 50.78 | 7.49 | 19.61 | 16.16 | 24.95 | 51.74 | 82.18 |
+| 15 | 26.51 | 50.81 | 13.84 | 28.46 | 23.47 | 36.17 | 55.96 | 82.05 |
+| 20 | 35.08 | 50.72 | 24.30 | 38.54 | 31.79 | 48.93 | 58.37 | 82.02 |
+| 25 | 39.08 | 50.71 | 30.20 | 44.36 | 36.59 |   56.31   | 59.24 | 81.96 |
+| 30 | 42.04 | 50.84 | 34.88 | 49.13 | 40.53 | 62.36 | 59.39 | 82.02 |
 |             **35**             |         **44.50**         | 50.82 | 39.10 | **52.33** | **43.19** | **66.37** | 59.59 | 82.00 |
 |            **50**              |         **44.40**         | 50.66 | **39.11** | **50.57** | **41.75** | **64.12** | 59.17 | 81.95 |
-|             **60**             |    43.71    | 50.47 | 38.08 | 49.36 | 40.77 | 62.53 | 58.93 | 81.97 |
+|             60             |    43.71    | 50.47 | 38.08 | 49.36 | 40.77 | 62.53 | 58.93 | 81.97 |
 |                100                |    40.21    | 50.41 | 32.28 | 44.54 | 36.77 | 56.47 | 58.23 | 81.95 |
 |                150                |    39.79    | 50.42 | 31.62 | 43.75 | 36.11 | 55.5 | 57.62 | 81.97 |
 |                200​                |         37.11         | 50.33 | 27.57 | 39.74 | 32.78 | 50.45 | 57.26 | 82.00 |
@@ -290,22 +295,37 @@ Here is a picture to visually illustrates the process of graph construction with
 
 ![evolutionK](./.assert/evolutionK.bmp)
 
-|             Different K              |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+|            Different K            |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :-------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+|         k=2(Vanilla one*)         |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
+|                k=3                |   36.12   | 50.34 |   26.11   |   39.17   |   32.32   |   49.69   | 57.39 | 81.94 |
+|                k=4                |   34.21   | 50.34 |   23.42   |   36.54   |   31.12   |   46.44   | 57.23 | 82.01 |
+|                k=5                |   38.67   | 50.28 |   29.94   |   42.60   |   35.13   |   54.08   | 57.95 | 81.95 |
+|                k=6                |   38.06   | 50.48 |   28.91   |   40.99   |   33.81   |   52.04   | 57.73 | 82.00 |
+|                k=7                |   36.70   | 50.38 |   26.92   |   39.42   |   32.50   |   50.07   | 57.47 | 81.96 |
+|                k=8                |   36.74   | 50.35 |   26.98   |   39.81   |   32.83   |   50.57   | 57.99 | 81.98 |
+|             **k=12**              | **38.73** | 50.67 | **30.16** | **42.53** | **35.04** | **54.10** | 57.67 | 82.05 |
+|               k=16                |   37.26   | 50.65 |   27.58   |   40.72   |   33.59   |   51.68   | 57.93 | 82.04 |
+|               k=32                |   38.42   | 50.52 |   29.39   |   42.04   |   34.68   |   53.37   | 57.82 | 81.99 |
+|               k=64                |   38.82   | 50.49 |   30.01   |   41.95   |   34.61   |   53.24   | 57.67 | 82.02 |
+| k=999(INF) (Full Connected Graph) |   37.10   | 50.33 |   27.53   |   40.27   |   33.22   |   51.14   | 57.27 | 82.00 |
+|        k=12 [`Undirected`]        |   37.94   | 50.53 |   28.64   |   41.38   |   34.13   |   52.54   | 57.60 | 81.97 |
+
+|      Different K<br>+[Mask-50]       |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|     k=2(Vanilla one<sup>*</sup>)     |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
-|                 k=3                  |   36.12   | 50.34 |   26.11   |   39.17   |   32.32   |   49.69   | 57.39 | 81.94 |
-|                 k=4                  |   34.21   | 50.34 |   23.42   |   36.54   |   31.12   |   46.44   | 57.23 | 82.01 |
-|                 k=5                  |   38.67   | 50.28 |   29.94   |   42.60   |   35.13   |   54.08   | 57.95 | 81.95 |
-|                 k=6                  |   38.06   | 50.48 |   28.91   |   40.99   |   33.81   |   52.04   | 57.73 | 82.00 |
-|                 k=7                  |   36.70   | 50.38 |   26.92   |   39.42   |   32.50   |   50.07   | 57.47 | 81.96 |
-|                 k=8                  |   36.74   | 50.35 |   26.98   |   39.81   |   32.83   |   50.57   | 57.99 | 81.98 |
-|               **k=12**               | **38.73** | 50.67 | **30.16** | **42.53** | **35.04** | **54.10** | 57.67 | 82.05 |
-|                 k=16                 |   37.26   | 50.65 |   27.58   |   40.72   |   33.59   |   51.68   | 57.93 | 82.04 |
-|                 k=32                 |   38.42   | 50.52 |   29.39   |   42.04   |   34.68   |   53.37   | 57.82 | 81.99 |
-|                 k=64                 |   38.82   | 50.49 |   30.01   |   41.95   |   34.61   |   53.24   | 57.67 | 82.02 |
-| k=999(INF)<br>(Full Connected Graph) |   37.10   | 50.33 |   27.53   |   40.27   |   33.22   |   51.14   | 57.27 | 82.00 |
-|        k=12<br>[`Undirected`]        |   37.94   | 50.53 |   28.64   |   41.38   |   34.13   |   52.54   | 57.60 | 81.97 |
-| k=12<br/>[`Undirected`]+[`Mask-50`]  |   41.17   | 50.63 |   33.67   |   46.49   |   38.39   |   58.92   | 58.55 | 81.98 |
+|                 k=2                  |   43.82   | 50.71 |   38.08   |   50.08   |   41.35   |   63.47   | 59.09 | 81.97 |
+|                 k=3                  |   43.67   | 50.69 |   37.89   |   50.20   |   41.43   |   63.66   | 59.11 | 82.11 |
+|               **k=4**                | **44.27** | 50.59 | **38.93** | **50.73** | **41.87** | **64.33** | 59.18 | 81.99 |
+|               **k=5**                |   44.19   | 50.58 |   38.00   |   50.44   |   41.65   |   63.96   | 59.15 | 82.01 |
+|                 k=6                  |   43.70   | 50.46 |   38.03   |   50.06   |   41.32   |   63.47   | 58.94 | 82.00 |
+|                 k=7                  |   44.08   | 50.65 |   38.55   |   50.10   |   41.36   |   63.52   | 58.91 | 81.99 |
+|                 k=8                  |   42.08   | 50.43 |   35.28   |   47.74   |   39.40   |   60.58   | 58.67 | 82.00 |
+|                 k=12                 |   41.85   | 50.61 |   34.80   |   47.45   |   39.16   |   60.20   | 58.52 | 82.00 |
+|                 k=16                 |   42.64   | 50.67 |   36.07   |   48.26   |   39.83   |   61.21   | 58.49 | 82.00 |
+|                 k=32                 |   42.77   | 50.43 |   36.44   |   48.31   |   39.88   |   64.27   | 58.68 | 82.00 |
+|                 k=64                 |   42.93   | 50.32 |   36.81   |   48.49   |   40.02   |   61.50   | 58.44 | 81.99 |
+| k=999(INF)<br>(Full Connected Graph) |   42.11   | 50.52 |   35.28   |   47.68   |   39.34   |   60.50   | 58.46 | 81.96 |
+|       k=12<br/>[`Undirected`]        |   41.17   | 50.63 |   33.67   |   46.49   |   38.39   |   58.92   | 58.55 | 81.98 |
 
 And here is a line chart which shows the trend of performance with increasing K : 
 
@@ -570,30 +590,30 @@ In order to better  organize and manage these experiments, it is necessary to re
 
 And here are the summary results.
 
-|          Experiment           | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :---------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|           ImgNorm4            | 33.67 | 50.28 | 22.73 | 34.90 | 28.74 | 44.41 | 55.56 | 81.96 |
-|           SrcNorm4            | 33.37 | 50.40 | 22.77 | 35.60 | 29.35 | 45.23 | 56.37 | 81.92 |
-|           TgtNorm4​​            | 33.47 | 50.37 | 22.44 | 34.98 | 28.84 | 44.45 | 56.25 | 81.98 |
-|         MeanSizeNorm4         | 34.29 | 50.22 | 23.63 | 36.84 | 30.39 | 46.79 | 56.53 | 81.95 |
-|        MeanHeightNorm4        | 32.63 | 50.23 | 21.37 | 33.64 | 27.73 | 42.75 | 56.11 | 82.00 |
-|        MeanWidthNorm4         | 34.21 | 50.24 | 23.45 | 36.50 | 30.10 | 46.36 | 56.52 | 81.97 |
-|          ConvexNorm4          | 34.47 | 50.32 | 23.83 | 36.15 | 29.80 | 45.94 | 56.52 | 81.99 |
-|           MaxNorm4            | 33.31 | 50.41 | 22.21 | 34.61 | 28.53 | 43.97 | 56.31 | 81.96 |
-|             IOUd5             | 35.51 | 50.33 | 25.26 | 37.46 | 30.88 | 47.61 | 56.48 | 81.95 |
-|             IOU5              |       |       |       |       |       |       |       |       |
-|            GIOUd5             |       |       |       |       |       |       |       |       |
-|             GIOU5             |       |       |       |       |       |       |       |       |
-| DIOUd5 <br> (`Vanilla model`) | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-|             DIOU5             |       |       |       |       |       |       |       |       |
-|            CIOUd5             |       |       |       |       |       |       |       |       |
-|             CIOU5             |       |       |       |       |       |       |       |       |
-|            EIOUd5             |       |       |       |       |       |       |       |       |
-|             EIOU5             |       |       |       |       |       |       |       |       |
-|          DIOUd-Cos6           |       |       |       |       |       |       |       |       |
-|      IouFamily8-vanilla       |       |       |       |       |       |       |       |       |
-|       IouFamily8-convex       |       |       |       |       |       |       |       |       |
-|      IouFamily8-separate      |       |       |       |       |       |       |       |       |
+|          Experiment<br>+[Mask-50]           | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                  ImgNorm4                   | 44.52 | 50.46 | 39.48 | 50.73 | 41.88 | 64.32 | 58.60 | 82.00 |
+| <strong style='color:red'>SrcNorm4</strong> | 45.31 | 50.51 | 40.84 | 52.36 | 43.23 | 66.38 | 59.19 | 81.97 |
+| <strong style='color:red'>TgtNorm4</strong> | 45.70 | 50.53 | 41.51 | 53.10 | 43.85 | 67.30 | 59.27 | 81.99 |
+|                MeanSizeNorm4                | 44.93 | 50.53 | 40.15 | 51.97 | 42.90 | 65.89 | 59.32 | 82.01 |
+|               MeanHeightNorm4​​               | 45.13 | 50.39 | 40.57 | 52.67 | 43.48 | 66.79 | 59.13 | 82.02 |
+|               MeanWidthNorm4                | 45.05 | 50.69 | 40.24 | 52.16 | 43.06 | 66.14 | 59.32 | 82.03 |
+|                 ConvexNorm4                 | 45.11 | 50.58 | 40.43 | 51.70 | 42.69 | 65.52 | 59.16 | 82.01 |
+| <strong style='color:red'>MaxNorm4</strong> | 45.45 | 50.21 | 41.08 | 52.63 | 43.45 | 66.74 | 59.35 | 82.01 |
+|                    IOUd5                    | 44.56 | 50.70 | 39.36 | 51.33 | 42.39 | 65.06 | 59.23 | 81.98 |
+|                    IOU5                     | 44.64 | 50.58 | 39.59 | 51.58 | 42.58 | 65.39 | 59.13 | 81.96 |
+| <strong style='color:green'>GIOUd5</strong> | 45.51 | 50.52 | 41.18 | 52.54 | 43.39 | 66.60 | 59.20 | 82.00 |
+|                    GIOU5                    | 44.79 | 50.73 | 39.74 | 50.58 | 41.77 | 64.12 | 59.32 | 82.01 |
+|        DIOUd5 <br> (`Vanilla model`)        | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|                    DIOU5                    | 44.98 | 50.60 | 40.17 | 51.96 | 42.90 | 65.88 | 59.17 | 81.99 |
+| <strong style='color:green'>CIOUd5</strong> | 45.43 | 50.75 | 40.86 | 52.75 | 43.55 | 66.89 | 59.37 | 81.96 |
+|                    CIOU5                    | 45.30 | 50.60 | 40.75 | 51.94 | 42.89 | 65.83 | 59.18 | 81.97 |
+|                   EIOUd5​​                    | 44.94 | 50.64 | 40.08 | 51.35 | 42.41 | 65.09 | 59.33 | 81.98 |
+|                    EIOU5                    | 43.47 | 50.73 | 37.44 | 49.81 | 41.14 | 63.13 | 59.24 | 81.98 |
+|                 DIOUd-Cos6                  |       |       |       |       |       |       |       |       |
+|             IouFamily8-vanilla              |       |       |       |       |       |       |       |       |
+|              IouFamily8-convex              |       |       |       |       |       |       |       |       |
+|             IouFamily8-separate             |       |       |       |       |       |       |       |       |
 
 <a id='weirdPhenomenon'></a>The results are quite beyond my expectation. And In my intuition, the more information edge embedding contains , the better model will be. However, the fact goes away my intuition. But WHAT can I learn from all those results??  Noticed that some directional information maybe impacts more on model, so I plan do some extra experiments —— the sequence of each item in IoUFamily8 and another type of directional information of width and height.
 
@@ -648,22 +668,18 @@ And here are the summary results.
     $$
     
 
-|               Experiment                | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | ----- |
-|         IouFamily8-vanilla-seq          |       |       |       |       |       |       |       |       |
-|          IouFamily8-convex-seq          |       |       |       |       |       |       |       |       |
-|         IouFamily8-separate-seq         |       |       |       |       |       |       |       |       |
-|             ConvexNorm4-v2              | 34.50 | 50.30 | 23.86 | 35.51 | 29.27 | 45.12 | 56.31 | 82.00 |
-|               MaxNorm4-v2               | 33.07 | 50.37 | 21.90 | 34.26 | 28.24 | 43.54 | 56.23 | 82.02 |
-|                GIOUd5-v2                |       |       |       |       |       |       |       |       |
-|                GIOU5-v2                 |       |       |       |       |       |       |       |       |
-|                DIOU5-v2                 |       |       |       |       |       |       |       |       |
-|                CIOU5-v2                 |       |       |       |       |       |       |       |       |
-|            IouFamily6-convex            |       |       |       |       |       |       |       |       |
-|      ConvexNorm4-v2<br>[`deepMsg`]      |       |       |       |       |       |       |       |       |
-|       MaxNorm4-v2<br/>[`deepMsg`]       |       |       |       |       |       |       |       |       |
-|  IouFamily8-convex-seq<br/>[`deepMsg`]  |       |       |       |       |       |       |       |       |
-| IouFamily8-separate-seq<br/>[`deepMsg`] |       |       |       |       |       |       |       |       |
+|       Experiment        | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | ----- |
+| IouFamily8-vanilla-seq  |       |       |       |       |       |       |       |       |
+|  IouFamily8-convex-seq  | 28.79 | 51.00 | 16.47 | 27.70 | 23.15 | 34.47 | 52.71 | 81.89 |
+| IouFamily8-separate-seq |       |       |       |       |       |       |       |       |
+|     ConvexNorm4-v2      | 44.33 | 50.64 | 39.00 | 51.00 | 42.11 | 64.65 | 59.24 | 81.97 |
+|       MaxNorm4-v2       | 44.58 | 50.62 | 39.47 | 51.08 | 42.17 | 64.75 | 59.23 | 82.00 |
+|  GIOUd5-v2:red_circle:  |       |       |       |       |       |       |       |       |
+|  GIOU5-v2:red_circle:   |       |       |       |       |       |       |       |       |
+|  DIOU5-v2:red_circle:   |       |       |       |       |       |       |       |       |
+|  CIOU5-v2:red_circle:   |       |       |       |       |       |       |       |       |
+|    IouFamily6-convex​​    |       |       |       |       |       |       |       |       |
 
 #### 4.7.2 Attention Mechanism [:eyes:]
 
@@ -713,13 +729,13 @@ Motivated by the influence of self loop, I wanna explore more about variants gra
 |          Model Variants          | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |     Vanilla one<sup>*</sup>      | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-|             deepMsg              |       |       |       |       |       |       |       |       |
-|             meanAggr             |       |       |       |       |       |       |       |       |
+|             deepMsg              | 33.54 | 50.37 | 22.54 | 34.25 | 28.24 | 43.51 | 56.27 | 81.98 |
+|             meanAggr             | 26.69 | 51.01 | 14.17 | 25.15 | 21.01 | 31.31 | 51.81 | 81.87 |
 |   Graphconv <br>*w/* self-loop   |       |       |       |       |       |       |       |       |
 |  Graphconv <br/>*w/o* self-loop  |       |       |       |       |       |       |       |       |
-|  DouleEdgeEmb<br>*w/* self-loop  |       |       |       |       |       |       |       |       |
-| DouleEdgeEmb<br/>*w/o* self-loop |       |       |       |       |       |       |       |       |
-|            selfConcat            |       |       |       |       |       |       |       |       |
+|  DouleEdgeEmb<br>*w/* self-loop  | 30.88 | 51.38 | 18.77 | 29.97 | 25.06 | 37.27 | 56.10 | 81.86 |
+| DouleEdgeEmb<br/>*w/o* self-loop | 37.43 | 50.50 | 27.94 | 40.16 | 33.12 | 51.00 | 58.11 | 81.99 |
+|            selfConcat            | 30.31 | 51.24 | 18.13 | 30.29 | 25.33 | 37.68 | 56.09 | 81.88 |
 
 Noted that the method of adding up to enhance one\`s own features is not quite effective, i.e. `GraphConv` and `DoubleEdgeEmb`. Instead, the method of concatenation seems to perform better, i.e. `selfConcat`. So let me dig further out the potentiality of concatenation.
 
@@ -735,12 +751,12 @@ Noted that the method of adding up to enhance one\`s own features is not quite e
    ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([~Edge~emb ~\cdot~(^{d}g_j^{l} - ^{d}g_i^{l})~ ]})\\
    $$
 
-|            Model Variants            | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
-| :----------------------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-|  StaticSelfConcat<br>*w/* self-loop  |      |      |      |      |      |      |      |      |
-| StaticSelfConcat<br/>*w/o* self-loop |      |      |      |      |      |      |      |      |
-|      SwapConv<br>*w/* self-loop      |      |      |      |      |      |      |      |      |
-|     SwapConv<br/>*w/o* self-loop     |      |      |      |      |      |      |      |      |
+|            Model Variants            | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|  StaticSelfConcat<br>*w/* self-loop  | 30.60 | 51.18 | 18.49 | 30.84 | 25.79 | 38.36 | 55.80 | 81.87 |
+| StaticSelfConcat<br/>*w/o* self-loop |       |       |       |       |       |       |       |       |
+|      SwapConv<br>*w/* self-loop      | 38.78 | 50.61 | 29.88 | 43.16 | 35.60 | 54.80 | 58.41 | 82.01 |
+|     SwapConv<br/>*w/o* self-loop     |       |       |       |       |       |       |       |       |
 
 ----
 
@@ -767,11 +783,11 @@ P.S. the following experiments will not apply `deepMsg`, for fair comparison.
 |        ProgressiveEdgeDim        |      |      |      |      |      |      |      |      |
 |           RawEdgeAttr            |      |      |      |      |      |      |      |      |
 
-| Vanilla Model[DIoUd5] + | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
-| :---------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-|      FixedEdgeDim       |      |      |      |      |      |      |      |      |
-|   ProgressiveEdgeDim    |      |      |      |      |      |      |      |      |
-|       RawEdgeAttr       |      |      |      |      |      |      |      |      |
+| Vanilla Model[DIoUd5] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|      FixedEdgeDim       |       |       |       |       |       |       |       |       |
+|   ProgressiveEdgeDim    |       |       |       |       |       |       |       |       |
+|       RawEdgeAttr       | 34.53 | 50.28 | 23.89 | 36.85 | 30.37 | 46.85 | 56.12 | 81.98 |
 
 | Vanilla Model[GIoUd5] + | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
 | :---------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
@@ -808,8 +824,8 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 | Model Variant  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |  Vanilla one*  | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-| Static-smooth  |       |       |       |       |       |       |       |       |
-| Dynamic-smooth |       |       |       |       |       |       |       |       |
+| Static-smooth  | 34.45 | 50.44 | 23.74 | 35.81 | 29.54 | 45.46 | 56.48 | 81.98 |
+| Dynamic-smooth | 34.69 | 50.43 | 24.06 | 36.28 | 29.90 | 46.10 | 56.52 | 81.99 |
 
 #### 4.9.2 About Update Layer
 
@@ -868,16 +884,16 @@ To sum up, here is the state transition network of my track management. And ther
 The detailed significance of these four states of each trajectory:
 
 1. `BORN state`\:  only those high-confidence detections (confidence >= 0.7) filtered by two-phase matching can be initialized as `BORN state` trajectory in the whole pipeline of track management. 
-   - `BORN` ->`BORN`: Considering the case of detector false alarms, namely mistakenly identifying non-target objects as targets (FP, False Positive), there is possibility that `BORN` state is a kind of noise. Therefore, here sets the second matching phase, i.e. IOU Matching, to filter out the noise. And I set a variable `cnt_to_Active` to 
-   - `BORN`->`ACTIVE`:
-   - `BRON`->`Dead`:
-2. `ACTIVE state`:
+   - `BORN` ->`BORN`: Considering the case of detector false alarms, namely mistakenly identifying non-target objects as targets (FP, False Positive), there is possibility that `BORN` state is a kind of noise. Therefore, here sets the second matching phase, i.e. IOU Matching, to filter out the noise. And I set a variable `cnt_to_Active` ( default: 1 ) , which counts the continuous times of `BORN` state trajectories are successfully matched , to control the ability of filtration.
+   - `BORN`->`ACTIVE`: I set a relatively strict rule that only those trajectories , whose state is switched from `BORN` state to `Active` for the first time , can be assigned with unique id.
+   - `BRON`->`Dead`: the meaning of this switching process is that those `BORN`-state trajectories are noises, which should be filtered out.
+2. `ACTIVE state`: the `Active`-state trajectories 
 3. `SLEEP state`:
 4. `DEAD state`: 
 
 ### 5.1 plz live longer [:eyes:]
 
-### 5.2 plz look better [:eyes:]
+### 5.2 plz look better [:eyes:] 
 
 ## 6. Experimental Records [Code Optimization]
 
