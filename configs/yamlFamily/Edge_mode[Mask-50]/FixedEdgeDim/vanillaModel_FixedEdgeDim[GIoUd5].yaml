@@ -3,8 +3,8 @@
 #---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
-BT_DIST_MASK: False
-DIST_THRESH: 300
+BT_DIST_MASK: True
+DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
 Edge_mode: 'FixedEdgeDim'
@@ -44,8 +44,8 @@ edge_encoder:
   #      ConvexNorm4-v2 |   MaxNorm4-v2     | GIOUd5-v2            | GIOU5-v2       | DIOU5-v2
   #           CIOU5-v2   
   #---------------------------------#
-  edge_type: 'MaxNorm4-v2'
-  dims_list: [4,16,16]
+  edge_type: 'GIOUd5'
+  dims_list: [5,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True

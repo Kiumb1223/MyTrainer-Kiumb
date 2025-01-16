@@ -114,9 +114,8 @@ dynamic_graph_model:
     - [128,96,96]
     - [192,128,128]
   updLayer_dims:
-    - []
-    - []
-    - []
+    - [96,96,96]
+    - [128,128,128]
   aggr: 'max'
   # module layer settings 
   layer_type: 'linear'

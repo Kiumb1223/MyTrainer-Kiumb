@@ -20,7 +20,7 @@ def get_config():
         DEVICE            = 'cuda',
         NUM_WORKS         = 2,
         EMABLE_AMP        = True,
-        WORK_DIR          = "largeDataset",
+        WORK_DIR          = "BiggerFamily[Mask-50]/biggerBetter",
 
         BATCH_SIZE        = 16,
         MAXEPOCH          = 120,
@@ -49,13 +49,13 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\yamlFamily\EdgeFamily[Mask-50]\5-dim\model_structure[EIOU5].yaml',
+        MODEL_YAML_PATH   = r'configs\yamlFamily\BiggerFamily[Mask-50]\better\model_structure[biggerBetter].yaml',
         
         #---------------------------------#
         #  3. Dataset related
         #---------------------------------#
         DATA_DIR          = 'datasets',
-        JSON_PATH         = 'configs/train_Mix.json',
+        JSON_PATH         = 'configs/train_MOT17.json',
         TRACKBACK_WINDOW  = 10,
         ACCEPTABLE_OBJ_TYPE   = [1,2,7],
 
@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\edge[mask-50]\5-dim\EIOU5.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\bigger[mask-50]\better\biggerBetter.pth',
         FUSION_METHOD     = 'DFF', # options DFF CWFF EMAFF
         EMA_LAMBDA        = 0.9,
         MIN_DET_CONF      = 0.1,

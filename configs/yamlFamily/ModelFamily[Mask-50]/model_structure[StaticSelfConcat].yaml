@@ -3,7 +3,7 @@
 #---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
-BT_DIST_MASK: False
+BT_DIST_MASK: True
 DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr

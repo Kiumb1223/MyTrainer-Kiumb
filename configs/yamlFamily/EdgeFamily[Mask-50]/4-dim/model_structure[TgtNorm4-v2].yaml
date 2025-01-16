@@ -3,11 +3,11 @@
 #---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
-BT_DIST_MASK: False
-DIST_THRESH: 300
+BT_DIST_MASK: True
+DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
-Edge_mode: 'RawEdgeAttr'
+Edge_mode: 'vanilla'
 # Options : vanilla , graphConv , doubleEdgeEmb , selfConcat
 GraphModel_type: 'vanilla'
 
@@ -44,8 +44,8 @@ edge_encoder:
   #      ConvexNorm4-v2 |   MaxNorm4-v2     | GIOUd5-v2            | GIOU5-v2       | DIOU5-v2
   #           CIOU5-v2   
   #---------------------------------#
-  edge_type: 'DIOUd5'
-  dims_list: [5,16,16]
+  edge_type: 'TgtNorm4-v2'
+  dims_list: [4,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True
@@ -86,11 +86,11 @@ edge_encoder:
 #---------------------------------#
 static_graph_model:
   nodeEmb_size: [32,64,96]
-  edgeEmb_size: [5,5,5]
+  edgeEmb_size: [16,16,16]
   msgLayer_dims:
-    - [37,64]
-    - [69,96]
-    - [101,128]
+    - [48,64]
+    - [80,96]
+    - [112,128]
   updLayer_dims:
     - [64,64]
     - [96,96]
@@ -109,7 +109,7 @@ static_graph_model:
 #---------------------------------#
 dynamic_graph_model:
   nodeEmb_size: [64,96]
-  edgeEmb_size: [5,5]
+  edgeEmb_size: [16,16]
   msgLayer_dims:
     - [128,96,96]
     - [192,128,128]

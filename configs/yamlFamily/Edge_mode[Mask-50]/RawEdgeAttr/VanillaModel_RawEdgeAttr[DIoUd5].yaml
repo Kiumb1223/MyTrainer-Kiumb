@@ -7,7 +7,7 @@ BT_DIST_MASK: True
 DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
-Edge_mode: 'vanilla'
+Edge_mode: 'RawEdgeAttr'
 # Options : vanilla , graphConv , doubleEdgeEmb , selfConcat
 GraphModel_type: 'vanilla'
 
@@ -86,11 +86,11 @@ edge_encoder:
 #---------------------------------#
 static_graph_model:
   nodeEmb_size: [32,64,96]
-  edgeEmb_size: [16,16,16]
+  edgeEmb_size: [5,5,5]
   msgLayer_dims:
-    - [48,64]
-    - [80,96]
-    - [112,128]
+    - [37,64]
+    - [69,96]
+    - [101,128]
   updLayer_dims:
     - [64,64]
     - [96,96]
@@ -109,7 +109,7 @@ static_graph_model:
 #---------------------------------#
 dynamic_graph_model:
   nodeEmb_size: [64,96]
-  edgeEmb_size: [16,16]
+  edgeEmb_size: [5,5]
   msgLayer_dims:
     - [128,96,96]
     - [192,128,128]

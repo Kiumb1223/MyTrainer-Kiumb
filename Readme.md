@@ -43,7 +43,7 @@ $$
 
 The last but not least, it\`s necessary to take a glimpse of my **trajectory management strategy**. My trajectory management strategy mainly refers to **ByteTrack**. And here is my program flow chart:
 
-<img src="./.assert/flowChart.png" alt="flowChart" style="zoom: 50%;" />
+<img src="./.assert/flowChart.png" alt="flowChart" style="zoom: 200%;" />
 
 There are four states in the trajectory management strategy — **Born,Active,Sleep,Dead**. It\`s possible that `Born Trajectory` can be false positive, i.e. noise, so there are two phases in trajectory management — `Match Strategy` mainly for denoising and `Graph Matching` for matching. And the rest of the strategy is unnecessary to discuss, which is obvious in the flow chart.
 
@@ -169,7 +169,7 @@ And it is also essential to record the time consumption of training and inferenc
 
   I can encode the some info of graph structure into the embeddings(maybe cant be so sufficient)
 
-- [ ] Design more suitable track management ,like the lifespan of active tracks
+- [x] Design more suitable track management ,like the lifespan of active tracks
 
 - [x] Simplify the logic of KNN — make KNN more adaptive . It seems that variable `bt_self_loop`  is relatively useless, because self-loop only matters when there is only one object, which will lead to fatal error in my project. And this maybe save more time expense. 
 
@@ -295,21 +295,21 @@ Here is a picture to visually illustrates the process of graph construction with
 
 ![evolutionK](./.assert/evolutionK.bmp)
 
-|            Different K            |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :-------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|         k=2(Vanilla one*)         |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
-|                k=3                |   36.12   | 50.34 |   26.11   |   39.17   |   32.32   |   49.69   | 57.39 | 81.94 |
-|                k=4                |   34.21   | 50.34 |   23.42   |   36.54   |   31.12   |   46.44   | 57.23 | 82.01 |
-|                k=5                |   38.67   | 50.28 |   29.94   |   42.60   |   35.13   |   54.08   | 57.95 | 81.95 |
-|                k=6                |   38.06   | 50.48 |   28.91   |   40.99   |   33.81   |   52.04   | 57.73 | 82.00 |
-|                k=7                |   36.70   | 50.38 |   26.92   |   39.42   |   32.50   |   50.07   | 57.47 | 81.96 |
-|                k=8                |   36.74   | 50.35 |   26.98   |   39.81   |   32.83   |   50.57   | 57.99 | 81.98 |
-|             **k=12**              | **38.73** | 50.67 | **30.16** | **42.53** | **35.04** | **54.10** | 57.67 | 82.05 |
-|               k=16                |   37.26   | 50.65 |   27.58   |   40.72   |   33.59   |   51.68   | 57.93 | 82.04 |
-|               k=32                |   38.42   | 50.52 |   29.39   |   42.04   |   34.68   |   53.37   | 57.82 | 81.99 |
-|               k=64                |   38.82   | 50.49 |   30.01   |   41.95   |   34.61   |   53.24   | 57.67 | 82.02 |
-| k=999(INF) (Full Connected Graph) |   37.10   | 50.33 |   27.53   |   40.27   |   33.22   |   51.14   | 57.27 | 82.00 |
-|        k=12 [`Undirected`]        |   37.94   | 50.53 |   28.64   |   41.38   |   34.13   |   52.54   | 57.60 | 81.97 |
+|              Different K              |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :-----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+|           k=2(Vanilla one*)           |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
+|                  k=3                  |   36.12   | 50.34 |   26.11   |   39.17   |   32.32   |   49.69   | 57.39 | 81.94 |
+|                  k=4                  |   34.21   | 50.34 |   23.42   |   36.54   |   31.12   |   46.44   | 57.23 | 82.01 |
+|                  k=5                  |   38.67   | 50.28 |   29.94   |   42.60   |   35.13   |   54.08   | 57.95 | 81.95 |
+|                  k=6                  |   38.06   | 50.48 |   28.91   |   40.99   |   33.81   |   52.04   | 57.73 | 82.00 |
+|                  k=7                  |   36.70   | 50.38 |   26.92   |   39.42   |   32.50   |   50.07   | 57.47 | 81.96 |
+|                  k=8                  |   36.74   | 50.35 |   26.98   |   39.81   |   32.83   |   50.57   | 57.99 | 81.98 |
+|               **k=12**                | **38.73** | 50.67 | **30.16** | **42.53** | **35.04** | **54.10** | 57.67 | 82.05 |
+|                 k=16                  |   37.26   | 50.65 |   27.58   |   40.72   |   33.59   |   51.68   | 57.93 | 82.04 |
+|                 k=32                  |   38.42   | 50.52 |   29.39   |   42.04   |   34.68   |   53.37   | 57.82 | 81.99 |
+|                 k=64                  |   38.82   | 50.49 |   30.01   |   41.95   |   34.61   |   53.24   | 57.67 | 82.02 |
+| k=999(INF) <br>(Full Connected Graph) |   37.10   | 50.33 |   27.53   |   40.27   |   33.22   |   51.14   | 57.27 | 82.00 |
+|          k=12 [`Undirected`]          |   37.94   | 50.53 |   28.64   |   41.38   |   34.13   |   52.54   | 57.60 | 81.97 |
 
 |      Different K<br>+[Mask-50]       |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :----------------------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
@@ -443,243 +443,358 @@ The reason why I wanna change the weight of edge is **the week connection betwee
 
 ![whyEdge](./.assert/whyEdge.bmp)
 
-How to alleviate or even solve this problem? Some trial methods are waiting for me to practice.
+How to alleviate or even solve this problem? To address this problem, I believe there are two potential paths that could lead to a solution. The first path involves determining the most optimal calculation for edge embeddings, while the second focuses on identifying the best possible graph convolutional network.
 
 #### 4.7.1 several Variants of Edge Embedding [:tada:]
 
-Curious about the influences of edge embedding , I design several variants of Edge embedding  and do some experiments. And here are some mathematical formulation of my ideas. [The edge embedding of `Vanilla model`  mainly refers [SUSHI(CVPR 2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Cetintas_Unifying_Short_and_Long-Term_Tracking_With_Graph_Hierarchies_CVPR_2023_paper.pdf) , which is a offline and graph-based tracker. And it\` another motivation to encourage me to solve the puzzle ]
+Curious about the influences of edge embedding , I design several variants of Edge embedding  and do some experiments. And here are some mathematical formulation of my ideas. [ The edge embedding of `Vanilla model`  mainly refers [SUSHI(CVPR 2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Cetintas_Unifying_Short_and_Long-Term_Tracking_With_Graph_Hierarchies_CVPR_2023_paper.pdf) , which is a offline and graph-based tracker. And it\` another motivation to encourage me to solve the puzzle. ]
 
-1. **4-dim** Edge embedding (normalized by the **length and width of the original image**):
+There are two approaches: one is to explore normalization methods (4-dim edge attributes), and the other is to supplement the information (5-dim , 6-dim 8-dim edge attributes).
+
+##### Exp1.  4-dim Edge Attributes (Normalization methods)
+
+1. **4-dim** Edge embedding (normalized by the **length and width of the original image**):   [marked as `ImgNorm4`]
    $$
    Edge~emb := f([\frac{x_j - x_i}{w},\frac{y_j-y_i}{h},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-2. **4-dim** Edge embedding (normalized by the **length and width of the bounding box of source nodes** ,i.e. neighbor nodes):
+2. **4-dim** Edge embedding (normalized by the **length and width of the bounding box of source nodes** ,i.e. neighbor nodes):  [marked as `SrcNorm4`]
    $$
    Edge~emb := f([\frac{x_j - x_i}{w_j},\frac{y_j-y_i}{h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-3. **4-dim** Edge embedding (normalized by the **length and width of the bounding box of target nodes**):
+3. **4-dim** Edge embedding (normalized by the **length and width of the bounding box of target nodes**):  [marked as `TgtNorm4`]
    $$
    Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-4. **4-dim** Edge embedding (normalized by the **mean width and height of nodes**):
+4. `TgtNorm4-v2`:
    $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
-   $$
-
-5. **4-dim** Edge embedding (normalized by **length and width of smallest enclosing bbox**):
-   $$
-   Edge~emb := f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},\frac{w_j - w_i}{w_i},\frac{h_j-h_i}{h_i}])
    $$
 
-6. **4-dim** Edge embedding(normalized by **maximum shape of nodes**):
+5. **4-dim** Edge embedding(normalized by **maximum shape of nodes**):  [marked as `MaxNorm4`]
    $$
    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
    $$
 
-7. **4-dim** Edge embedding (normalized by the **mean height of nodes**):
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{h_i+h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
-   $$
-
-8. **4-dim** Edge embedding (normalized by the **mean width of nodes**):
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{w_i+w_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
-   $$
-
-9. **5-dim** Edge embedding (add **IOU distance** as another dimension to supply more information):
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-IoU(i,j)])
-   $$
-
-10. **5-dim** Edge embedding (add  **IOU ** rather than **IOU distance** ):
-$$
-Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),IoU(i,j)])
-$$
-
-11. **5-dim** Edge embedding (add  **GIOU distance ** as another dimension to supply more information):
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-GIoU(i,j)])
-    $$
-
-12. **5-dim** Edge embedding (add  **GIOU ** rather than **GIOU distance** ):
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),GIoU(i,j)])
-    $$
-
-13. **5-dim** Edge embedding (add **DIOU distance** as another dimension to supply more information): [Actually, the same as `Vanilla model`]
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-DIoU(i,j)])
-    $$
-
-14. **5-dim** Edge embedding (add **DIOU** rather than **DIOU distance**):
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),DIoU(i,j)])
-    $$
-
-15. **5-dim** Edge embedding (add **CIOU distance** as another dimension to supply more information): 
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-CIoU(i,j)])
-    $$
-
-16. **5-dim** Edge embedding (add **CIOU** rather than CIOU distance):
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),CIoU(i,j)])
-    $$
-
-17. **5-dim** Edge embedding (add **EIOU distance** as another dimension to supply more information): 
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-EIoU(i,j)])
-    $$
-
-18. **5-dim** Edge embedding (add **EIOU** rather than EIOU distance):
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),EIoU(i,j)])
-    $$
-
-19. **6-dim** Edge embedding (add **Cosine distance** as another dimension to supply more information):
-    $$
-    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-DIoU(i,j),cosineDist(i,j))])
-    $$
-
-20. **8-dim** Edge embedding (Motivated by **IOU Family -- GIOU , DIOU , CIOU , EIOU, SIOU**):
-    $$
-    Edge~emb := &f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},1-GIoU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{(w_j-w_i)^2}{w_{convex}^2},\frac{(h_j-h_i)^2}{h_{convex}^2})])
-    $$
-
-    * The reason why I calculate the edge embedding is that **this 4 original items reveals more information about directions** rather than more precise quantitative information. After making a simple research and code implementation on IOU Family, I design this 8-dim edge embedding. And the only thing puzzles me that relativity of each item — **the 4 original items with some directional info is relative by mean height of paired bounding box ,while the other is relative by smallest enclosing bounding box ( the same as EIOU )**. And waiting to see :eyes:
-
-21. **8-dim** Edge embedding (The variation of No. 16: Since the calculation of GIoU takes the smallest enclosing bounding box into account, I have standardized **the relativity of all elements based on this smallest enclosing bounding box**)
-    $$
-    Edge~emb := &f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},1-GIoU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{(w_j-w_i)^2}{w_{convex}^2},\frac{(h_j-h_i)^2}{h_{convex}^2})])
-    $$
-    
-22. **8-dim** Edge embedding (The variation of No. 17: While the first four items need to have their relativity standardized based on the smallest enclosing bounding box, the other four items should instead have their relativity **standardized based on the maximum of the nodes** rather than the smallest enclosing bounding box):
-    $$
-    Edge~emb := &f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},1- GIoU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{(w_j-w_i)^2}{\max^2{(w_i,w_j)}},\frac{(h_j-h_i)^2}{\max ^2{(h_i,h_j)}})])
-    $$
-
-In order to better  organize and manage these experiments, it is necessary to rename these experiments:
-
-| Experimental Index |  Experimental Name  |
-| :----------------: | :-----------------: |
-|         1          |      ImgNorm4       |
-|         2          |      SrcNorm4       |
-|         3          |      TgtNorm4       |
-|         4          |    MeanSizeNorm4    |
-|         5          |   MeanHeightNorm4   |
-|         6          |   MeanWidthNorm4    |
-|         7          |     ConvexNorm4     |
-|         8          |      MaxNorm4       |
-|         9          |        IOUd5        |
-|         10         |        IOU5         |
-|         11         |       GIOUd5        |
-|         12         |        GIOU5        |
-|         13         |       DIOUd5        |
-|         14         |        DIOU5        |
-|         15         |       CIOUd5        |
-|         16         |        CIOU5        |
-|         17         |       EIOUd5        |
-|         18         |        EIOU5        |
-|         19         |     DIOUd-Cos6      |
-|         20         | IouFamily8-vanilla  |
-|         21         |  IouFamily8-convex  |
-|         22         | IouFamily8-separate |
-
-And here are the summary results.
-
-|          Experiment<br>+[Mask-50]           | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-----------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|                  ImgNorm4                   | 44.52 | 50.46 | 39.48 | 50.73 | 41.88 | 64.32 | 58.60 | 82.00 |
-| <strong style='color:red'>SrcNorm4</strong> | 45.31 | 50.51 | 40.84 | 52.36 | 43.23 | 66.38 | 59.19 | 81.97 |
-| <strong style='color:red'>TgtNorm4</strong> | 45.70 | 50.53 | 41.51 | 53.10 | 43.85 | 67.30 | 59.27 | 81.99 |
-|                MeanSizeNorm4                | 44.93 | 50.53 | 40.15 | 51.97 | 42.90 | 65.89 | 59.32 | 82.01 |
-|               MeanHeightNorm4​​               | 45.13 | 50.39 | 40.57 | 52.67 | 43.48 | 66.79 | 59.13 | 82.02 |
-|               MeanWidthNorm4                | 45.05 | 50.69 | 40.24 | 52.16 | 43.06 | 66.14 | 59.32 | 82.03 |
-|                 ConvexNorm4                 | 45.11 | 50.58 | 40.43 | 51.70 | 42.69 | 65.52 | 59.16 | 82.01 |
-| <strong style='color:red'>MaxNorm4</strong> | 45.45 | 50.21 | 41.08 | 52.63 | 43.45 | 66.74 | 59.35 | 82.01 |
-|                    IOUd5                    | 44.56 | 50.70 | 39.36 | 51.33 | 42.39 | 65.06 | 59.23 | 81.98 |
-|                    IOU5                     | 44.64 | 50.58 | 39.59 | 51.58 | 42.58 | 65.39 | 59.13 | 81.96 |
-| <strong style='color:green'>GIOUd5</strong> | 45.51 | 50.52 | 41.18 | 52.54 | 43.39 | 66.60 | 59.20 | 82.00 |
-|                    GIOU5                    | 44.79 | 50.73 | 39.74 | 50.58 | 41.77 | 64.12 | 59.32 | 82.01 |
-|        DIOUd5 <br> (`Vanilla model`)        | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
-|                    DIOU5                    | 44.98 | 50.60 | 40.17 | 51.96 | 42.90 | 65.88 | 59.17 | 81.99 |
-| <strong style='color:green'>CIOUd5</strong> | 45.43 | 50.75 | 40.86 | 52.75 | 43.55 | 66.89 | 59.37 | 81.96 |
-|                    CIOU5                    | 45.30 | 50.60 | 40.75 | 51.94 | 42.89 | 65.83 | 59.18 | 81.97 |
-|                   EIOUd5​​                    | 44.94 | 50.64 | 40.08 | 51.35 | 42.41 | 65.09 | 59.33 | 81.98 |
-|                    EIOU5                    | 43.47 | 50.73 | 37.44 | 49.81 | 41.14 | 63.13 | 59.24 | 81.98 |
-|                 DIOUd-Cos6                  |       |       |       |       |       |       |       |       |
-|             IouFamily8-vanilla              |       |       |       |       |       |       |       |       |
-|              IouFamily8-convex              |       |       |       |       |       |       |       |       |
-|             IouFamily8-separate             |       |       |       |       |       |       |       |       |
-
-<a id='weirdPhenomenon'></a>The results are quite beyond my expectation. And In my intuition, the more information edge embedding contains , the better model will be. However, the fact goes away my intuition. But WHAT can I learn from all those results??  Noticed that some directional information maybe impacts more on model, so I plan do some extra experiments —— the sequence of each item in IoUFamily8 and another type of directional information of width and height.
-
-1. **IouFamily8-vanilla-seq**：
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1-GIoU(i,j),centerPointDist(i,j),\frac{(w_j-w_i)^2}{w_{convex}^2},\frac{(h_j-h_i)^2}{h_{convex}^2})])
-   $$
-
-2. **IouFamily8-convex-seq**：
-   $$
-   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1-GIoU(i,j),centerPointDist(i,j),\frac{(w_j-w_i)^2}{w_{convex}^2},\frac{(h_j-h_i)^2}{h_{convex}^2})])
-   $$
-
-3. **IouFamily8-separate-seq**：
-   $$
-   Edge~emb := f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),centerPointDist(i,j),\frac{(w_j-w_i)^2}{\max^2{(w_i,w_j)}},\frac{(h_j-h_i)^2}{\max ^2{(h_i,h_j)}})])
-   $$
-
-4. **ConvexNorm4-v2**：
-   $$
-   Edge~emb := f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},\frac{w_j - w_i}{w_{convex}},\frac{h_j-h_i}{h_{convex}}])
-   $$
-
-5. **MaxNorm4-v2**：
+6. `MaxNorm4-v2`:
    $$
    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},\frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}}])
    $$
 
-6. **GIOUd5-v2**：
+7. **4-dim** Edge embedding (normalized by **length and width of smallest enclosing bbox**):  [marked as `EncloseNorm4`]
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
+
+8. `EncloseNorm4-v2`：
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},\frac{w_j - w_i}{w_{enclose}},\frac{h_j-h_i}{h_{enclose}}])
+   $$
+
+9. **4-dim** Edge embedding (normalized by the **mean width and height of nodes**):  [marked as `meanSizeNorm4`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+   $$
+
+10. **4-dim** Edge embedding (normalized by the **mean height of nodes**):  [marked as `meanHeightNorm4`]
+$$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i+h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+$$
+
+11. **4-dim** Edge embedding (normalized by the **mean width of nodes**):  [marked as `meanWidthNorm4`]
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{w_i+w_j},\frac{2(y_j-y_i)}{w_i+w_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})])
+    $$
+---
+
+Experimental Results :
+
+|             Experiments + [Mask-50]             | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                  Vanilla one*                   | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|                    ImgNorm4                     | 44.52 | 50.46 | 39.48 | 50.73 | 41.88 | 64.32 | 58.60 | 82.00 |
+| **<strong style='color:red'>SrcNorm4</strong>** | 45.31 | 50.51 | 40.84 | 52.36 | 43.23 | 66.38 | 59.19 | 81.97 |
+|   <strong style='color:red'>TgtNorm4</strong>   | 45.70 | 50.53 | 41.51 | 53.10 | 43.85 | 67.30 | 59.27 | 81.99 |
+|                   TgtNorm4-v2                   |       |       |       |       |       |       |       |       |
+|   <strong style='color:red'>MaxNorm4</strong>   | 45.45 | 50.21 | 41.08 | 52.63 | 43.45 | 66.74 | 59.35 | 82.01 |
+|                   MaxNorm4-v2                   | 44.58 | 50.62 | 39.47 | 51.08 | 42.17 | 64.75 | 59.23 | 82.00 |
+|                  EncloseNorm4                   | 45.11 | 50.58 | 40.43 | 51.70 | 42.69 | 65.52 | 59.16 | 82.01 |
+|                 EncloseNorm4-v2                 | 44.33 | 50.64 | 39.00 | 51.00 | 42.11 | 64.65 | 59.24 | 81.97 |
+|                  MeanSizeNorm4                  | 44.93 | 50.53 | 40.15 | 51.97 | 42.90 | 65.89 | 59.32 | 82.01 |
+|                 MeanHeightNorm4                 | 45.13 | 50.39 | 40.57 | 52.67 | 43.48 | 66.79 | 59.13 | 82.02 |
+|                 MeanWidthNorm4                  | 45.05 | 50.69 | 40.24 | 52.16 | 43.06 | 66.14 | 59.32 | 82.03 |
+
+Some Conclusions:
+
+- `MaxNorm4-2` & `EncloseNorm4-v2` are worse than `MaxNorm4` & `EncloseNorm4`, which means $log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i})$ are better~
+
+- Normalization by shape of single node , i.e. `MaxNorm4 | TgtNorm4 | SrcNorm4` is better than those by mean size of matching nodes. Besides, `MaxNorm4` and `SrcNorm4` perform better then `TgtNorm4` in a hard-to-track scene i.e. MOT17-02.
+
+| MOT17-02 | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| SrcNorm4 | 25.49 | 32.78 | 20.02 | 27.77 | 20.05 | 45.14 | 33.37 | 81.25 |
+| TgtNorm4 | 22.41 | 32.81 | 15.46 | 25.83 | 18.67 | 41.90 | 33.38 | 81.21 |
+| MaxNorm4 | 25.88 | 32.95 | 20.51 | 27.59 | 19.91 | 44.87 | 33.57 | 81.25 |
+
+<p align='center' style="font-size: 30px;">All in all, the winners in exp1 are <strong style='color:red'>MaxNorm4</strong></p>
+
+##### Exp2.  5-dim Edge Attributes (IoU Family)
+
+1. **5-dim** Edge embedding (add **IOU distance** as another dimension to supply more information):  [marked as `IOUd5`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-IoU(i,j)])
+   $$
+
+2. **5-dim** Edge embedding (add  **IOU ** rather than **IOU distance** ):  [marked as `IOU5`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),IoU(i,j)])
+   $$
+
+3. **5-dim** Edge embedding (add  **GIOU distance ** as another dimension to supply more information):  [marked as `GIOUd5`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-GIoU(i,j)])
+   $$
+
+4. `GIOUd5-v2`:   
    $$
    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},\\\frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}},1-GIoU(i,j)])
    $$
 
-7. **GIOU5-v2**：
+5. **5-dim** Edge embedding (add  **GIOU ** rather than **GIOU distance** ):  [marked as `GIOU5`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),GIoU(i,j)])
+   $$
+
+6. `GIOU5-v2`:
    $$
    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}}\\ \frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}},GIoU(i,j)])
    $$
 
-8. **DIOU5-v2**：
+7. **5-dim** Edge embedding (add **DIOU distance** as another dimension to supply more information): [Actually, the same as `Vanilla model`]  [marked as `DIOUd5`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-DIoU(i,j)])
+   $$
+
+8. **5-dim** Edge embedding (add **DIOU** rather than **DIOU distance**):  [marked as `DIOU5`]
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),DIoU(i,j)])
+   $$
+
+9. `DIOU5-v2`:
    $$
    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},\\ \frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}},DIoU(i,j)])
    $$
 
-9. **CIOU5-v2**：
+10. **5-dim** Edge embedding (add **CIOU distance** as another dimension to supply more information):   [marked as `CIOUd5`]
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-CIoU(i,j)])
+    $$
+
+11. **5-dim** Edge embedding (add **CIOU** rather than CIOU distance):  [marked as `CIOU5`]
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),CIoU(i,j)])
+    $$
+
+12. `CIOU5-v2`:
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},\\ \frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}},CIoU(i,j)])
+    $$
+
+13. **5-dim** Edge embedding (add **EIOU distance** as another dimension to supply more information):   [marked as `EIOUd5`]
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-EIoU(i,j)])
+    $$
+
+14. **5-dim** Edge embedding (add **EIOU** rather than EIOU distance):  [marked as `EIOU5`]
+    $$
+    Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),EIoU(i,j)])
+    $$
+
+----
+
+Experimental Results :
+
+|           Experiments + [Mask-50]           | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                    IOUd5                    | 44.56 | 50.70 | 39.36 | 51.33 | 42.39 | 65.06 | 59.23 | 81.98 |
+|                    IOU5                     | 44.64 | 50.58 | 39.59 | 51.58 | 42.58 | 65.39 | 59.13 | 81.96 |
+| <strong style='color:green'>GIOUd5</strong> | 45.51 | 50.52 | 41.18 | 52.54 | 43.39 | 66.60 | 59.20 | 82.00 |
+|                    GIOU5                    | 44.79 | 50.73 | 39.74 | 50.58 | 41.77 | 64.12 | 59.32 | 82.01 |
+|          DIOUd5  (`Vanilla model`)          | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|                    DIOU5                    | 44.98 | 50.60 | 40.17 | 51.96 | 42.90 | 65.88 | 59.17 | 81.99 |
+| <strong style='color:green'>CIOUd5</strong> | 45.43 | 50.75 | 40.86 | 52.75 | 43.55 | 66.89 | 59.37 | 81.96 |
+|                    CIOU5                    | 45.30 | 50.60 | 40.75 | 51.94 | 42.89 | 65.83 | 59.18 | 81.97 |
+|                   EIOUd5                    | 44.94 | 50.64 | 40.08 | 51.35 | 42.41 | 65.09 | 59.33 | 81.98 |
+|                    EIOU5                    | 43.47 | 50.73 | 37.44 | 49.81 | 41.14 | 63.13 | 59.24 | 81.98 |
+|                  GIOUd5-v2                  | 44.17 | 50.60 | 38.77 | 50.10 | 41.36 | 63.52 | 59.13 | 82.01 |
+|                  GIOU5-v2                   | 44.52 | 50.37 | 39.55 | 50.86 | 41.99 | 64.47 | 59.07 | 81.97 |
+|                  DIOU5-v2                   | 44.36 | 50.58 | 39.09 | 51.18 | 42.27 | 64.87 | 59.30 | 81.99 |
+|                  CIOU5-v2​​                   | 44.73 | 50.33 | 39.95 | 50.38 | 41.59 | 63.87 | 59.20 | 81.98 |
+
+Conclusions：
+
+- Compared with using IoU Family , **the distance of IoU Family** is more beneficial to my model.
+- More Specifically, `GIOU` and `CIOU` are better than the rest of IoU Family.
+
+<p align='center' style="font-size: 30px;">All in all, the winners in exp2 are <strong style='color:green'>GIOUd5 and CIOUd5</strong></p>
+
+##### Exp3.  6-dim Edge Attributes
+
+1. **6-dim** Edge embedding (add **Cosine distance** as another dimension to supply more information):  [marked as `DIOUd-Cosd6`]
    $$
-   Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},\\ \frac{w_j - w_i}{\max{(w_i,w_j)}},\frac{h_j-h_i}{\max{(h_i,h_j)}},CIoU(i,j)])
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-DIoU(i,j),cosineDist(i,j))])
    $$
 
-10. **IouFamily6-convex** :
-    $$
-    Edge~emb := f([\frac{x_j - x_i}{w_{convex}},\frac{y_j-y_i}{h_{convex}},\frac{w_j - w_i}{w_{convex}},\frac{h_j-h_i}{h_{convex}},\\1- GIoU(i,j),centerPointDist(i,j)])
-    $$
-    
+2. `GIOUd-Cosd6`:
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-GIoU(i,j),cosineDist(i,j))])
+   $$
 
-|       Experiment        | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | ----- |
-| IouFamily8-vanilla-seq  |       |       |       |       |       |       |       |       |
-|  IouFamily8-convex-seq  | 28.79 | 51.00 | 16.47 | 27.70 | 23.15 | 34.47 | 52.71 | 81.89 |
-| IouFamily8-separate-seq |       |       |       |       |       |       |       |       |
-|     ConvexNorm4-v2      | 44.33 | 50.64 | 39.00 | 51.00 | 42.11 | 64.65 | 59.24 | 81.97 |
-|       MaxNorm4-v2       | 44.58 | 50.62 | 39.47 | 51.08 | 42.17 | 64.75 | 59.23 | 82.00 |
-|  GIOUd5-v2:red_circle:  |       |       |       |       |       |       |       |       |
-|  GIOU5-v2:red_circle:   |       |       |       |       |       |       |       |       |
-|  DIOU5-v2:red_circle:   |       |       |       |       |       |       |       |       |
-|  CIOU5-v2:red_circle:   |       |       |       |       |       |       |       |       |
-|    IouFamily6-convex​​    |       |       |       |       |       |       |       |       |
+3. `CIOUd-Cosd6`:
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),1-CIoU(i,j),cosineDist(i,j))])
+   $$
+
+4. `Tgt-GIOUd-Cosd6`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),cosineDist(i,j)])
+   $$
+
+5. `Tgt-GIOUd-Cos6`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),cosineSimilarity(i,j)])
+   $$
+
+6. `Tgt-DIOUd-Cosd6`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- DIoU(i,j),cosineDist(i,j)])
+   $$
+
+7. `Tgt-CIOUd-Cosd6`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- CIoU(i,j),cosineDist(i,j)])
+   $$
+
+8. `Tgt-CIOUd-Cos6`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_i},\frac{y_j-y_i}{h_i},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- CIoU(i,j),cosineSimilarity(i,j)])
+   $$
+
+9. `Max-GIOUd-Cosd6`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),cosineDist(i,j)])
+   $$
+
+10. `Max-GIOUd-Cos6`:
+$$
+   Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),cosineSimilarity(i,j)])
+$$
+
+11. `Max-CIOUd-Cosd6`:
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- CIoU(i,j),cosineDist(i,j)])
+    $$
+
+12. `Max-CIOUd-Cos6`:
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- CIoU(i,j),cosineDist(i,j)])
+    $$
+
+13. `IouFamily6-max`
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{\max{(w_i,w_j)}},\frac{y_j-y_i}{\max{(h_i,h_j)}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),centerPointDist(i,j)])
+    $$
+
+14. `IouFamily6-enclose`:
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),centerPointDist(i,j)])
+    $$
+
+15. `IouFamily6-enclose-v2`:
+    $$
+    Edge~emb := f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},\frac{w_j - w_i}{w_{enclose}},\frac{h_j-h_i}{h_{enclose}},\\1- GIoU(i,j),centerPointDist(i,j)])
+    $$
+
+---
+
+Experimental Results:
+
+|              Experiments + [Mask-50]              | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                   Vanilla one*                    | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+| <strong style='color:orange'>DIOUd-Cosd6</strong> | 46.09 | 50.56 | 42.19 | 53.92 | 44.51 | 68.36 | 59.31 | 82.00 |
+|                    GIOUd-Cosd6                    | 45.08 | 50.77 | 40.22 | 52.00 | 42.94 | 65.93 | 59.40 | 82.00 |
+|                    CIOUd-Cosd6                    | 44.99 | 50.64 | 40.17 | 51.87 | 42.82 | 65.77 | 59.34 | 81.98 |
+|                  Tgt-GIOUd-Cosd6                  | 45.65 | 50.74 | 41.26 | 52.45 | 43.30 | 66.49 | 59.52 | 81.98 |
+|                  Tgt-GIOUd-Cos6                   | 45.95 | 50.75 | 41.79 | 53.47 | 44.15 | 67.77 | 59.36 | 81.99 |
+|                  Tgt-DIOUd-Cosd6                  |       |       |       |       |       |       |       |       |
+|                  Tgt-CIOUd-Cosd6                  | 44.81 | 50.63 | 39.85 | 51.41 | 42.44 | 65.18 | 59.40 | 82.00 |
+|                  Tgt-CIOUd-Cos6                   | 45.40 | 50.86 | 40.71 | 52.71 | 43.53 | 66.78 | 59.48 | 81.97 |
+|                  Max-GIOUd-Cosd6                  | 45.66 | 50.52 | 41.44 | 53.28 | 43.98 | 67.58 | 59.32 | 81.98 |
+|                  Max-GIOUd-Cos6                   | 45.36 | 50.57 | 40.86 | 52.68 | 43.50 | 66.77 | 59.40 | 82.00 |
+|                  Max-CIOUd-Cosd6                  | 44.68 | 50.63 | 39.64 | 51.73 | 42.71 | 65.58 | 59.36 | 81.98 |
+|                  Max-CIOUd-Cos6                   | 45.08 | 50.67 | 40.28 | 52.38 | 43.26 | 66.37 | 59.48 | 81.98 |
+|                  IouFamily6-max                   | 45.01 | 50.48 | 40.31 | 52.25 | 43.15 | 66.22 | 59.40 | 82.01 |
+|                IouFamily6-enclose                 | 44.75 | 50.74 | 39.67 | 51.32 | 42.38 | 65.04 | 59.46 | 81.99 |
+|               IouFamily6-enclose-v2​​               | 44.69 | 50.60 | 39.65 | 51.89 | 42.84 | 65.78 | 59.34 | 82.00 |
+
+Some Conclusions:
+
+
+
+##### Exp4. 8-dim Edge Attributes
+
+1. **8-dim** Edge embedding (Motivated by **IOU Family -- GIOU , DIOU , CIOU , EIOU, SIOU**):  [marked as `IouFamily8-vanilla`]
+   $$
+   Edge~emb := &f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},1-GIoU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{(w_j-w_i)^2}{w_{enclose}^2},\frac{(h_j-h_i)^2}{h_{enclose}^2})])
+   $$
+
+   * The reason why I calculate the edge embedding is that **this 4 original items reveals more information about directions** rather than more precise quantitative information. After making a simple research and code implementation on IOU Family, I design this 8-dim edge embedding. And the only thing puzzles me that relativity of each item — **the 4 original items with some directional info is relative by mean height of paired bounding box ,while the other is relative by smallest enclosing bounding box ( the same as EIOU )**. And waiting to see :eyes:
+
+2. **8-dim** Edge embedding (The variation of No. 16: Since the calculation of GIoU takes the smallest enclosing bounding box into account, I have standardized **the relativity of all elements based on this smallest enclosing bounding box**)  [marked as `IouFamily8-enclose`]
+   $$
+   Edge~emb := &f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},1-GIoU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{(w_j-w_i)^2}{w_{enclose}^2},\frac{(h_j-h_i)^2}{h_{enclose}^2})])
+   $$
+
+3. **8-dim** Edge embedding (The variation of No. 17: While the first four items need to have their relativity standardized based on the smallest enclosing bounding box, the other four items should instead have their relativity **standardized based on the maximum of the nodes** rather than the smallest enclosing bounding box):  [marked as `IouFamily8-separate`]
+   $$
+   Edge~emb := &f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},1- GIoU(i,j),centerPointDist(i,j),\\&log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\frac{(w_j-w_i)^2}{\max^2{(w_i,w_j)}},\frac{(h_j-h_i)^2}{\max ^2{(h_i,h_j)}})])
+   $$
+
+4. `IouFamily8-vanilla-seq`:
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1-GIoU(i,j),centerPointDist(i,j),\frac{(w_j-w_i)^2}{w_{convex}^2},\frac{(h_j-h_i)^2}{h_{enclose}^2})])
+   $$
+
+5. `IouFamily8-enclose-seq`:
+   $$
+   Edge~emb := f([\frac{2(x_j - x_i)}{h_i + h_j},\frac{2(y_j-y_i)}{h_i+h_j},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1-GIoU(i,j),centerPointDist(i,j),\frac{(w_j-w_i)^2}{w_{enclose}^2},\frac{(h_j-h_i)^2}{h_{enclose}^2})])
+   $$
+
+6. `IouFamily8-separate-seq`:
+   $$
+   Edge~emb := f([\frac{x_j - x_i}{w_{enclose}},\frac{y_j-y_i}{h_{enclose}},log(\frac{w_j}{w_i}),log(\frac{h_j}{h_i}),\\1- GIoU(i,j),centerPointDist(i,j),\frac{(w_j-w_i)^2}{\max^2{(w_i,w_j)}},\frac{(h_j-h_i)^2}{\max ^2{(h_i,h_j)}})])
+   $$
+
+----
+
+Experimental Results:
+
+|   Experiment<br>+[Mask-50]    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| DIOUd5 <br> (`Vanilla model`) | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|      IouFamily8-vanilla       | 44.54 | 50.51 | 39.47 | 51.32 | 42.37 | 65.07 | 59.25 | 82.00 |
+|      IouFamily8-enclose       | 44.78 | 50.56 | 39.86 | 51.53 | 42.54 | 65.33 | 59.27 | 82.00 |
+|      IouFamily8-separate      | 44.53 | 50.58 | 39.42 | 51.02 | 42.13 | 64.66 | 59.24 | 81.95 |
+|    IouFamily8-vanilla-seq     | 44.50 | 50.69 | 39.27 | 51.27 | 42.33 | 65.00 | 59.18 | 82.00 |
+|    IouFamily8-enclose-seq     | 45.02 | 50.42 | 40.39 | 52.05 | 42.98 | 65.96 | 59.23 | 82.00 |
+|    IouFamily8-separate-seq    | 44.50 | 50.60 | 39.34 | 50.89 | 42.03 | 64.50 | 59.22 | 81.95 |
+
+Some Conclusions:
+
+- it seems that there is almost no obvious improvement in results.
 
 #### 4.7.2 Attention Mechanism [:eyes:]
 
@@ -726,37 +841,45 @@ Motivated by the influence of self loop, I wanna explore more about variants gra
    ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot~Edge~emb^* \cdot ~(^d g_j^{l} - ^d g_i^{l})~ ])}
    $$
 
-|          Model Variants          | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|     Vanilla one<sup>*</sup>      | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-|             deepMsg              | 33.54 | 50.37 | 22.54 | 34.25 | 28.24 | 43.51 | 56.27 | 81.98 |
-|             meanAggr             | 26.69 | 51.01 | 14.17 | 25.15 | 21.01 | 31.31 | 51.81 | 81.87 |
-|   Graphconv <br>*w/* self-loop   |       |       |       |       |       |       |       |       |
-|  Graphconv <br/>*w/o* self-loop  |       |       |       |       |       |       |       |       |
-|  DouleEdgeEmb<br>*w/* self-loop  | 30.88 | 51.38 | 18.77 | 29.97 | 25.06 | 37.27 | 56.10 | 81.86 |
-| DouleEdgeEmb<br/>*w/o* self-loop | 37.43 | 50.50 | 27.94 | 40.16 | 33.12 | 51.00 | 58.11 | 81.99 |
-|            selfConcat            | 30.31 | 51.24 | 18.13 | 30.29 | 25.33 | 37.68 | 56.09 | 81.88 |
-
-Noted that the method of adding up to enhance one\`s own features is not quite effective, i.e. `GraphConv` and `DoubleEdgeEmb`. Instead, the method of concatenation seems to perform better, i.e. `selfConcat`. So let me dig further out the potentiality of concatenation.
-
-1. Just concatenate of node\`s own feature in the static graph convolution network: (marked as `StatiSelfConcat`)
+6. Just concatenate of node\`s own feature in the static graph convolution network: (marked as `StatiSelfConcat`)
    $$
    ^{s}g^{l+1}_i=& \Phi \{~\max _{j \in \mathbb{N}_i}{f([^s g_i^{l}~\cdot~Edge~emb~\cdot ~(^s g_j^{l} - ^s g_i^{l}) ]~\}} \\
    ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([^d g_i^{l}~\cdot(^d g_j^{l} - ^d g_i^{l})~ ])}
    $$
 
-2. Swap two graph convolution methods: (marked as `SwapConv`)
+7. Swap two graph convolution methods: (marked as `SwapConv`)
    $$
    ^{s}g^{l+1}_i=& \Phi\{\max _{j \in \mathbb{N}_i}{f([^{s}g_i^{l}~\cdot~(^{s}g_j^{l} - ^{s}g_i^{l})~]\}})\\
    ^{d}g^{l+1}_i=& \max _{j \in \mathbb{N}_i}{f([~Edge~emb ~\cdot~(^{d}g_j^{l} - ^{d}g_i^{l})~ ]})\\
    $$
 
-|            Model Variants            | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :----------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  StaticSelfConcat<br>*w/* self-loop  | 30.60 | 51.18 | 18.49 | 30.84 | 25.79 | 38.36 | 55.80 | 81.87 |
-| StaticSelfConcat<br/>*w/o* self-loop |       |       |       |       |       |       |       |       |
-|      SwapConv<br>*w/* self-loop      | 38.78 | 50.61 | 29.88 | 43.16 | 35.60 | 54.80 | 58.41 | 82.01 |
-|     SwapConv<br/>*w/o* self-loop     |       |       |       |       |       |       |       |       |
+-----
+
+Experimental Results:
+
+|       Model Variants<br>+[Mask-50]       | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :--------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|         Vanilla one<sup>*</sup>          | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|                 deepMsg                  | 44.70 | 50.56 | 39.71 | 51.86 | 42.81 | 65.76 | 59.14 | 81.94 |
+|                 meanAggr                 | 43.85 | 50.30 | 38.42 | 50.30 | 41.53 | 63.77 | 58.98 | 81.98 |
+|       Graphconv <br>*w/* self-loop       | 45.81 | 50.45 | 41.78 | 53.16 | 43.90 | 67.38 | 59.37 | 81.98 |
+|      Graphconv <br/>*w/o* self-loop      | 46.52 | 50.73 | 42.84 | 53.91 | 44.51 | 68.34 | 59.53 | 81.99 |
+|  Graphconv <br/>*w/o* self-loop[SGraph]  | 45.60 | 50.73 | 41.18 | 53.06 | 43.81 | 67.25 | 59.48 | 82.00 |
+|      DouleEdgeEmb<br>*w/* self-loop      | 44.99 | 50.54 | 40.25 | 53.25 | 43.96 | 67.50 | 59.51 | 82.01 |
+|     DouleEdgeEmb<br/>*w/o* self-loop     | 46.16 | 50.53 | 42.53 | 53.35 | 44.05 | 67.62 | 59.41 | 81.98 |
+| DouleEdgeEmb<br/>*w/o* self-loop[SGraph] | 45.02 | 50.70 | 40.17 | 51.75 | 42.72 | 65.61 | 59.52 | 82.00 |
+|                selfConcat                | 45.14 | 50.71 | 40.35 | 52.94 | 43.71 | 67.10 | 59.56 | 81.99 |
+|    StaticSelfConcat<br>*w/* self-loop    | 45.17 | 50.74 | 40.40 | 52.40 | 43.26 | 66.41 | 59.40 | 81.99 |
+|   StaticSelfConcat<br/>*w/o* self-loop   | 45.86 | 50.69 | 41.67 | 53.20 | 43.92 | 67.44 | 59.34 | 82.00 |
+|        SwapConv<br>*w/* self-loop        | 45.26 | 50.59 | 40.68 | 52.79 | 43.58 | 66.91 | 59.58 | 82.00 |
+|       SwapConv<br/>*w/o* self-loop       |       |       |       |       |       |       |       |       |
+|   SwapConv<br/>*w/o* self-loop[Dgraph]   | 45.15 | 50.79 | 40.33 | 52.11 | 43.04 | 66.04 | 59.55 | 81.97 |
+
+Some Conclusions:
+
+
+
+Noted that the method of adding up to enhance one\`s own features is not quite effective, i.e. `GraphConv` and `DoubleEdgeEmb`. Instead, the method of concatenation seems to perform better, i.e. `selfConcat`. So let me dig further out the potentiality of concatenation.
 
 ----
 
@@ -787,13 +910,13 @@ P.S. the following experiments will not apply `deepMsg`, for fair comparison.
 | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |      FixedEdgeDim       |       |       |       |       |       |       |       |       |
 |   ProgressiveEdgeDim    |       |       |       |       |       |       |       |       |
-|       RawEdgeAttr       | 34.53 | 50.28 | 23.89 | 36.85 | 30.37 | 46.85 | 56.12 | 81.98 |
+|       RawEdgeAttr       | 44.28 | 50.51 | 39.03 | 50.98 | 42.09 | 64.63 | 59.13 | 81.99 |
 
-| Vanilla Model[GIoUd5] + | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
-| :---------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-|      FixedEdgeDim       |      |      |      |      |      |      |      |      |
-|   ProgressiveEdgeDim    |      |      |      |      |      |      |      |      |
-|       RawEdgeAttr       |      |      |      |      |      |      |      |      |
+| Vanilla Model[GIoUd5] + | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|      FixedEdgeDim       |       |       |       |       |       |       |       |       |
+|   ProgressiveEdgeDim    |       |       |       |       |       |       |       |       |
+|       RawEdgeAttr       | 43.29 | 50.71 | 37.15 | 49.70 | 41.04 | 62.98 | 59.03 | 81.96 |
 
 | Vanilla Model<br>[IoUFamily8-convex-seq] + | HOTA | DetA | AssA | IDF1 | IDR  | IDP  | MOTA | MOTP |
 | :----------------------------------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
@@ -813,39 +936,50 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 
 ![deepmsg2](./.assert/deepmsg2.bmp)
 
-|      Model Variant      | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+|   Bigger + [Mask-50]    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one<sup>*</sup> | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-|        DeepMsg-1        | 33.54 | 50.37 | 22.54 | 34.25 | 28.24 | 43.51 | 56.27 | 81.98 |
-|        DeepMsg-2        |       |       |       |       |       |       |       |       |
+| Vanilla one<sup>*</sup> | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|        DeepMsg-1        | 44.70 | 50.56 | 39.71 | 51.86 | 42.81 | 65.76 | 59.14 | 81.94 |
+|      **DeepMsg-2**      | 45.08 | 50.39 | 40.51 | 51.77 | 42.74 | 65.64 | 59.14 | 81.99 |
 
 <img src="./.assert/smoothFamily.bmp" alt="smoothFamily" style="zoom:50%;" />
 
-| Model Variant  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  Vanilla one*  | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-| Static-smooth  | 34.45 | 50.44 | 23.74 | 35.81 | 29.54 | 45.46 | 56.48 | 81.98 |
-| Dynamic-smooth | 34.69 | 50.43 | 24.06 | 36.28 | 29.90 | 46.10 | 56.52 | 81.99 |
+| Bigger + [Mask-50] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|    Vanilla one*    | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|   Static-smooth    | 44.73 | 50.49 | 39.83 | 51.01 | 42.11 | 64.66 | 59.18 | 81.99 |
+| **Dynamic-smooth** | 46.16 | 50.54 | 42.33 | 53.95 | 44.55 | 68.39 | 59.33 | 81.97 |
 
 #### 4.9.2 About Update Layer
 
 ![upd-2](./.assert/upd-2.bmp)
 
-| Model Variant | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-----------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one*  | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-|   DeepUpd-2   |       |       |       |       |       |       |       |       |
+| Bigger + [Mask-50] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|    Vanilla one*    | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|   **DeepUpd-2**    | 45.48 | 50.68 | 41.01 | 53.05 | 43.81 | 67.22 | 59.55 | 81.95 |
+
+----
+
+| Bigger + [Mask-50] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|    Vanilla one*    | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|      AddUpd-1      | 44.89 | 50.63 | 40.00 | 51.90 | 42.85 | 65.80 | 59.21 | 81.97 |
+|    **AddUpd-2**    | 45.89 | 50.70 | 41.73 | 53.27 | 43.99 | 67.50 | 59.43 | 81.98 |
 
 #### 4.9.3 About Fuse Model
 
 ![deepFuse](./.assert/deepFuse.bmp)
 
-| Model Variant | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :-----------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one*  | 35.14 | 50.43 | 24.70 | 37.29 | 30.74 | 47.37 | 56.89 | 81.94 |
-|  DeepFuse-1   | 34.16 | 50.35 | 23.37 | 35.70 | 29.44 | 45.35 | 56.40 | 81.99 |
-|  DeepFuse-2   | 33.94 | 50.24 | 23.13 | 35.45 | 29.21 | 45.08 | 56.28 | 81.97 |
-|  DeepFuse-3   |       |       |       |       |       |       |       |       |
+| Bigger + [Mask-50] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|    Vanilla one*    | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|     DeepFuse-1     | 44.50 | 50.50 | 39.38 | 51.06 | 42.17 | 64.69 | 59.26 | 81.98 |
+|     DeepFuse-2     | 43.80 | 50.43 | 38.23 | 50.45 | 41.67 | 63.93 | 59.05 | 81.99 |
+|     DeepFuse-3     | 44.59 | 50.32 | 39.69 | 51.56 | 42.56 | 65.37 | 59.12 | 81.97 |
+|  **DeepFuse-1+3**  | 45.24 | 50.62 | 40.62 | 52.15 | 43.06 | 66.11 | 59.28 | 82.01 |
+|   DeepFuse-1+2+3   | 44.72 | 50.68 | 39.66 | 51.54 | 42.55 | 65.33 | 59.16 | 81.96 |
+|                    | 45.49 | 50.39 | 41.25 | 52.45 | 43.27 | 66.48 | 59.06 | 81.96 |
 
 #### 4.9.4 Summary
 
@@ -866,12 +1000,12 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 
 One of the core and useful experience or intuition in the era of deep learning is that `if you have a large big dataset and you train a very big neural network, then success is guaranted` (quoted from [llya`s speech at NeurlPS conference in 2024](https://www.bilibili.com/video/BV1cSBGYkE9w/?spm_id_from=333.337.search-card.all.click&vd_source=812705912b7abe259d54d8593a97a8b3)) , like CLIP model trained in 400 million dataset.
 
-So I also attempt to add more benchmark, like MOT20 and DanceTrack, to enlarge the training dataset. Finally, the number of data is reached to **48856**, which is **20x times than before**. And the time expense is also huge , which maybe cost **3 days** to complete the whole training, **3x times than before.**
+So I also attempt to add more benchmark, like MOT20 and DanceTrack, to enlarge the training dataset. Finally, the number of data is reached to **48856**, which is **20x times than before**. And the time expense is also huge , which maybe cost **40 hours** to complete the whole training, **20x times than before.**
 
-|       Conditions        | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Vanilla one<sup>*</sup> | 23.31 | 49.68 | 11.03 | 22.87 | 18.76 | 29.28 | 51.74 | 81.89 |
-|     Larger Dataset      |       |       |       |       |       |       |       |       |
+| Conditions<br>+[Mask-50] |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
+| :----------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
+| Vanilla one<sup>*</sup>  |   44.40   | 50.66 |   39.11   |   50.57   |   41.75   |   64.12   | 59.17 | 81.95 |
+|      Larger Dataset      | **46.02** | 50.73 | **41.92** | **53.05** | **43.79** | **67.28** | 59.29 | 81.98 |
 
 ## 5. Experimental Records [Track Management]
 

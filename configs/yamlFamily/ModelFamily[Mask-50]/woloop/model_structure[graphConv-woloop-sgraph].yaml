@@ -9,7 +9,7 @@ DIST_THRESH: 50
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
 Edge_mode: 'vanilla'
 # Options : vanilla , graphConv , doubleEdgeEmb , selfConcat
-GraphModel_type: 'vanilla'
+GraphModel_type: 'graphConv'
 
 #---------------------------------#
 #         Model Structure
@@ -53,7 +53,7 @@ edge_encoder:
   lrelu_slope: 0.0
   # static graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 

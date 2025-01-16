@@ -38,14 +38,14 @@ edge_encoder:
   #  Options : 
   #            ImgNorm4 | SrcNorm4          | TgtNorm4             | MeanSizeNorm4  | MeanHeightNorm4 
   #      MeanWidthNorm4 | CorverxNorm4      | MaxNorm4             | IOUd5          | IOU5
-  #      GIOUd5         |  GIOU5            | DIOUd5               | DIOU5          | DIOU-Cos6 
+  #      GIOUd5         |  GIOU5            | DIOUd5               | DIOU5          | DIOUd-Cos6 
   #      IouFamily8-vanilla       |   IouFamily8-convex       |    IouFamily8-separate      
   #      IouFamily8-vanilla-seq   |   IouFamily8-convex-seq   |    IouFamily8-separate-seq
   #      ConvexNorm4-v2 |   MaxNorm4-v2     | GIOUd5-v2            | GIOU5-v2       | DIOU5-v2
   #           CIOU5-v2   
   #---------------------------------#
-  edge_type: 'DIOUd5'
-  dims_list: [5,16,16]
+  edge_type: 'GIOUd-Cosd6-ultimate'
+  dims_list: [6,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True

@@ -3,11 +3,11 @@
 #---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
-BT_DIST_MASK: False
-DIST_THRESH: 300
+BT_DIST_MASK: True
+DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
-Edge_mode: 'ProgressiveEdgeDim'
+Edge_mode: 'vanilla'
 # Options : vanilla , graphConv , doubleEdgeEmb , selfConcat
 GraphModel_type: 'vanilla'
 
@@ -38,14 +38,17 @@ edge_encoder:
   #  Options : 
   #            ImgNorm4 | SrcNorm4          | TgtNorm4             | MeanSizeNorm4  | MeanHeightNorm4 
   #      MeanWidthNorm4 | CorverxNorm4      | MaxNorm4             | IOUd5          | IOU5
-  #      GIOUd5         |  GIOU5            | DIOUd5               | DIOU5          | DIOU-Cos6 
+  #      GIOUd5         |  GIOU5            | DIOUd5               | DIOU5          | DIOUd-Cosd6 
   #      IouFamily8-vanilla       |   IouFamily8-convex       |    IouFamily8-separate      
   #      IouFamily8-vanilla-seq   |   IouFamily8-convex-seq   |    IouFamily8-separate-seq
   #      ConvexNorm4-v2 |   MaxNorm4-v2     | GIOUd5-v2            | GIOU5-v2       | DIOU5-v2
   #           CIOU5-v2   
+  #
+  # Ultimate version:
+  #      GIOUd-Cosd6-ultimate  | GIOUd-Cos6-ultimate   | CIOUd-Cosd6-ultimate  | CIOUd-Cos6-ultimate
   #---------------------------------#
-  edge_type: 'GIOUd5'
-  dims_list: [5,16,16]
+  edge_type: 'GIOUd-Cosd6'
+  dims_list: [6,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True
@@ -86,11 +89,11 @@ edge_encoder:
 #---------------------------------#
 static_graph_model:
   nodeEmb_size: [32,64,96]
-  edgeEmb_size: [16,32,64]
+  edgeEmb_size: [16,16,16]
   msgLayer_dims:
     - [48,64]
-    - [96,96]
-    - [160,128]
+    - [80,96]
+    - [112,128]
   updLayer_dims:
     - [64,64]
     - [96,96]

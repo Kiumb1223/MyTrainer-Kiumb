@@ -133,8 +133,8 @@ dynamic_graph_model:
 fuse_model:
   # [in_dim , mid_dim, out_dim]
   fuseLayer_dims: 
-    - [512,1024]
-    - [1536,768,384,192] 
+    - [512,1024,1024]
+    - [1536,768,384,192,192] 
   layer_type: 'Conv1d'
   layer_bias: False
   use_batchnorm: True

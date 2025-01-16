@@ -3,13 +3,13 @@
 #---------------------------------#
 K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
-BT_DIST_MASK: False
-DIST_THRESH: 300
+BT_DIST_MASK: True
+DIST_THRESH: 50
 
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
-Edge_mode: 'FixedEdgeDim'
+Edge_mode: 'vanilla'
 # Options : vanilla , graphConv , doubleEdgeEmb , selfConcat
-GraphModel_type: 'vanilla'
+GraphModel_type: 'doubleEdgeEmb'
 
 #---------------------------------#
 #         Model Structure
@@ -53,7 +53,7 @@ edge_encoder:
   lrelu_slope: 0.0
   # static graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 
@@ -111,8 +111,8 @@ dynamic_graph_model:
   nodeEmb_size: [64,96]
   edgeEmb_size: [16,16]
   msgLayer_dims:
-    - [128,96,96]
-    - [192,128,128]
+    - [144,120,96,96]
+    - [208,168,128,128]
   updLayer_dims:
     - []
     - []
