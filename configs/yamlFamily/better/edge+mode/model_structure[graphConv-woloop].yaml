@@ -9,7 +9,7 @@ DIST_THRESH: 50
 # Options : vanilla, FixedEdgeDim , ProgressiveEdgeDim , RawEdgeAttr
 Edge_mode: 'vanilla'
 # Options : vanilla , graphConv , doubleEdgeEmb , selfConcat
-GraphModel_type: 'vanilla'
+GraphModel_type: 'graphConv'
 
 #---------------------------------#
 #         Model Structure
@@ -44,8 +44,8 @@ edge_encoder:
   #      ConvexNorm4-v2 |   MaxNorm4-v2     | GIOUd5-v2            | GIOU5-v2       | DIOU5-v2
   #           CIOU5-v2   
   #---------------------------------#
-  edge_type: 'DIOUd5'
-  dims_list: [5,16,16]
+  edge_type: 'Tgt-GIOUd-Cos6'
+  dims_list: [6,16,16]
   layer_type: 'linear'
   layer_bias: False
   use_batchnorm: True
@@ -53,7 +53,7 @@ edge_encoder:
   lrelu_slope: 0.0
   # static graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 
@@ -88,13 +88,13 @@ static_graph_model:
   nodeEmb_size: [32,64,96]
   edgeEmb_size: [16,16,16]
   msgLayer_dims:
-    - [48,56,64,64,64]
-    - [80,88,96,96,96]
-    - [112,120,128,128,128]
+    - [48,64]
+    - [80,96]
+    - [112,128]
   updLayer_dims:
-    - [64,64,64]
-    - [96,96,96]
-    - [128,128,128]
+    - [64,64]
+    - [96,96]
+    - [128,128]
   aggr: 'max'
   layer_type: 'linear'
   layer_bias: False
@@ -111,11 +111,12 @@ dynamic_graph_model:
   nodeEmb_size: [64,96]
   edgeEmb_size: [16,16]
   msgLayer_dims:
-    - [128,112,96,96]
-    - [192,160,128,128]
+    - [128,96,96]
+    - [192,128,128]
   updLayer_dims:
-    - [96,96,96]
-    - [128,128,128]
+    - []
+    - []
+    - []
   aggr: 'max'
   # module layer settings 
   layer_type: 'linear'
@@ -125,15 +126,15 @@ dynamic_graph_model:
   lrelu_slope: 0.1
   # dynamic graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 #---------------------------------#
 fuse_model:
   # [in_dim , mid_dim, out_dim]
   fuseLayer_dims: 
-    - [512,1024,1024]
-    - [1536,768,384,192,192] 
+    - [512,1024]
+    - [1536,768,384,192] 
   layer_type: 'Conv1d'
   layer_bias: False
   use_batchnorm: True

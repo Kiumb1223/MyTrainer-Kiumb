@@ -287,6 +287,16 @@ It seems that **the speed of object moving poses the bigger influence on the sta
 
 ![Kfamily_metrics](./.assert/mask.png)
 
+
+
+| Epoch Range | HOTA      | DetA  | AssA      | IDF1      | IDR       | IDP       | MOTA  | MOTP  |
+| ----------- | --------- | ----- | --------- | --------- | --------- | --------- | ----- | ----- |
+| 120         | **44.40** | 50.66 | **39.11** | **50.57** | **41.75** | **64.12** | 59.17 | 81.95 |
+| 150         | 44.75     | 50.58 | 39.80     | 51.19     | 42.27     | 64.90     | 59.22 | 82.00 |
+|             |           |       |           |           |           |           |       |       |
+
+
+
 ### 4.6 After Different K [:tada:]
 
 According to the descriptions about construction graph in [[Sec 1. Brief Introduction about My Model]](#1. Brief Introduction about My Model), there is a hyperparameter `k` in KNN algorithm. And k is set to 2 in my vanilla model, so let`s search for best k.
@@ -517,7 +527,7 @@ Experimental Results :
 |                    ImgNorm4                     | 44.52 | 50.46 | 39.48 | 50.73 | 41.88 | 64.32 | 58.60 | 82.00 |
 | **<strong style='color:red'>SrcNorm4</strong>** | 45.31 | 50.51 | 40.84 | 52.36 | 43.23 | 66.38 | 59.19 | 81.97 |
 |   <strong style='color:red'>TgtNorm4</strong>   | 45.70 | 50.53 | 41.51 | 53.10 | 43.85 | 67.30 | 59.27 | 81.99 |
-|                   TgtNorm4-v2                   |       |       |       |       |       |       |       |       |
+|                   TgtNorm4-v2                   | 44.34 | 50.58 | 39.07 | 51.41 | 42.45 | 65.14 | 59.18 | 81.96 |
 |   <strong style='color:red'>MaxNorm4</strong>   | 45.45 | 50.21 | 41.08 | 52.63 | 43.45 | 66.74 | 59.35 | 82.01 |
 |                   MaxNorm4-v2                   | 44.58 | 50.62 | 39.47 | 51.08 | 42.17 | 64.75 | 59.23 | 82.00 |
 |                  EncloseNorm4                   | 45.11 | 50.58 | 40.43 | 51.70 | 42.69 | 65.52 | 59.16 | 82.01 |
@@ -729,7 +739,7 @@ Experimental Results:
 |                    CIOUd-Cosd6                    | 44.99 | 50.64 | 40.17 | 51.87 | 42.82 | 65.77 | 59.34 | 81.98 |
 |                  Tgt-GIOUd-Cosd6                  | 45.65 | 50.74 | 41.26 | 52.45 | 43.30 | 66.49 | 59.52 | 81.98 |
 |                  Tgt-GIOUd-Cos6                   | 45.95 | 50.75 | 41.79 | 53.47 | 44.15 | 67.77 | 59.36 | 81.99 |
-|                  Tgt-DIOUd-Cosd6                  |       |       |       |       |       |       |       |       |
+|                  Tgt-DIOUd-Cosd6                  | 45.59 | 50.56 | 41.31 | 53.23 | 43.96 | 67.47 | 59.51 | 81.98 |
 |                  Tgt-CIOUd-Cosd6                  | 44.81 | 50.63 | 39.85 | 51.41 | 42.44 | 65.18 | 59.40 | 82.00 |
 |                  Tgt-CIOUd-Cos6                   | 45.40 | 50.86 | 40.71 | 52.71 | 43.53 | 66.78 | 59.48 | 81.97 |
 |                  Max-GIOUd-Cosd6                  | 45.66 | 50.52 | 41.44 | 53.28 | 43.98 | 67.58 | 59.32 | 81.98 |
@@ -863,7 +873,7 @@ Experimental Results:
 |                 deepMsg                  | 44.70 | 50.56 | 39.71 | 51.86 | 42.81 | 65.76 | 59.14 | 81.94 |
 |                 meanAggr                 | 43.85 | 50.30 | 38.42 | 50.30 | 41.53 | 63.77 | 58.98 | 81.98 |
 |       Graphconv <br>*w/* self-loop       | 45.81 | 50.45 | 41.78 | 53.16 | 43.90 | 67.38 | 59.37 | 81.98 |
-|      Graphconv <br/>*w/o* self-loop      | 46.52 | 50.73 | 42.84 | 53.91 | 44.51 | 68.34 | 59.53 | 81.99 |
+|    **Graphconv <br/>*w/o* self-loop**    | 46.52 | 50.73 | 42.84 | 53.91 | 44.51 | 68.34 | 59.53 | 81.99 |
 |  Graphconv <br/>*w/o* self-loop[SGraph]  | 45.60 | 50.73 | 41.18 | 53.06 | 43.81 | 67.25 | 59.48 | 82.00 |
 |      DouleEdgeEmb<br>*w/* self-loop      | 44.99 | 50.54 | 40.25 | 53.25 | 43.96 | 67.50 | 59.51 | 82.01 |
 |     DouleEdgeEmb<br/>*w/o* self-loop     | 46.16 | 50.53 | 42.53 | 53.35 | 44.05 | 67.62 | 59.41 | 81.98 |
@@ -872,7 +882,7 @@ Experimental Results:
 |    StaticSelfConcat<br>*w/* self-loop    | 45.17 | 50.74 | 40.40 | 52.40 | 43.26 | 66.41 | 59.40 | 81.99 |
 |   StaticSelfConcat<br/>*w/o* self-loop   | 45.86 | 50.69 | 41.67 | 53.20 | 43.92 | 67.44 | 59.34 | 82.00 |
 |        SwapConv<br>*w/* self-loop        | 45.26 | 50.59 | 40.68 | 52.79 | 43.58 | 66.91 | 59.58 | 82.00 |
-|       SwapConv<br/>*w/o* self-loop       |       |       |       |       |       |       |       |       |
+|       SwapConv<br/>*w/o* self-loop       | 46.49 | 50.64 | 42.86 | 54.77 | 45.21 | 69.45 | 59.42 | 81.94 |
 |   SwapConv<br/>*w/o* self-loop[Dgraph]   | 45.15 | 50.79 | 40.33 | 52.11 | 43.04 | 66.04 | 59.55 | 81.97 |
 
 Some Conclusions:
@@ -880,6 +890,14 @@ Some Conclusions:
 
 
 Noted that the method of adding up to enhance one\`s own features is not quite effective, i.e. `GraphConv` and `DoubleEdgeEmb`. Instead, the method of concatenation seems to perform better, i.e. `selfConcat`. So let me dig further out the potentiality of concatenation.
+
+|        Experiment +[Mask-50]         | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|            Vanilla model             | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+| GraphConv-woloop<br>+ Tgt-GIOUd-Cos5 | 45.33 | 50.51 | 40.86 | 52.06 | 42.98 | 66.00 | 59.54 | 82.01 |
+| SwapConv-woloop<br/>+ Tgt-GIOUd-Cos5 | 45.40 | 50.73 | 40.80 | 53.44 | 44.13 | 67.73 | 59.80 | 81.99 |
+|                                      | 44.53 | 50.58 | 39.42 | 51.02 | 42.13 | 64.66 | 59.24 | 81.95 |
+|                                      | 44.50 | 50.69 | 39.27 | 51.27 | 42.33 | 65.00 | 59.18 | 82.00 |
 
 ----
 
@@ -991,6 +1009,17 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 | Bigger Model  |                |            |           |
 
 ![flops-para(vanilla)](./.assert/flops-para(vanilla).bmp)
+
+
+
+|                  Experiment +[Mask-50]                  | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------------------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                      Vanilla model                      | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|                       biggerModel                       | 45.00 | 50.61 | 40.22 | 51.66 | 42.65 | 65.49 | 59.13 | 82.00 |
+|          GraphConv-woloop<br>+ Tgt-GIOUd-Cos5v          | 45.33 | 50.51 | 40.86 | 52.06 | 42.98 | 66.00 | 59.54 | 82.01 |
+|          SwapConv-woloop<br> + Tgt-GIOUd-Cos5           | 45.40 | 50.73 | 40.80 | 53.44 | 44.13 | 67.73 | 59.80 | 81.99 |
+| GraphConv-woloop<br> + Tgt-GIOUd-Cos5<br>+ biggerModel  | 44.85 | 50.81 | 39.79 | 51.92 | 42.87 | 65.80 | 59.36 | 82.00 |
+| SwapConv-woloop<br/> + Tgt-GIOUd-Cos5<br/>+ biggerModel | 45.49 | 50.57 | 41.10 | 52.57 | 43.40 | 66.66 | 59.46 | 82.02 |
 
 ### 4.10 After Superior Appearance Feature Extractor [:eyes:]
 

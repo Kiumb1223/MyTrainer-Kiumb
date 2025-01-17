@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\yamlFamily\BiggerFamily[Mask-50]\better\model_structure[biggerBetter].yaml',
+        MODEL_YAML_PATH   = r'configs\yamlFamily\Mask\model_structure[mask-50].yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\bigger[mask-50]\better\biggerBetter.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\past-exp\Mask\Mask-50-150ep.pth',
         FUSION_METHOD     = 'DFF', # options DFF CWFF EMAFF
         EMA_LAMBDA        = 0.9,
         MIN_DET_CONF      = 0.1,
