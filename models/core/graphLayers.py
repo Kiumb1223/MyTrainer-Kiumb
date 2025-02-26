@@ -3,30 +3,164 @@
 
 import torch
 import torch.nn as nn
-from typing import Union
 from torchvision import models
 import torch.nn.functional as F
+from typing import Union,Optional
+import torch_geometric.nn.norm as norm
 from torch_geometric.data import Batch,Data
+from torch_geometric.nn import MessagePassing
 import torchvision.transforms.functional as T
 from models.graphToolkit import knn,calc_iouFamily
-from models.core.fastReid import load_fastreid_model
-from models.core.layerToolkit import SequentialBlock,parse_layer_dimension
+from models.core.fastReid import load_fastreid_model,load_ckpt_FastReid
 
-__all__ = ['NodeEncoder','EdgeEncoder']
+__all__ = ['parse_layer_dimension','SequentialBlock','NodeEncoder','NodeUpdater','EdgeUpdater','EdgeEncoder']
 
+def parse_layer_dimension(layer_dims: Union[list, tuple]):
+    """
+    Parses the input layer dimensions and returns the input, output, and hidden dimensions.
+
+    This utility function is designed to handle various configurations of `layer_dims`, 
+    ensuring robust parsing for layer dimension specifications. The input can be a list 
+    or tuple of integers representing the dimensions for a sequence of layers.
+
+    Args:
+        layer_dims (Union[list, tuple]): A list or tuple containing layer dimensions.
+            - If empty, returns (None, None, None).
+            - If it contains one item, it is treated as both the input and output dimensions 
+              (hidden dimensions will be an empty list).
+            - If it contains multiple items, the first is treated as the input dimension,
+              the last as the output dimension, and the middle items as hidden dimensions.
+
+    Returns:
+        tuple: A tuple containing:
+            - in_dim (int or None): The input dimension. None if `layer_dims` is empty.
+            - out_dim (int or None): The output dimension. None if `layer_dims` is empty.
+            - hidden_dim (list): A list of hidden dimensions. Empty list if only one dimension is provided.
+
+    Raises:
+        AssertionError: If `layer_dims` is not a list or tuple.
+
+    """
+
+    assert isinstance(layer_dims,(list,tuple)), "layer_dims must be a list or tuple"
+    
+    if len(layer_dims) == 0:
+        return None, None, None
+    elif len(layer_dims) == 1:
+        return layer_dims[0], layer_dims[0], []
+    
+    in_dim , *hidden_dim , out_dim = layer_dims
+    return in_dim, hidden_dim, out_dim 
+
+
+class SequentialBlock(nn.Module):
+    '''
+    A dynamic module constructor that uses `layer_type` to dynamically select layer types 
+    and build a configurable network.
+    '''
+    def __init__(self,
+            dims_list  :Union[list,tuple], 
+            layer_type :str, layer_bias :bool,
+            norm_type  :str ,
+            activate_func :str, lrelu_slope:float =0.0,
+            final_activation :bool=True
+        ):
+        '''
+        :param dims_list: A list of  dimensions for each layer.
+        :param layer_type: The type of layer to use, e.g., 'linear', 'conv1d'.
+        :param layer_bias: Whether to use bias in Conv1d or Linear layers.        
+        :param norm_type: Thy type of normalization layer to use , e.g., 'batchNorm' , 'LayerNorm' ,'graphNorm'.
+        :param activate_func: Activation function type, e.g., 'relu', 'lrelu'.
+        :param lrelu_slope: Negative slope for LeakyReLU activation.
+        :param final_activation: Whether to add activation after the last layer (default is True).
+        '''
+        super(SequentialBlock, self).__init__()
+        activation_map = {
+            'relu': nn.ReLU(inplace=True),
+            'lrelu': nn.LeakyReLU(negative_slope=lrelu_slope, inplace=True),
+        }
+        normalization_map = {
+            'batchnorm' : nn.BatchNorm1d,
+            'layernorm' : nn.LayerNorm,
+            'graphnorm':norm.GraphNorm,
+        }
+        layer_type    = layer_type.lower()
+        activate_func = activate_func.lower()
+        norm_type     = norm_type.lower()
+        
+        assert layer_type in ['linear','conv1d'] , f"Unsupported layer type: {layer_type}. "
+        assert activate_func in activation_map , f"Unsupported activation function: {activate_func}. " + f"Supported functions are: {list(activation_map.keys())}"
+        assert norm_type in normalization_map , f"Unsupported normalization layer type: {norm_type}."
+        
+        assert len(dims_list) > 0 , "dims_list should not be empty"
+        #---------------------------------#
+        #  dims_list : [in_dim, hidden_dim , out_dim]
+        #---------------------------------#
+        in_dim = dims_list[0]
+        if len(dims_list) > 1 :
+            dims_list = dims_list[1:]
+
+        layers = []
+
+        length = len(dims_list)
+
+        norm_layer     = normalization_map[norm_type]   
+        activate_layer = activation_map[activate_func]
+        
+        for cnt,dim in enumerate(dims_list):
+            if layer_type == 'conv1d':
+                layers.append(nn.Conv1d(in_dim, dim, kernel_size=1, bias=layer_bias))
+            elif layer_type == 'linear':
+                layers.append(nn.Linear(in_dim, dim, bias=layer_bias))
+
+            if cnt < length - 1 or final_activation:
+                if norm_type:
+                    layers.append(norm_layer(dim))
+                layers.append(activate_layer)
+            in_dim = dim
+        self.layers = nn.Sequential(*layers)
+
+        self._initialize_weights(lrelu_slope)
+
+    def _initialize_weights(self,lrelu_slope):
+        for m in self.layers:
+            if isinstance(m,nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.Conv1d):
+                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope,mode='fan_out')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.BatchNorm1d) or isinstance(m,nn.LayerNorm):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m,norm.GraphNorm):
+                if hasattr(m, 'reset_parameters'):
+                    m.reset_parameters()
+
+    def forward(self,input,batch :Optional[torch.Tensor]=None):
+        for layer in self.layers:
+            if isinstance(layer,norm.GraphNorm):
+                if input.dim() == 3 : # conv1d
+                    input = layer(input.squeeze(-1),batch).unsqueeze(-1)
+                else:  
+                    input = layer(input,batch)
+            else:
+                input = layer(input)
+        return input
 
 class NodeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
-    def __init__(self, node_model_dict :dict):
+    def __init__(self, node_encode_model_dict :dict):
         
         super(NodeEncoder, self).__init__()
+        self.backbone_type = node_encode_model_dict['backbone']
+        assert node_encode_model_dict['dims_list'] is not [] , '[node_encoder] dims_list is empty'
 
-        assert node_model_dict['dims_list'] is not [] , '[node_encoder] dims_list is empty'
 
-        in_dim , mid_dim , out_dim = parse_layer_dimension(node_model_dict['dims_list'])
-
-        self.backbone = self.gen_backbone(node_model_dict['backbone'],node_model_dict['wight_path'])
-        if node_model_dict['backbone'] == 'densenet121':
+        self.backbone = self.gen_backbone(node_encode_model_dict['backbone'],node_encode_model_dict['weight_path'])
+        if node_encode_model_dict['backbone'] == 'densenet121':
             self.head = nn.Sequential(
                 nn.Sequential(
                     nn.ReLU(inplace=True),
@@ -34,108 +168,143 @@ class NodeEncoder(nn.Module):
                     nn.Flatten(1),  # 1024
                 ),
                 SequentialBlock(
-                    in_dim, out_dim, mid_dim,
-                    node_model_dict['layer_type'], node_model_dict['layer_bias'],
-                    node_model_dict['use_batchnorm'], 
-                    node_model_dict['activate_func'],node_model_dict['lrelu_slope']
+                    node_encode_model_dict['dims_list'],
+                    node_encode_model_dict['layer_type'], node_encode_model_dict['layer_bias'],
+                    node_encode_model_dict['norm_type'], 
+                    node_encode_model_dict['activate_func'],node_encode_model_dict['lrelu_slope']
                 )
             )
+            #  freeze model weights
+            params = list(self.backbone.parameters())
+            for param in params:
+                param.requires_grad = False
+
+            for param in params[-3:]:
+                param.requires_grad = True
         else:
             self.head = SequentialBlock(
-                    in_dim, out_dim, mid_dim,
-                    node_model_dict['layer_type'], node_model_dict['layer_bias'],
-                    node_model_dict['use_batchnorm'], 
-                    node_model_dict['activate_func'],node_model_dict['lrelu_slope']
+                    node_encode_model_dict['dims_list'],
+                    node_encode_model_dict['layer_type'], node_encode_model_dict['layer_bias'],
+                    node_encode_model_dict['norm_type'], 
+                    node_encode_model_dict['activate_func'],node_encode_model_dict['lrelu_slope']
                 )
-        #  freeze model weights
-        params = list(self.backbone.parameters())
-        for param in params:
-            param.requires_grad = False
-
-        for param in params[-3:]:
-            param.requires_grad = True
+            #  freeze model weights
+            for param in self.backbone.parameters():
+                param.required_grad = False
 
 
     def gen_backbone(self,backbone:str,weight_path:str):
-        assert backbone in ['densenet121','fastreid']
+        # assert backbone in ['densenet121','fastreid']
         if backbone == 'densenet121':
             backbone_tmp = models.densenet121(pretrained=True)
             backbone = nn.Sequential(*(list(backbone_tmp.children())[:-1]))
             return backbone
+        elif backbone.startswith('fastreid_'):
+            backbone = load_fastreid_model(backbone)
+            return load_ckpt_FastReid(backbone,weight_path)
 
-    def forward(self, graph :Union[Batch,Data]) -> Union[Batch,Data]:
+    def forward(self, graph :Union[Data,Batch]) -> Union[Data,Batch]:
         graph.x = T.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
-        graph.x = self.backbone(graph.x)
+        if self.backbone_type.startswith('fastreid_'):
+            self.backbone.eval()
+            with torch.no_grad():
+                graph.x = self.backbone(graph.x)
+        else:
+            graph.x = self.backbone(graph.x)
         graph.x = self.head(graph.x)
         
-        return graph   
+        return graph
 
 
-
-class EdgeEmbedRefiner(nn.Module):
-    '''graph.attr in and graph.attr out'''
-    def __init__(self, 
-        edge_mode :str,
-        edge_dim_in:int,
-        edge_dim_out:int,
-        edge_model_dict :dict,
+class NodeUpdater(MessagePassing):
+    def __init__(self,
+        idx : int, 
+        node_update_model_dict: dict
         ):
-        super(EdgeEmbedRefiner, self).__init__()
 
-        if edge_mode in ['vanilla','RawEdgeAttr']:
-            self.edge_refiner = lambda x :x
-        elif edge_mode == 'FixedEdgeDim':
-            assert edge_dim_in ==  edge_dim_out
-            self.edge_refiner = SequentialBlock(
-                    edge_dim_in, edge_dim_out,[],
-                    edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
-                    edge_model_dict['use_batchnorm'],
-                    edge_model_dict['activate_func'],edge_model_dict['lrelu_slope']
-                )
-        elif edge_mode == 'ProgressiveEdgeDim':
-            self.edge_refiner = SequentialBlock(
-                    edge_dim_in, edge_dim_out,[],
-                    edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
-                    edge_model_dict['use_batchnorm'],
-                    edge_model_dict['activate_func'],edge_model_dict['lrelu_slope']
-                )
-    def forward(self,edgeEmb :torch.Tensor):
+        super().__init__(aggr=node_update_model_dict['aggr']) 
+        
+        msg_model_dict = node_update_model_dict['message_model']
+        upd_model_dict = node_update_model_dict['update_model']
 
-        return self.edge_refiner(edgeEmb)
+        self.msg_layer    = SequentialBlock(
+                dims_list  = msg_model_dict['dims_list'][idx],
+                layer_type = msg_model_dict['layer_type'], layer_bias = msg_model_dict['layer_bias'],
+                norm_type  = msg_model_dict['norm_type'], 
+                activate_func = msg_model_dict['activate_func'], lrelu_slope = msg_model_dict['lrelu_slope']
+            )
+
+        self.upd_layer = SequentialBlock(
+                dims_list  = upd_model_dict['dims_list'][idx],
+                layer_type = upd_model_dict['layer_type'] , layer_bias = upd_model_dict['layer_bias'],
+                norm_type  = upd_model_dict['norm_type']  , 
+                activate_func = upd_model_dict['activate_func'] , lrelu_slope = upd_model_dict['lrelu_slope']
+            )
+
+
+    def forward(self,x :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
+        # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
+        return self.propagate(edge_index,edge_attr=edge_attr,x=x,batch=batch)
     
+    def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor,batch:torch.Tensor) -> torch.Tensor:
+        '''
+        x_i : target nodes 
+        x_j : source nodes
+        '''
+        return self.msg_layer(torch.cat([edge_attr,x_j - x_i], dim=1),batch)
+
+
+    def update(self, msg:torch.Tensor,x:torch.Tensor,batch:torch.Tensor) -> torch.Tensor:
+
+        return self.upd_layer(x + msg,batch)
+
+class EdgeUpdater(nn.Module):
+
+    def __init__(self, 
+        idx :str,
+        edge_update_model_dict :dict,
+        ):
+        super(EdgeUpdater, self).__init__()
+
+        assert edge_update_model_dict['edge_mode'] in ['NodeConcat', 'NodeDiff'], 'edge_mode is not in [NodeConcat, NodeDiff]'
+
+        self.edge_mode = edge_update_model_dict['edge_mode']
+        self.layers = SequentialBlock(
+                edge_update_model_dict['dims_list'][idx],
+                edge_update_model_dict['layer_type'], edge_update_model_dict['layer_bias'],
+                edge_update_model_dict['norm_type'],
+                edge_update_model_dict['activate_func'],edge_update_model_dict['lrelu_slope']
+            )
+    def forward(self,x:torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor,batch :Optional[torch.Tensor]=None):
+        x_source = x[edge_index[0]]
+        x_target = x[edge_index[1]]
+        if self.edge_mode == 'NodeConcat':
+            res = torch.cat([x_source,x_target,edge_attr],dim=-1)
+        elif self.edge_mode == 'NodeDiff':
+            res = torch.cat([x_source-x_target,edge_attr],dim=-1)
+        return self.layers(res,batch)
+
+
 class EdgeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
     def __init__(self, 
-        edge_mode: str,
-        edge_model_dict :dict,
+        edge_encode_model_dict :dict,
         ):
         super(EdgeEncoder, self).__init__()
-        # assert edge_model_dict['edge_type'] in ["ImgNorm4","SrcNorm4","TgtNorm4", "MeanSizeNorm4", "MeanHeightNorm4",
-        #         "MeanWidthNorm4","CorverxNorm4","MaxNorm4","IOU5", "DIOU5", "DIOU-Cos6", "IouFamily8"]
         
-        
-        self.edge_mode = edge_mode
-        
-        assert not (edge_mode != 'RawEdgeAttr' and edge_model_dict['dims_list'] == []), \
-            "edge_mode is not 'RawEdgeAttr' but dims_list is empty"
+        self.edge_type    = edge_encode_model_dict['edge_type']
+        self.bt_cosine    = edge_encode_model_dict['bt_cosine']
+        self.bt_self_loop = edge_encode_model_dict['bt_self_loop']
+        self.bt_directed  = edge_encode_model_dict['bt_directed']
 
-
-        in_dim , mid_dim , out_dim = parse_layer_dimension(edge_model_dict['dims_list'])
-        
-        self.edge_type    = edge_model_dict['edge_type']
-        self.bt_cosine    = edge_model_dict['bt_cosine']
-        self.bt_self_loop = edge_model_dict['bt_self_loop']
-        self.bt_directed  = edge_model_dict['bt_directed']
-
-        if self.edge_mode != 'RawEdgeAttr':
-            self.encoder  = SequentialBlock(
-                    in_dim, out_dim, mid_dim,
-                    edge_model_dict['layer_type'], edge_model_dict['layer_bias'],
-                    edge_model_dict['use_batchnorm'],
-                    edge_model_dict['activate_func'],edge_model_dict['lrelu_slope']
-                )
+        self.encoder  = SequentialBlock(
+                edge_encode_model_dict['dims_list'],
+                edge_encode_model_dict['layer_type'], edge_encode_model_dict['layer_bias'],
+                edge_encode_model_dict['norm_type'],
+                edge_encode_model_dict['activate_func'],edge_encode_model_dict['lrelu_slope']
+            )
   
-    def forward(self,graph:Union[Batch,Data],k:int) -> Union[Batch,Data]:
+    def forward(self,graph:Union[Batch,Data],k:int,batch:Optional[torch.Tensor]=None) -> Union[Batch,Data]:
         
         assert len(graph.x.shape) == 2 , 'Encode node attribute first!'
         
@@ -143,10 +312,7 @@ class EdgeEncoder(nn.Module):
                         bt_cosine=self.bt_cosine,bt_self_loop= self.bt_self_loop,bt_directed=self.bt_directed)
         raw_edge_attr    = self.compute_edge_attr(graph)
         
-        if self.edge_mode != 'RawEdgeAttr':
-            graph.edge_attr = self.encoder(raw_edge_attr)
-        else:
-            graph.edge_attr = raw_edge_attr
+        graph.edge_attr = self.encoder(raw_edge_attr,batch)
         return graph 
     
     @staticmethod
@@ -168,7 +334,7 @@ class EdgeEncoder(nn.Module):
         """
 
         if not hasattr(batch,'num_graphs'): # Date Type
-            edge_index = knn(batch.location_info[:,6:8],k, bt_cosine=bt_cosine,bt_self_loop= bt_self_loop,bt_directed=bt_directed)
+            edge_index = knn(batch.geometric_info[:,6:8],k, bt_cosine=bt_cosine,bt_self_loop= bt_self_loop,bt_directed=bt_directed)
             return edge_index
         
         # Batch Type
@@ -176,7 +342,7 @@ class EdgeEncoder(nn.Module):
         for i in range(batch.num_graphs):
             start, end = batch.ptr[i:i+2]
             
-            sub_positions = batch.location_info[start:end,6:8]
+            sub_positions = batch.geometric_info[start:end,6:8]
             
             edge_index = knn(sub_positions, k, bt_cosine= bt_cosine,bt_self_loop= bt_self_loop,bt_directed= bt_directed)
             
@@ -206,14 +372,14 @@ class EdgeEncoder(nn.Module):
         source_x      = batch.x[source_indice]
         target_x      = batch.x[target_indice]
 
-        source_info   = batch.location_info[source_indice]
-        target_info   = batch.location_info[target_indice]
+        source_info   = batch.geometric_info[source_indice]
+        target_info   = batch.geometric_info[target_indice]
 
         return self._calc_edge_type(source_info,target_info,source_x,target_x)
 
     def _calc_edge_type(self,source_info,target_info,source_x,target_x):
 
-        # location_info = [x,y,x2,y2,w,h,xc,yc,W,H]
+        # geometric_info = [x,y,x2,y2,w,h,xc,yc,W,H]
 
         #---------------------------------#
         #  4-dims

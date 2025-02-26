@@ -15,8 +15,8 @@ from utils.logger import setup_logger
 from models.lossFunc import GraphLoss
 from utils.distributed import get_rank
 from torch.utils.data import DataLoader
+from models.graphModel import GraphModel
 from utils.graphTrainer import GraphTrainer
-from models.graphModel import TrainingGraphModel
 from torch.optim.lr_scheduler import MultiStepLR,ExponentialLR
 from utils.graphDataset import GraphDataset, graph_collate_fn
 from utils.misc import collect_env,get_exp_info,set_random_seed,get_model_configuration
@@ -45,8 +45,8 @@ def main():
 
     valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
+    model = GraphModel(cfg.MODEL_YAML_PATH).to(cfg.DEVICE)
     
-    model = TrainingGraphModel(cfg.MODEL_YAML_PATH).to(cfg.DEVICE)
     # optimizer = AdamW(model.parameters(), lr=cfg.LR,weight_decay=cfg.WEIGHT_DECAY)
     # lr_scheduler = MultiStepLR(optimizer,milestones=cfg.MILLESTONES)
     optimizer = SGD(model.parameters(), lr=cfg.LR,momentum=cfg.MOMENTUM,weight_decay=cfg.WEIGHT_DECAY)

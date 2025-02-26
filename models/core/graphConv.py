@@ -3,304 +3,190 @@
 
 import torch
 import torch.nn as nn
-from typing import Union
-from torch.nn import Module
+from typing import Union,Optional
 from torch_geometric.data import Batch,Data
 from torch_geometric.nn import MessagePassing
-from models.core.graphEncoder import EdgeEncoder,EdgeEmbedRefiner
-from models.core.layerToolkit import SequentialBlock,parse_layer_dimension 
+from models.core.graphLayers import SequentialBlock,NodeUpdater,EdgeEncoder,EdgeUpdater
 
 __all__ = ['SDgraphConv']
 
-class StaticConv(MessagePassing):
-    '''graph in and graph out '''
+class StaticConv(nn.Module):
+    '''
+        reference: from torch_geometric.nn import MetaLayer, with a minor modification
+    '''
     def __init__(self,
-        graphModel_type :str,
-        nodeEmb_size :int, 
-        edgeEmb_size :int,
-        msgLayer_dims : Union[list,tuple], 
-        updLayer_dims :Union[list,tuple],
-        aggr :str, layer_type :str, layer_bias :bool,
-        use_batchnorm :bool,activate_func :str,lrelu_slope :float=0.0
+        idx : int,
+        static_graph_conv_dict: dict,
         ):
-
-        super().__init__(aggr=aggr) 
-
-        assert msgLayer_dims != [], '[StaticConv] msgLayer_dims is empty'
-        assert updLayer_dims != [], '[StaticConv] updLayer_dims is empty'
-        assert msgLayer_dims[-1] == updLayer_dims[0], '[StaticConv] msgLayer_dims[-1] != updLayer_dims[0]'
-        
-        
-        self.graphModel_type = graphModel_type
-        if self.graphModel_type in  ['vanilla','graphConv','doubleEdgeEmb']:
-            assert nodeEmb_size + edgeEmb_size == msgLayer_dims[0]
-        elif self.graphModel_type in ['selfConcat','StaticSelfConcat']:
-            assert nodeEmb_size*2 + edgeEmb_size == msgLayer_dims[0]
-        elif self.graphModel_type in ['SwapConv']:
-            assert nodeEmb_size*2 == msgLayer_dims[0]
-        elif self.graphModel_type in ['pureAppear']:
-            assert nodeEmb_size == msgLayer_dims[0]
+        super(StaticConv,self).__init__()
+        node_encode_model_dict = static_graph_conv_dict['node_update_model']
+        edge_update_model_dict = static_graph_conv_dict['edge_update_model']
+        self.node_update_model = NodeUpdater(idx,node_encode_model_dict)
+        if idx == 0:
+            self.edge_update_model = None
         else:
-            AttributeError(f'graphModel_type {self.graphModel_type} is not supported')
+            self.edge_update_model = EdgeUpdater(idx,edge_update_model_dict)
+    def forward(self,
+            x :torch.Tensor , edge_index:torch.Tensor,
+            edge_attr:torch.Tensor , batch:Optional[torch.Tensor]=None
+        ) -> torch.Tensor:
 
-        self.nodeEmb_size = nodeEmb_size
-        self.edgeEmb_size = edgeEmb_size
+        if self.edge_update_model is not None:
+            edge_attr = self.edge_update_model(x,edge_index,edge_attr,batch)
+        
+        x = self.node_update_model(x,edge_index,edge_attr,batch)
 
-        msg_in , msg_hidden , msg_out = parse_layer_dimension(msgLayer_dims)
-        upd_in , upd_hidden , upd_out = parse_layer_dimension(updLayer_dims)
-
-        if self.graphModel_type in ['graphConv','doubleEdgeEmb']:
-            self.res_node_func = SequentialBlock(
-                in_dim=nodeEmb_size, out_dim=msg_out, hidden_dim= [],
-                layer_type =layer_type, layer_bias=layer_bias,
-                use_batchnorm=use_batchnorm, 
-                activate_func=activate_func, lrelu_slope=lrelu_slope
-            )
-
-        self.msg_func    = SequentialBlock(
-                in_dim=msg_in, out_dim=msg_out, hidden_dim=msg_hidden,
-                layer_type =layer_type, layer_bias=layer_bias,
-                use_batchnorm=use_batchnorm, 
-                activate_func=activate_func, lrelu_slope=lrelu_slope
-            )
-
-        self.update_func = SequentialBlock(
-                in_dim=upd_in, out_dim=upd_out, hidden_dim=upd_hidden,
-                layer_type =layer_type,layer_bias=layer_bias,
-                use_batchnorm=use_batchnorm, 
-                activate_func=activate_func, lrelu_slope=lrelu_slope
-            )
+        return x,edge_attr
 
 
-    def forward(self,node_emb :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
-        # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
-        return self.propagate(edge_index,edge_attr=edge_attr,x=node_emb)
-    
-    def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
-        '''
-        x_i : target nodes 
-        x_j : source nodes
-        '''
-        if self.graphModel_type in  ['vanilla','graphConv','doubleEdgeEmb']:
-            return self.msg_func(torch.cat([edge_attr,x_j - x_i], dim=1))
-        elif self.graphModel_type in ['selfConcat','StaticSelfConcat']:
-            return self.msg_func(torch.cat([x_i,edge_attr,x_j - x_i], dim=1))
-        elif self.graphModel_type in ['SwapConv']:
-            return self.msg_func(torch.cat([x_i,x_j - x_i], dim=1))
-        elif self.graphModel_type in ['pureAppear']:
-            return self.msg_func(x_j - x_i)
 
-    def update(self, msg:torch.Tensor,x:torch.Tensor) -> torch.Tensor:
-        if self.graphModel_type in ['vanilla','selfConcat','StaticSelfConcat','SwapConv','pureAppear']:
-            return self.update_func(msg)
-        elif self.graphModel_type in ['graphConv','doubleEdgeEmb']:
-            return self.update_func(self.res_node_func(x) + msg)
-
-class DynamicGonv(MessagePassing):
+class DynamicConv(MessagePassing):
     def __init__(self,
-        edge_mode :str,
-        edge_model_dict :dict,
-        graphModel_type :str,
-        nodeEmb_size :int, 
-        edgeEmb_size :int,
-        msgLayer_dims : Union[list,tuple], 
-        updLayer_dims :Union[list,tuple],
-        aggr :str, layer_type :str, layer_bias :bool,
-        use_batchnorm :bool,activate_func :str,lrelu_slope :float=0.0,
-        bt_cosine :bool=False, bt_self_loop :bool=True,bt_directed :bool=True
+        idx :int,
+        dynamic_graph_conv_dict :dict
         ):
 
-        super().__init__(aggr=aggr)
+        super().__init__(aggr=dynamic_graph_conv_dict['aggr'])
 
-        assert msgLayer_dims != [] , '[DynamicGonv] updLayer_dims is empty'
-        
-        self.graphModel_type = graphModel_type
+        self.bt_cosine     = dynamic_graph_conv_dict['bt_cosine']
+        self.bt_self_loop  = dynamic_graph_conv_dict['bt_self_loop']
+        self.bt_directed   = dynamic_graph_conv_dict['bt_directed']
 
-        if self.graphModel_type in ['vanilla','graphConv','StaticSelfConcat','pureAppear']:
-            assert 2 * nodeEmb_size == msgLayer_dims[0]
-            self.bt_cosine     = bt_cosine
-            self.bt_self_loop  = bt_self_loop
-            self.bt_directed   = bt_directed
+        message_model_dict = dynamic_graph_conv_dict['message_model']
+        update_model_dict  = dynamic_graph_conv_dict['update_model']
 
-        elif self.graphModel_type in ['doubleEdgeEmb','selfConcat']:
-            assert 2 * nodeEmb_size + edgeEmb_size == msgLayer_dims[0]
-
-            edge_model_dict['bt_cosine']     = bt_cosine
-            edge_model_dict['bt_self_loop']  = bt_self_loop
-            edge_model_dict['bt_directed']   = bt_directed
-
-            self.dg_edgeEncoder = EdgeEncoder(edge_mode,edge_model_dict)
-            
-        elif self.graphModel_type in ['SwapConv']:
-            assert nodeEmb_size + edgeEmb_size == msgLayer_dims[0]
-
-            edge_model_dict['bt_cosine']     = bt_cosine
-            edge_model_dict['bt_self_loop']  = bt_self_loop
-            edge_model_dict['bt_directed']   = bt_directed
-
-            self.dg_edgeEncoder = EdgeEncoder(edge_mode,edge_model_dict)
-    
-
-        msg_in , msg_hidden , msg_out = parse_layer_dimension(msgLayer_dims)
-        self.msg_func = SequentialBlock(
-                in_dim=msg_in, out_dim=msg_out, hidden_dim= msg_hidden, 
-                layer_type = layer_type, layer_bias=layer_bias,
-                use_batchnorm=use_batchnorm, 
-                activate_func=activate_func, lrelu_slope=lrelu_slope
+        self.msg_layer = SequentialBlock(
+                dims_list  = message_model_dict['dims_list'][idx], 
+                layer_type = message_model_dict['layer_type'], layer_bias = message_model_dict['layer_bias'],
+                norm_type  = message_model_dict['norm_type'] , 
+                activate_func = message_model_dict['activate_func'], lrelu_slope = message_model_dict['lrelu_slope']
             )
 
-        if updLayer_dims != []:
-            upd_in , upd_hidden , upd_out = parse_layer_dimension(updLayer_dims)
-            self.update_func = SequentialBlock(
-                    in_dim=upd_in, out_dim=upd_out, hidden_dim= upd_hidden,
-                    layer_type = layer_type, layer_bias=layer_bias,
-                    use_batchnorm=use_batchnorm, 
-                    activate_func=activate_func, lrelu_slope=lrelu_slope
+        if update_model_dict['dims_list'][idx] != []:
+            self.upd_layer = SequentialBlock(
+                dims_list  = update_model_dict['dims_list'][idx], 
+                layer_type = update_model_dict['layer_type'], layer_bias = update_model_dict['layer_bias'],
+                norm_type  = update_model_dict['norm_type'] , 
+                activate_func = update_model_dict['activate_func'], lrelu_slope = update_model_dict['lrelu_slope']
                 )
         else:
-            self.update_func = lambda x : x
+            self.upd_layer = lambda msg,batch : msg
 
-    def forward(self,node_emb :torch.Tensor,graph :Union[Batch,Data],k:int) -> torch.Tensor:
-        graph.x = node_emb
-
-        if self.graphModel_type in ['vanilla','graphConv','StaticSelfConcat','pureAppear']:
-            edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_directed=self.bt_directed) 
-            edge_attr  = None
-        elif self.graphModel_type in ['doubleEdgeEmb','selfConcat','SwapConv']:
-            graph = self.dg_edgeEncoder(graph,k)
-            edge_index = graph.edge_index            
-            edge_attr  = graph.edge_attr
-        node_emb = self.propagate(edge_index,x=node_emb,edge_attr=edge_attr)
-        return node_emb
+    def forward(self,x :torch.Tensor,graph :Union[Batch,Data],k:int,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
+        
+        graph.x = x
+        edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
+        x = self.propagate(edge_index,x=x,batch=batch)
+        
+        return x
     
-    def message(self, x_i:torch.Tensor,x_j:torch.Tensor,edge_attr:torch.Tensor) -> torch.Tensor:
+    def message(self, x_i:torch.Tensor,x_j:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
         '''
         x_i : target nodes 
         x_j : source nodes
         '''
-        if self.graphModel_type in ['vanilla','graphConv','StaticSelfConcat','pureAppear']:
-            return self.msg_func(torch.cat([x_i,x_j-x_i],dim=1))
-        elif self.graphModel_type in ['doubleEdgeEmb','selfConcat']:
-            return self.msg_func(torch.cat([x_i,edge_attr,x_j-x_i],dim=1))
-        elif self.graphModel_type in ['SwapConv']:
-            return self.msg_func(torch.cat([edge_attr,x_j-x_i],dim=1))
-        
-    def update(self, msg:torch.Tensor,x:torch.Tensor) -> torch.Tensor:
-        return self.update_func(msg)    
+        return self.msg_layer(torch.cat([x_i,x_j-x_i],dim=1),batch)        
+    def update(self, msg:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
+        return self.upd_layer(msg,batch)    
 
-class SDgraphConv(Module):
+class SDgraphConv(nn.Module):
+    '''
+    graph in and node emb out 
+    '''
     def __init__(self,
-        edge_mode : str,
-        graphModel_type : str,
-        edge_model_dict :dict,
-        static_graph_model_dict :dict, 
-        dynamic_graph_model_dict :dict,
+        static_graph_conv_dict :dict, 
+        dynamic_graph_conv_dict :dict,
         fuse_model_dict :dict
         ):
 
         super().__init__()
 
-        self.sg1conv  = StaticConv(
-                graphModel_type,
-                static_graph_model_dict['nodeEmb_size'][0],static_graph_model_dict['edgeEmb_size'][0],
-                static_graph_model_dict['msgLayer_dims'][0],static_graph_model_dict['updLayer_dims'][0],
-                static_graph_model_dict['aggr'],static_graph_model_dict['layer_type'],static_graph_model_dict['layer_bias'],
-                static_graph_model_dict['use_batchnorm'],static_graph_model_dict['activate_func'],static_graph_model_dict['lrelu_slope']
+        #---------------------------------#
+        # Instantiate static graph convolutional layer
+        #---------------------------------#
+        self.sgConv_num = static_graph_conv_dict['layers_num']
+        for i in range(self.sgConv_num):
+            sgConv = StaticConv(
+                i,static_graph_conv_dict
+            )
+            self.add_module(f'sgConv_{i}',sgConv)
+        #---------------------------------# 
+        # Instantiate dynamic graph convolutional layer
+        #---------------------------------#
+        self.dgConv_num = dynamic_graph_conv_dict['layers_num']
+        for i in range(self.dgConv_num):
+            dgConv = DynamicConv(
+                i,dynamic_graph_conv_dict
+            )
+            self.add_module(f'dgConv_{i}',dgConv)
+        #---------------------------------#
+        # Instantiate fusion layer
+        # there are two fusion layers
+        #---------------------------------#
+        self.fuseLayer_0 = SequentialBlock(
+                dims_list  = fuse_model_dict['dims_list'][0],
+                layer_type = fuse_model_dict['layer_type'], layer_bias = fuse_model_dict['layer_bias'],
+                norm_type  = fuse_model_dict['norm_type'], 
+                activate_func = fuse_model_dict['activate_func'], lrelu_slope = fuse_model_dict['lrelu_slope']
+            )
+        self.fuseLayer_1 = SequentialBlock(
+                dims_list  = fuse_model_dict['dims_list'][1],
+                layer_type = fuse_model_dict['layer_type'], layer_bias = fuse_model_dict['layer_bias'],
+                norm_type  = fuse_model_dict['norm_type'], 
+                activate_func = fuse_model_dict['activate_func'], lrelu_slope = fuse_model_dict['lrelu_slope']
             )
         
-        self.sg1_edgeRefiner = EdgeEmbedRefiner(
-                edge_mode       = edge_mode,
-                edge_dim_in     = static_graph_model_dict['edgeEmb_size'][0],
-                edge_dim_out    = static_graph_model_dict['edgeEmb_size'][1],
-                edge_model_dict = edge_model_dict
-            )
-
-        self.sg2conv  = StaticConv(
-                graphModel_type,
-                static_graph_model_dict['nodeEmb_size'][1],static_graph_model_dict['edgeEmb_size'][1],
-                static_graph_model_dict['msgLayer_dims'][1],static_graph_model_dict['updLayer_dims'][1],
-                static_graph_model_dict['aggr'],static_graph_model_dict['layer_type'],static_graph_model_dict['layer_bias'],
-                static_graph_model_dict['use_batchnorm'],static_graph_model_dict['activate_func'],static_graph_model_dict['lrelu_slope']
-            )
-
-        self.sg2_edgeRefiner = EdgeEmbedRefiner(
-                edge_mode       = edge_mode,
-                edge_dim_in     = static_graph_model_dict['edgeEmb_size'][1],
-                edge_dim_out    = static_graph_model_dict['edgeEmb_size'][2],
-                edge_model_dict = edge_model_dict
-            )
-
-        self.sg3conv  = StaticConv(
-                graphModel_type,
-                static_graph_model_dict['nodeEmb_size'][2],static_graph_model_dict['edgeEmb_size'][2],
-                static_graph_model_dict['msgLayer_dims'][2],static_graph_model_dict['updLayer_dims'][2],
-                static_graph_model_dict['aggr'],static_graph_model_dict['layer_type'],static_graph_model_dict['layer_bias'],
-                static_graph_model_dict['use_batchnorm'],static_graph_model_dict['activate_func'],static_graph_model_dict['lrelu_slope']
-            )
-
-        self.dg1conv  = DynamicGonv(
-                edge_mode,edge_model_dict,graphModel_type,
-                dynamic_graph_model_dict['nodeEmb_size'][0],dynamic_graph_model_dict['edgeEmb_size'][0],
-                dynamic_graph_model_dict['msgLayer_dims'][0],dynamic_graph_model_dict['updLayer_dims'][0],
-                dynamic_graph_model_dict['aggr'],dynamic_graph_model_dict['layer_type'],dynamic_graph_model_dict['layer_bias'],
-                dynamic_graph_model_dict['use_batchnorm'],dynamic_graph_model_dict['activate_func'],dynamic_graph_model_dict['lrelu_slope'],
-                dynamic_graph_model_dict['bt_cosine'],dynamic_graph_model_dict['bt_self_loop'],dynamic_graph_model_dict['bt_directed']
-            )
-        self.dg2conv  = DynamicGonv(
-                edge_mode,edge_model_dict,graphModel_type,
-                dynamic_graph_model_dict['nodeEmb_size'][1],dynamic_graph_model_dict['edgeEmb_size'][1],
-                dynamic_graph_model_dict['msgLayer_dims'][1],dynamic_graph_model_dict['updLayer_dims'][1],
-                dynamic_graph_model_dict['aggr'],dynamic_graph_model_dict['layer_type'],dynamic_graph_model_dict['layer_bias'],
-                dynamic_graph_model_dict['use_batchnorm'],dynamic_graph_model_dict['activate_func'],dynamic_graph_model_dict['lrelu_slope'],
-                dynamic_graph_model_dict['bt_cosine'],dynamic_graph_model_dict['bt_self_loop'],dynamic_graph_model_dict['bt_directed']
-            )
-        
-
-        assert fuse_model_dict['fuseLayer_dims'][0] != []
-        assert fuse_model_dict['fuseLayer_dims'][1] != []
-
-        f1_in , f1_mid, f1_out = parse_layer_dimension(fuse_model_dict['fuseLayer_dims'][0])
-        f2_in , f2_mid, f2_out = parse_layer_dimension(fuse_model_dict['fuseLayer_dims'][1])
-
-        self.fuse1conv = SequentialBlock(f1_in,f1_out,f1_mid,fuse_model_dict['layer_type'],fuse_model_dict['layer_bias'],
-                        fuse_model_dict['use_batchnorm'],fuse_model_dict['activate_func'],fuse_model_dict['lrelu_slope'])
-        self.fuse2conv = SequentialBlock(f2_in,f2_out,f2_mid,fuse_model_dict['layer_type'],fuse_model_dict['layer_bias'],
-                        fuse_model_dict['use_batchnorm'],fuse_model_dict['activate_func'],fuse_model_dict['lrelu_slope'],final_activation=False)
-
-
     def forward(self,graph:Union[Batch,Data],k:int) -> torch.Tensor:
-        ''' graph in and node_embedding out '''
+        
         assert graph.x is not None         and graph.edge_index is not None \
-           and graph.edge_attr is not None and graph.location_info is not None
+           and graph.edge_attr is not None and graph.geometric_info is not None
         
         # make a copy 
         if hasattr(graph,'num_graphs'): # Batch Type
+            bt_batch = True
             graph_copy = Batch(
                 x = None,
-                location_info=graph.location_info.clone(),
+                geometric_info=graph.geometric_info.clone(),
                 batch=graph.batch.clone(),
                 ptr=graph.ptr.clone(),
             )
         else: # Data type 
+            bt_batch = False
             graph_copy = Data( 
                 x = None,
-                location_info=graph.location_info.clone(),
+                geometric_info=graph.geometric_info.clone(),
             )
-            
-        node_embedding_sg1 = self.sg1conv(graph.x,graph.edge_index,graph.edge_attr)    
-        graph.edge_attr    = self.sg1_edgeRefiner(graph.edge_attr)  
-        node_embedding_sg2 = self.sg2conv(node_embedding_sg1,graph.edge_index,graph.edge_attr)  
-        graph.edge_attr    = self.sg2_edgeRefiner(graph.edge_attr)  
-        node_embedding_sg3 = self.sg3conv(node_embedding_sg2,graph.edge_index,graph.edge_attr)  
 
-        node_embedding_dg1 = self.dg1conv(node_embedding_sg1,graph_copy,k)  
-        node_embedding_dg2 = self.dg2conv(node_embedding_dg1,graph_copy,k)  
-
-        node_embedding_cat1  = torch.cat([node_embedding_sg1,node_embedding_dg1,node_embedding_dg2,
-                                          node_embedding_sg2,node_embedding_sg3],dim=1).unsqueeze(-1)   
-        node_embedding_fuse1 = self.fuse1conv(node_embedding_cat1) 
-
-        node_embedding_cat2  = torch.cat([node_embedding_fuse1,node_embedding_cat1],dim=1)  
-        node_embedding_output= self.fuse2conv(node_embedding_cat2)
+        x , edge_attr = graph.x,graph.edge_attr
+        sgConv_x_list , dgConv_x_list = [] , []
         
-        return node_embedding_output.squeeze(-1)
+        #---------------------------------#
+        # Static Graph Convolution Layers
+        #---------------------------------#
+        for i in range(self.sgConv_num):
+            sgConv = getattr(self,f'sgConv_{i}')
+            x_res ,edge_attr_res= sgConv(x, graph.edge_index,
+                        edge_attr, batch = graph.batch if bt_batch else None)
+            x , edge_attr = x_res ,edge_attr_res 
+            sgConv_x_list.append(x_res)
+
+        #---------------------------------#
+        # Dynamic Graph Convolution Layers
+        #---------------------------------#
+        x = sgConv_x_list[0]
+        for i in range(self.dgConv_num):
+            dgConv = getattr(self,f'dgConv_{i}')
+            x_res = dgConv(x,graph_copy,k,batch = graph.batch if bt_batch else None)
+            x = x_res
+            dgConv_x_list.append(x_res)
+
+
+        #---------------------------------#
+        #  Fusion Module
+        #---------------------------------#
+        node_emb_cat1 = torch.cat([sgConv_x_list[0],*dgConv_x_list,*sgConv_x_list[1:]],dim=1).unsqueeze(-1)
+        node_emb_fuse1 = self.fuseLayer_0(node_emb_cat1,batch = graph.batch if bt_batch else None) 
+        node_emb_cat2  = torch.cat([node_emb_fuse1,node_emb_cat1],dim=1)  
+        node_emb_output= self.fuseLayer_1(node_emb_cat2,batch = graph.batch if bt_batch else None)
+        
+        return node_emb_output.squeeze(-1)

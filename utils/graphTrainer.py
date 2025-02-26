@@ -371,7 +371,7 @@ class GraphTrainer:
             
             f1_score = []
             for pred_mtx,gt_mtx in zip(pred_mtx_list,gt_mtx_list):
-                binary_pred_mtx,_,_,_ = hungarian(pred_mtx[:-1,:-1].cpu().numpy(),0)
+                binary_pred_mtx,_,_,_ = hungarian(pred_mtx.cpu().numpy(),0)
                 f1_score.append(compute_f1_score(binary_pred_mtx,gt_mtx.cpu().numpy()))
             f1_score = np.mean(f1_score)
             logger.info(f'Evalution -> f1_score: [{f1_score}]')

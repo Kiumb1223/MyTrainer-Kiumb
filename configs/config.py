@@ -18,11 +18,11 @@ def get_config():
         LOG_PERIOD        = 10,       # Iteration 
         CHECKPOINT_PERIOD = 1,        # Epoch
         DEVICE            = 'cuda',
-        NUM_WORKS         = 2,
+        NUM_WORKS         = 0,
         EMABLE_AMP        = True,
-        WORK_DIR          = "BiggerFamily[Mask-50]/biggerBetter",
+        WORK_DIR          = "dustbin",
 
-        BATCH_SIZE        = 16,
+        BATCH_SIZE        = 2,
         MAXEPOCH          = 120,
 
         LR                = 1e-2,
@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\yamlFamily\Mask\model_structure[mask-50].yaml',
+        MODEL_YAML_PATH   = r'configs\model_structure[vanillaModel].yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -69,11 +69,11 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\past-exp\Mask\Mask-50-150ep.pth',
-        FUSION_METHOD     = 'DFF', # options DFF CWFF EMAFF
+        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\fastreid\fastreid2+graphConv-woloop+Msg+Dynamic-smooth+Fuse13.pth',
+        FUSION_METHOD     = 'CWFF', # options DFF CWFF EMAFF  CA-EMA
         EMA_LAMBDA        = 0.9,
-        MIN_DET_CONF      = 0.1,
-        MATCH_THRESH      = 0.05,
+        MIN_DET_CONF      = 0.2,
+        MATCH_THRESH      = 0, # DEFAULT 0.05
         Det2Tra_CONF      = 0.7,
         CNT_TO_ACTIVE     = 1,
         CNT_TO_SLEEP      = 1,

@@ -30,7 +30,7 @@ from fastreid.modeling import build_model
 from fastreid.utils.checkpoint import Checkpointer
 from fastreid.engine import  default_argument_parser
 
-__all__  = ['load_fastreid_model']
+__all__  = ['load_fastreid_model','load_ckpt_FastReid']
 
 
 _FASTREID_MODEL_ZOO = { 
@@ -104,6 +104,6 @@ def load_fastreid_model(reid_arch_name):
     cfg = _get_cfg(fastreid_cfg_file)
     model = build_model(cfg)
 
-    feature_embedding_model = model.eval()
+    # feature_embedding_model = model.eval()
 
-    return feature_embedding_model
+    return model

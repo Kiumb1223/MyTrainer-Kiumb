@@ -33,7 +33,7 @@ class Tracker:
 
     _track_id = 0
 
-    def __init__(self,start_frame:int,appearance_feat:torch.Tensor,conf:float,location_info:list,
+    def __init__(self,start_frame:int,appearance_feat:torch.Tensor,conf:float,geometric_info:list,
                  cnt_to_active:int,cnt_to_sleep:int,max_cnt_to_dead:int,feature_list_size:int):
         
         self.track_id   = None # when state: Born to Active, this will be assigned
@@ -47,7 +47,7 @@ class Tracker:
 
         self.conf = conf
         # self.tlwh = tlwh # (top left x, top left y, width, height)
-        self.location_info = location_info
+        self.geometric_info = geometric_info
         self.appearance_feats_list = []
         self.appearance_feats_list.append(appearance_feat) 
         
@@ -56,7 +56,7 @@ class Tracker:
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
-    def to_active(self,frame_idx,appearance_feat,conf,location_info):
+    def to_active(self,frame_idx,appearance_feat,conf,geometric_info):
         
         assert appearance_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {appearance_feat.shape}'
         if self.state  == LifeSpan.Born:
@@ -77,7 +77,7 @@ class Tracker:
         self.frame_idx = frame_idx
         self.conf = conf
         # self.tlwh = tlwh
-        self.location_info = location_info
+        self.geometric_info = geometric_info
         self.appearance_feats_list.append(appearance_feat)
 
         if len(self.appearance_feats_list) > self._feature_list_size:
@@ -127,19 +127,19 @@ class Tracker:
     @property
     def tlwh(self):
         """Convert bounding box to format `(top left x, top left y, width, height)`."""
-        top_left_x = self.location_info[0]
-        top_left_y = self.location_info[1]
-        width   = self.location_info[4]
-        height  = self.location_info[5]
+        top_left_x = self.geometric_info[0]
+        top_left_y = self.geometric_info[1]
+        width   = self.geometric_info[4]
+        height  = self.geometric_info[5]
         return [top_left_x, top_left_y, width, height]
 
     @property
     def tlbr(self):
         """Convert bounding box to format `(min x, min y, max x, max y)`."""
-        min_x = self.location_info[0]
-        min_y = self.location_info[1]
-        max_x = self.location_info[2]
-        max_y = self.location_info[3]
+        min_x = self.geometric_info[0]
+        min_y = self.geometric_info[1]
+        max_x = self.geometric_info[2]
+        max_y = self.geometric_info[3]
         return [min_x, min_y, max_x, max_y]
     
     @staticmethod
@@ -219,7 +219,7 @@ class TrackManager:
             smooth_features = self.smooth_feature(tra_feats,det_feats,tra_conf_list,det_conf_list)
             for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
                 first_match_list[tra_id].to_active(frame_idx,smooth_features[i].squeeze(),
-                                det_conf_list[i],det_graph.location_info[det_id].cpu().numpy())
+                                det_conf_list[i],det_graph.geometric_info[det_id].cpu().numpy())
                 if not first_match_list[tra_id].is_Born and not first_match_list[tra_id].is_Sleep:
                     output_track_list.append(first_match_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
@@ -228,38 +228,42 @@ class TrackManager:
         #------------------------------------------------------------------#
         #                       Second matching phase
         #------------------------------------------------------------------#
-        highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
-        highconf_to_global_det_idx = [ unmatch_det[i] for i in range(len(highconf_unmatch_dets)) ] 
+        # highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
+        highconf_unmatch_x    = det_graph.x[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
+        highconf_unmatch_dets_conf = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf][:,4].tolist()
+        highconf_unmatch_dets_geometric_info = det_graph.geometric_info[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf].cpu().numpy()
+        # highconf_to_global_det_idx = [ unmatch_det[i] for i in range(len(highconf_unmatch_dets)) ] 
 
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(second_match_list,highconf_unmatch_dets.copy())
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(second_match_list,highconf_unmatch_dets_geometric_info[:,:4])
         if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
-            det_feats , det_location_info = [], []
             tra_idx ,det_idx = match_idx
-            if tra_graph.num_nodes > 0: # if tra_graph is not empty
-                tra_feats = tra_graph.x[tra_idx]
+            if second_match_list: # if tra_graph is not empty
+                tra_feats = [second_match_list[i].appearance_feats_list[-1] for i in tra_idx]
+                tra_feats = torch.stack(tra_feats,dim=0)
                 tra_conf_list = [second_match_list[i].conf for i in tra_idx]
             else:
                 tra_feats = None
                 tra_conf_list = None
-            for det_id in det_idx:
-                global_id = highconf_to_global_det_idx[det_id]
-                det_feats.append(det_graph.x[global_id])
-                det_location_info.append(det_graph.location_info[global_id].cpu().numpy())
-            det_feats = torch.stack(det_feats,dim=0)
-            det_conf_list = [highconf_unmatch_dets[i][4] for i in det_idx]
+    
+            # for det_id in det_idx:
+            #     # global_id = highconf_to_global_det_idx[det_id]
+            #     det_feats.append(highconf_unmatch_x[det_id])
+            #     # det_geometric_info.append(det_graph.geometric_info[det_id].cpu().numpy())
+            det_feats = highconf_unmatch_x[det_idx]
+            det_conf_list = [highconf_unmatch_dets_conf[i] for i in det_idx]
             smooth_features = self.smooth_feature(tra_feats,det_feats,tra_conf_list,det_conf_list)          
 
             for i,( tra_id, det_id ) in enumerate(zip(tra_idx,det_idx)):
-                second_match_list[tra_id].to_active(frame_idx,smooth_features[i].squeeze(),det_conf_list[i],det_location_info[i])
+                second_match_list[tra_id].to_active(frame_idx,smooth_features[i].squeeze(),det_conf_list[i],highconf_unmatch_dets_geometric_info[det_id])
                 if not second_match_list[tra_id].is_Born:
                     output_track_list.append(second_match_list[tra_id])
         for tra_id in unmatch_tra:  # unmatched tras 
             second_match_list[tra_id].to_sleep()
         for det_id in unmatch_det:
-            global_id = highconf_to_global_det_idx[det_id]
+            # global_id = highconf_to_global_det_idx[det_id]
             second_match_list.append(
-                Tracker(frame_idx,det_graph.x[global_id],
-                        highconf_unmatch_dets[det_id][4],det_graph.location_info[global_id].cpu().numpy(),
+                Tracker(frame_idx,highconf_unmatch_x[det_id],
+                        highconf_unmatch_dets_conf[det_id],highconf_unmatch_dets_geometric_info[det_id],
                         self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
             )
 
@@ -280,50 +284,54 @@ class TrackManager:
         if not tracks_list: # if no tracks 
             return Data(num_nodes=0)
         
-        node_attr , location_info = [] , []
+        node_attr , geometric_info = [] , []
         for track in tracks_list:
             node_attr.append(track.appearance_feats_list[-1])
-            location_info.append(track.location_info)
+            geometric_info.append(track.geometric_info)
         node_attr = torch.stack(node_attr,dim=0).to(self.device)
-        location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
-        return Data(x=node_attr,location_info=location_info)
+        geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32).to(self.device)
+        return Data(x=node_attr,geometric_info=geometric_info)
     
     def construct_det_graph(self,current_detections:np.ndarray,img_date:torch.Tensor) -> Data:
         '''construct raw graph of detections'''
-        H,W = img_date.shape[1:]
-        im_tensor  = img_date.to(self.device).to(torch.float32) / 255.0
-        raw_node_attr , location_info = [] , []
+
+        im_tensor   = img_date.to(self.device).to(torch.float32) / 255.0
+        h_im , w_im = im_tensor.shape[1:]
+        raw_node_attr , geometric_info = [] , []
         # im_tensor = T.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         for det in current_detections:
             x,y , w,h = map(int,det[:4])
-            xc , yc   = x + w/2 , y + h/2
-            x2 , y2   = x + w   , y + h
-            if x < 0:
-                w = w + x  
-                x = 0 
+            w , h   = min(w, w+x)   , min(h,h+y)
+            x , y   = max(x ,0)     , max(y,0)
+            w , h   = min(w, w_im-x), min(h,h_im-y)
+            xc , yc   = x + w / 2 , y + h / 2
+            x2 , y2   = x + w     , y + h
+            # if x < 0:
+            #     w = w + x  
+            #     x = 0 
 
-            if y < 0:
-                h = h + y  
-                y = 0  
+            # if y < 0:
+            #     h = h + y  
+            #     y = 0  
                 
-            w = min(w, im_tensor.shape[2] - x)  
-            h = min(h, im_tensor.shape[1] - y)
+            # w = min(w, im_tensor.shape[2] - x)  
+            # h = min(h, im_tensor.shape[1] - y)
 
             patch = T.crop(im_tensor,y,x,h,w)
             patch = T.resize(patch,self._resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append([x,y,x2,y2,w,h,xc,yc,W,H])  # STORE x,y,x2,y2,w,h,xc,yc, W,H
+            geometric_info.append([x,y,x2,y2,w,h,xc,yc,w_im,h_im])  # STORE x,y,x2,y2,w,h,xc,yc, W,H
         raw_node_attr = torch.stack(raw_node_attr,dim=0).to(self.device)
-        location_info = torch.as_tensor(location_info,dtype=torch.float32).to(self.device)
-        return Data(x=raw_node_attr,location_info=location_info)
+        geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32).to(self.device)
+        return Data(x=raw_node_attr,geometric_info=geometric_info)
 
     def _graph_match(self,tra_graph:Data,det_graph:Data):
         ''' first phase to match via graph model'''
-        pred_mtx = self.model(tra_graph.to(self.device),det_graph.to(self.device))
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx[:-1,:-1].cpu().numpy(),self._match_thresh)
+        pred_mtx = self.model.inference(tra_graph.to(self.device),det_graph.to(self.device))
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx.cpu().numpy(),self._match_thresh)
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
-    def _iou_match(self,tracks_list,highconf_unmatch_dets:np.ndarray):      
+    def _iou_match(self,tracks_list,highconf_unmatch_dets_tlbr:np.ndarray):      
         ''' second phase to match via IOU'''
         if tracks_list == []:
             tras_tlbr = np.array([])
@@ -332,10 +340,7 @@ class TrackManager:
                 track.tlbr for track in tracks_list 
             ]).astype(np.float32)
 
-        dets_tlbr = highconf_unmatch_dets[:,:4]
-        dets_tlbr[:,2:] = dets_tlbr[:,2:] + dets_tlbr[:,:2]
-
-        iou  = box_iou(tras_tlbr,dets_tlbr)
+        iou  = box_iou(tras_tlbr,highconf_unmatch_dets_tlbr)
         match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(iou,0.1)
 
         return match_mtx,match_idx,unmatch_tra,unmatch_det
@@ -344,12 +349,21 @@ class TrackManager:
 
         if self.fusion_method == 'DFF' or prev_feats is None: # Direct Feature Fusion OR EMPTY TRAGRAPH
             return  cur_feats.split(1,0)
-        if self.fusion_method == 'CWFF': # Confidence-weight Feature Fusion
+        elif self.fusion_method == 'CWFF': # Confidence-weight Feature Fusion
             prev_conf_tensor = torch.as_tensor(prev_conf_list).unsqueeze(1).to(prev_feats)
             cur_conf_tensor  = torch.as_tensor(cur_conf_list).unsqueeze(1).to(prev_feats)
             smooth_feature   = ( prev_conf_tensor * prev_feats + cur_conf_tensor * cur_feats ) / (prev_conf_tensor + cur_conf_tensor)
-        if self.fusion_method == 'EMAFF': # Expositential Moving Average Feature Fusion
+        elif self.fusion_method == 'EMAFF': # Expositential Moving Average Feature Fusion
             smooth_feature = (1 - self.EMA_lambda) * prev_feats + self.EMA_lambda * cur_feats
+        elif self.fusion_method == 'CA-EMA':
+            prev_conf_tensor = torch.as_tensor(prev_conf_list).unsqueeze(1).to(prev_feats)
+            cur_conf_tensor  = torch.as_tensor(cur_conf_list).unsqueeze(1).to(prev_feats)
+            CA_lambda = cur_conf_tensor / (prev_conf_tensor + cur_conf_tensor)
+            # CA_lambda = torch.pow(cur_conf_tensor,2) 
+            # CA_lambda = cur_conf_tensor
+
+            smooth_feature = (1 - CA_lambda) * prev_feats + CA_lambda * cur_feats
+            
         # return F.normalize(smooth_feature,dim=1).split(1,0)
         return smooth_feature.split(1,0)
         

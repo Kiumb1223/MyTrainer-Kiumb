@@ -199,10 +199,10 @@ As we all known, the MOT problem can be viewed as a problem of **maximizing a po
 
 There are three data augmentation techniques — **Low framerate, missed detections and discontinuous trajectories. **All of them is vividly showed in the above picture. So let\`s see the quantitative results of vanilla model after training. Oops, I changes some experimental settings. In this experiment, the total epoch is set to 120  (it maybe takes 2 hours or so in GTX3090 ), warmup iteration is set to 800 and multistep is set to 50 and 80.(Waiting to see :eyes:)
 
-|    Conditions     |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :---------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|    Vanilla one    |   25.67   | 50.01 |   13.31   |   27.12   |   22.31   |   34.56   | 53.94 | 81.96 |
-| Data Augmentation | **35.14** | 50.43 | **24.70** | **37.29** | **30.74** | **47.37** | 56.89 | 81.94 |
+|    Conditions     |   HOTA    | DetA  |   AssA    |   IDF1    |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------: | :-------: | :---: | :-------: | :-------: | :---: | :---: | :---: | :---: |
+|    Vanilla one    |   24.45   | 50.03 |   12.06   |   24.93   | 20.52 | 31.77 | 53.61 | 81.94 |
+| Data Augmentation | **34.74** | 50.40 | **24.16** | **36.02** | 29.68 | 45.78 | 56.89 | 81.97 |
 
 <img src="./.assert/dataAug-index.bmp" alt="dataAug" style="zoom:25%;" />
 
@@ -218,21 +218,21 @@ Here is the simple illustration about the undirected graph:
 
 |       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
 | :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-| Vanilla one<sup>*</sup> |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
+| Vanilla one<sup>*</sup> |   34.74   | 50.40 |   24.16   |   36.02   |   29.68   |   45.78   | 56.89 | 81.97 |
 |    Undirected Graph     | **38.21** | 50.28 | **29.25** | **41.18** | **33.95** | **52.32** | 57.58 | 82.02 |
 
 <img src="./.assert/UndirectedGraph-index.bmp" alt="UndirectedGraph-index" style="zoom: 25%;" />
 
-### 4.3 After without Self-Loop [:confused:]
+### 4.3 After without Self-Loop [:tada:]
 
 ![](./.assert/self-loop.bmp)
 
 Here is the simple example to show the graph with or without self loop. A special case is highlighted when only object is detected in an image (e.g., Fig3.). In such cases , a self-loop is retained for the object. This ensures the graph neural network can process the date effectively, avoiding issues that arise from an empty graph structure.
 
-|   Conditions    |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :-------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-|  Vanilla one*   | **35.14** | 50.43 | **24.70** | **37.29** | **30.74** | **47.37** | 56.89 | 81.94 |
-| *w/o* self loop |   34.82   | 50.44 |   24.23   |   36.90   |   30.43   |   46.88   | 56.83 | 81.97 |
+|   Conditions    | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|  Vanilla one*   | 34.74 | 50.40 | 24.16 | 36.02 | 29.68 | 45.78 | 56.89 | 81.97 |
+| *w/o* self loop | 35.03 | 50.42 | 24.55 | 37.58 | 30.99 | 47.74 | 56.81 | 81.95 |
 
 ![wo-loopGraph](./.assert/wo-loopGraph.bmp)
 
@@ -240,10 +240,10 @@ Here is the simple example to show the graph with or without self loop. A specia
 
 Considering that **the measurement based on cosine similarity in the graph match**, I change the dynamic graph based Euclidean distance to **cosine distance based** , just hoping my model can learn more discriminative features in the feature space based on cosine distance.  
 
-|       Conditions        |   HOTA    | DetA  |   AssA    |   IDF1    |    IDR    |    IDP    | MOTA  | MOTP  |
-| :---------------------: | :-------: | :---: | :-------: | :-------: | :-------: | :-------: | :---: | :---: |
-| Vanilla one<sup>*</sup> | **35.14** | 50.43 | **24.70** | **37.29** | **30.74** | **47.37** | 56.89 | 81.94 |
-|      Cosine-based       |   34.23   | 50.35 |   23.48   |   35.65   |   29.38   |   45.33   | 56.17 | 82.00 |
+|       Conditions        | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :---------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Vanilla one<sup>*</sup> | 34.74 | 50.40 | 24.16 | 36.02 | 29.68 | 45.78 | 56.89 | 81.97 |
+|      Cosine-based       | 32.90 | 50.30 | 21.69 | 34.34 | 28.29 | 43.66 | 56.16 | 81.99 |
 
 <img src="./.assert/cosinegraph-index.bmp" alt="cosinegraph-index" style="zoom:25%;" />
 
@@ -265,7 +265,7 @@ It seems that **the speed of object moving poses the bigger influence on the sta
 
 | Mask Range |         HOTA          | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
 | :-------------------------------: | :-------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|   None<br>(Vanilla one<sup>*</sup>)   |   35.14   | 50.43 |   24.70   |   37.29   |   30.74   |   47.37   | 56.89 | 81.94 |
+|   None<br>(Vanilla one<sup>*</sup>)   |   34.74   | 50.40 |   24.16   |   36.02   |   29.68   |   45.78   | 56.89 | 81.97 |
 | 11 | 19.49 | 50.78 | 7.49 | 19.61 | 16.16 | 24.95 | 51.74 | 82.18 |
 | 15 | 26.51 | 50.81 | 13.84 | 28.46 | 23.47 | 36.17 | 55.96 | 82.05 |
 | 20 | 35.08 | 50.72 | 24.30 | 38.54 | 31.79 | 48.93 | 58.37 | 82.02 |
@@ -882,7 +882,7 @@ Experimental Results:
 |    StaticSelfConcat<br>*w/* self-loop    | 45.17 | 50.74 | 40.40 | 52.40 | 43.26 | 66.41 | 59.40 | 81.99 |
 |   StaticSelfConcat<br/>*w/o* self-loop   | 45.86 | 50.69 | 41.67 | 53.20 | 43.92 | 67.44 | 59.34 | 82.00 |
 |        SwapConv<br>*w/* self-loop        | 45.26 | 50.59 | 40.68 | 52.79 | 43.58 | 66.91 | 59.58 | 82.00 |
-|       SwapConv<br/>*w/o* self-loop       | 46.49 | 50.64 | 42.86 | 54.77 | 45.21 | 69.45 | 59.42 | 81.94 |
+|     **SwapConv<br/>*w/o* self-loop**     | 46.49 | 50.64 | 42.86 | 54.77 | 45.21 | 69.45 | 59.42 | 81.94 |
 |   SwapConv<br/>*w/o* self-loop[Dgraph]   | 45.15 | 50.79 | 40.33 | 52.11 | 43.04 | 66.04 | 59.55 | 81.97 |
 
 Some Conclusions:
@@ -1023,7 +1023,37 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 
 ### 4.10 After Superior Appearance Feature Extractor [:eyes:]
 
+|                    Experiment +[Mask-50]                     | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------------------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                        Vanilla model                         | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|                          Fast Reid                           | 43.40 | 50.46 | 37.54 | 49.38 | 40.76 | 62.62 | 58.90 | 81.95 |
+|                         Fast Reid(2)                         | 44.13 | 50.54 | 38.73 | 50.62 | 41.79 | 64.16 | 59.12 | 81.97 |
+|                  Fast Reid(2) + DIOUd-Cosd6                  | 46.02 | 50.83 | 41.83 | 54.29 | 44.82 | 68.82 | 60.16 | 81.95 |
+|               Fast Reid(2) + GraphConv-woloop                | 47.17 | 50.70 | 44.05 | 55.43 | 45.75 | 70.30 | 60.19 | 81.98 |
+|                Fast Reid(2) + SwapConv-woloop                | 46.74 | 50.82 | 43.15 | 55.81 | 46.07 | 70.76 | 60.19 | 81.98 |
+| Fast Reid(2) + GraphConv-woloop+<br>DeepMsg+Dynamic-smooth+DeepFuse13 | 47.91 | 50.81 | 45.33 | 56.63 | 46.74 | 71.83 | 60.17 | 82.00 |
+| Fast Reid(2) + SwapConv-woloop<br/>DeepMsg+Dynamic-smooth+DeepFuse13 | 47.17 | 50.78 | 43.99 | 55.37 | 45.69 | 70.24 | 60.15 | 82.01 |
+|       Fast Reid(2) + GraphConv-woloop<br/>+DIOUd-Cosd6       | 45.69 | 50.85 | 41.22 | 53.14 | 43.86 | 67.40 | 60.26 | 81.97 |
+|       Fast Reid(2) + SwapConv-woloop<br/>+DIOUd-Cosd6        | 47.37 | 50.93 | 44.23 | 56.20 | 46.38 | 71.30 | 60.25 | 81.96 |
+|  Fast Reid(2) + GraphConv-woloop<br/>+DIOUd-Cosd6 + bigger   | 47.87 | 50.87 | 45.21 | 57.06 | 47.09 | 72.40 | 60.26 | 82.06 |
+|   Fast Reid(2) + SwapConv-woloop<br/>+DIOUd-Cosd6 + bigger   | 47.38 | 50.75 | 44.39 | 55.67 | 45.93 | 70.65 | 60.20 | 82.00 |
 
+| Platforms(3090) | 480p Video | 1080p Video | 4K video |
+| :-------------: | :--------: | :---------: | :------: |
+|  Vanilla Model  |   68 FPS   |   30 FPS    |  13 FPS  |
+|    Fast Reid    |   74 FPS   |   42 FPS    |  20 FPS  |
+
+
+
+|                    Conditions +[Mask-50]                     | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------------------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                         Vanilla one*                         | 44.96 | 50.55 | 40.17 | 51.64 | 42.64 | 65.45 | 59.04 | 81.96 |
+|                          LayerNorm                           | 46.37 | 50.73 | 42.57 | 53.65 | 44.29 | 68.03 | 59.52 | 81.95 |
+|                         Fast Reid(2)                         | 44.13 | 50.54 | 38.73 | 50.62 | 41.79 | 64.16 | 59.12 | 81.97 |
+|                   Fast Reid(2) + LayerNorm                   | 47.41 | 50.78 | 44.42 | 55.56 | 45.86 | 70.45 | 60.28 | 82.00 |
+|        Fast Reid(2) +LayerNorm <br>+ GraphConv-woloop        | 47.51 | 50.86 | 44.54 | 56.40 | 46.54 | 71.56 | 60.27 | 82.00 |
+|        Fast Reid(2) +LayerNorm <br/>+ SwapConv-woloop        | 47.19 | 50.79 | 43.99 | 55.60 | 45.90 | 70.51 | 60.26 | 81.95 |
+| Fast Reid(2) + DIOUd-Cosd6 <br>+LayerNorm + GraphConv-woloop + bigger | 46.54 | 50.80 | 42.81 | 54.59 | 45.05 | 69.26 | 60.12 | 82.03 |
 
 ### 4.11 After Larger Dataset [:tada:]
 

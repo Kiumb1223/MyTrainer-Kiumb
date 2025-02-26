@@ -63,11 +63,17 @@ class GraphDataset(torch.utils.data.Dataset):
                 self.dets_dict[seq_name] = {} 
 
                 if self.mode == 'Train' or dataset_name in ['MOT17','MOT20']:
-                    seq_path   = os.path.join(self.dataset_dir,dataset_name,'train',seq_name)  
+                    seq_path  = os.path.join(self.dataset_dir,dataset_name,'train',seq_name)  
                 elif self.mode == 'Validation' and dataset_name in ['DanceTrack']:
-                    seq_path   = os.path.join(self.dataset_dir,dataset_name,'val',seq_name)                         
+                    seq_path  = os.path.join(self.dataset_dir,dataset_name,'val',seq_name)                         
                 
-                txt_path   = os.path.join(seq_path,'gt','gt.txt') 
+                txt_path      = os.path.join(seq_path,'gt','gt.txt') 
+                seq_info_path = os.path.join(seq_path,'seqinfo.ini')
+                with open(seq_info_path,'r') as f:
+                    lines_split = [ l.split('=') for l in f.read().splitlines()[1:]]
+                    info_dict  = dict(s for s in lines_split if isinstance(s,list) and len(s) == 2)
+                h_im,w_im = map(int,[info_dict['imHeight'],info_dict['imWidth']])
+
                 detections = np.loadtxt(txt_path,delimiter=',')
                 valid_mask = (
                     # (detections[:, 2] >= 0) & (detections[:, 3] >= 0) &
@@ -78,13 +84,16 @@ class GraphDataset(torch.utils.data.Dataset):
                 sorted_detections = sorted(detections[valid_mask],key=lambda x:x[0])
                 for detection in sorted_detections:
                     x,y,w,h = map(float,detection[2:6])
+                    w , h   = min(w, w+x)   , min(h,h+y)
+                    x , y   = max(x ,0)     , max(y,0)
+                    w , h   = min(w, w_im-x), min(h,h_im-y)
                     x2,y2,xc,yc = x + w , y + h, x + w/2 , y + h/2
                     frame_idx,tracklet_id = map(int,detection[:2])
                     if frame_idx not in unique_frameidx_list:
                         unique_frameidx_list.append(frame_idx)
                         self.frame_list.append(f"{dataset_name}#{seq_name}#{frame_idx}")
                         self.dets_dict[seq_name][frame_idx] = []
-                    self.dets_dict[seq_name][frame_idx].append([frame_idx,tracklet_id,x,y,x2,y2,w,h,xc,yc])
+                    self.dets_dict[seq_name][frame_idx].append([frame_idx,tracklet_id,x,y,x2,y2,w,h,xc,yc,w_im,h_im])
                 # if self.mode !=  'Validation':
                 self.frame_list.remove(f"{dataset_name}#{seq_name}#{start_frame}")
             
@@ -117,38 +126,38 @@ class GraphDataset(torch.utils.data.Dataset):
     
     def construct_raw_graph(self,detections:Union[List,Dict],date_type,imgs_dir,is_tracklet:bool=False):
         prev_frame_idx = None
-        raw_node_attr , location_info = [] , []      
+        raw_node_attr , geometric_info = [] , []      
         if is_tracklet:
             # fetch the last item of each tracklet
             detections = [item[-1] for item in list(detections.values())]         
         for det in detections: # det = [frame_idx,tracklet_id,x,y,x2,y2,w,h,xc,yc]
             frame_idx   = int(det[0])
-            x,y,_,_,w,h = map(int,det[2:-2])
+            x,y,_,_,w,h = map(int,det[2:-4])
             # xc , yc   = map(float,det[6:])
             if frame_idx != prev_frame_idx:
                 prev_frame_idx = frame_idx
                 im_path = os.path.join(imgs_dir, f"{frame_idx:06d}.jpg" if date_type in ['MOT17','MOT20'] else f"{frame_idx:08d}.jpg")
                 im_tensor = I.read_image(im_path).to(torch.float32) / 255.0
-                H , W = im_tensor.shape[1:] 
+                # H , W = im_tensor.shape[1:] 
             
-            if x < 0:
-                w = w + x  
-                x = 0 
+            # if x < 0:
+            #     w = w + x  
+            #     x = 0 
 
-            if y < 0:
-                h = h + y  
-                y = 0  
+            # if y < 0:
+            #     h = h + y  
+            #     y = 0  
                 
-            w = min(w, im_tensor.shape[2] - x)  
-            h = min(h, im_tensor.shape[1] - y)
+            # w = min(w, im_tensor.shape[2] - x)  
+            # h = min(h, im_tensor.shape[1] - y)
             
             patch = T.crop(im_tensor,y,x,h,w)
             patch = T.resize(patch,self.resize_to_cnn)
             raw_node_attr.append(patch)
-            location_info.append(det[2:] + [W,H])   # STORE x,y,x2,y2,w,h,xc,yc ,W,H
+            geometric_info.append(det[2:])   # STORE x,y,x2,y2,w,h,xc,yc ,W,H
         raw_node_attr = torch.stack(raw_node_attr,dim=0)
-        location_info = torch.as_tensor(location_info,dtype=torch.float32)
-        return Data(x=raw_node_attr,location_info=location_info)
+        geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32)
+        return Data(x=raw_node_attr,geometric_info=geometric_info)
     
     def construct_label(self,current_detections,tracklets_dict):
         '''

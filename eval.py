@@ -51,6 +51,8 @@ def main():
 
     seq_name_list    = data_json['valid_seq'][dataset_name]['seq_name']
     for cnt, seq in enumerate(seq_name_list):
+        # if seq != 'MOT20-05':
+        #     continue
         # seq_det_path  = os.path.join(test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
         if dataset_name in ['MOT17','MOT20']:
             test_root_dir = data_json['Trackeval']['GT_FOLDER']+os.sep+f"{dataset_name}-{data_json['valid_seq'][dataset_name]['Trackeval']['SPLIT_TO_EVAL']}"

@@ -15,12 +15,11 @@ from functools import partial
 from torch_geometric.data import Batch,Data
 from models.core.graphConv import SDgraphConv
 from models.graphToolkit import sinkhorn_unrolled
-from models.core.graphEncoder import NodeEncoder,EdgeEncoder
+from models.core.graphLayers import NodeEncoder,EdgeEncoder
 
-__all__ =['TrainingGraphModel','GraphModel']
+__all__ =['GraphModel']
 
-class TrainingGraphModel(nn.Module):
-    '''This model structure is spefically designed for training purposes.'''
+class GraphModel(nn.Module):
     def __init__(self,model_yaml_path):
         super().__init__()
 
@@ -30,35 +29,36 @@ class TrainingGraphModel(nn.Module):
         self.k = model_dict['K_NEIGHBOR']
         self.bt_mask = model_dict['BT_DIST_MASK'] 
         self.dist_thresh = model_dict['DIST_THRESH']
-
+        #---------------------------------#
         # Encoder Layer
+        #---------------------------------#
         self.nodeEncoder = NodeEncoder(model_dict['node_encoder'])
-        self.edgeEncoder = EdgeEncoder(model_dict['Edge_mode'],model_dict['edge_encoder'])
+        self.edgeEncoder = EdgeEncoder(model_dict['edge_encoder'])
 
+        #---------------------------------#
         # Graph Layer
+        #---------------------------------#
         self.graphconvLayer = SDgraphConv(
-            edge_mode = model_dict['Edge_mode'],
-            graphModel_type = model_dict['GraphModel_type'],
-            edge_model_dict = model_dict['edge_encoder'],
-            static_graph_model_dict = model_dict['static_graph_model'],
-            dynamic_graph_model_dict = model_dict['dynamic_graph_model'],
+            static_graph_conv_dict = model_dict['static_graph_conv'],
+            dynamic_graph_conv_dict = model_dict['dynamic_graph_conv'],
             fuse_model_dict = model_dict['fuse_model']
             )
         
+        #---------------------------------#
         # Sinkhorn Layer 
-        self.alpha   = nn.Parameter(torch.ones(1))
-        self.eplison = nn.Parameter(torch.zeros(1))
+        #---------------------------------#
 
+        self.eplison = nn.Parameter(torch.zeros(1))
         self.sinkhornLayer = partial(sinkhorn_unrolled,num_sink = model_dict['SINKHORN_ITERS'])
         
 
     def forward(self,tra_graph_batch: Batch ,det_graph_batch: Batch) -> list:
-        
+        ''' Training Process'''
         tra_graph_batch = self.nodeEncoder(tra_graph_batch)
-        tra_graph_batch = self.edgeEncoder(tra_graph_batch,self.k)
+        tra_graph_batch = self.edgeEncoder(tra_graph_batch,self.k,tra_graph_batch.batch)
         
         det_graph_batch = self.nodeEncoder(det_graph_batch)
-        det_graph_batch = self.edgeEncoder(det_graph_batch,self.k)        
+        det_graph_batch = self.edgeEncoder(det_graph_batch,self.k,det_graph_batch.batch)        
 
 
         #---------------------------------#
@@ -89,72 +89,29 @@ class TrainingGraphModel(nn.Module):
             n2   = torch.norm(det_feats,dim=-1,keepdim=True)
 
             if self.bt_mask: # compute mask to filter out some unmatched nodes
-                dist_mask = ( torch.cdist(tra_graph_batch.location_info[tra_batch_indices == graph_idx][:,6:8],
-                                        det_graph_batch.location_info[det_batch_indices == graph_idx][:,6:8]) <= self.dist_thresh ).float()
+                dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx][:,6:8],
+                                        det_graph_batch.geometric_info[det_batch_indices == graph_idx][:,6:8]) <= self.dist_thresh ).float()
                 corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
             else:
                 corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
                 
             # 2. Prepare the augmented affinity matrix for Sinkhorn
             m , n = corr.shape
-            bins0 = self.alpha.expand(m, 1)
-            bins1 = self.alpha.expand(1, n)
-            alpha = self.alpha.expand(1, 1)
-            couplings = torch.cat([torch.cat([corr,bins0],dim=-1),
-                                   torch.cat([bins1,alpha],dim=-1)],dim=0)
-            norm  = 1 / ( m + n )  
-            a_aug = torch.full((m+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-            b_aug = torch.full((n+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-            a_aug[-1] = norm * n
-            b_aug[-1] = norm * m
+            a = torch.ones(m,device=self.eplison.device,dtype=torch.float32) 
+            b = torch.ones(n,device=self.eplison.device,dtype=torch.float32) 
 
-            # to original possibility space 
-            pred_mtx = self.sinkhornLayer(1 - couplings,a_aug,b_aug,
-                                          lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
+            pred_mtx = self.sinkhornLayer(1 - corr,a,b,
+                                          lambd_sink = torch.exp(self.eplison) + 0.03)
             
             pred_mtx_list.append(pred_mtx)
 
         return pred_mtx_list 
 
-
-class GraphModel(nn.Module):
-    '''This model structure is spefically designed for evalution purposes.'''
-    def __init__(self,model_yaml_path):
-        super().__init__()
-
-        with open(model_yaml_path,'r') as f:
-            model_dict = yaml.load(f.read(),Loader=yaml.FullLoader)
-
-        self.k = model_dict['K_NEIGHBOR']
-        self.bt_mask = model_dict['BT_DIST_MASK'] 
-        self.dist_thresh = model_dict['DIST_THRESH']
-        # Encoder Layer
-        self.nodeEncoder = NodeEncoder(model_dict['node_encoder'])
-        self.edgeEncoder = EdgeEncoder(model_dict['Edge_mode'],model_dict['edge_encoder'])
-
-        # Graph Layer
-        self.graphconvLayer = SDgraphConv(
-            edge_mode = model_dict['Edge_mode'],
-            graphModel_type = model_dict['GraphModel_type'],
-            edge_model_dict = copy.deepcopy(model_dict['edge_encoder']),
-            static_graph_model_dict = model_dict['static_graph_model'],
-            dynamic_graph_model_dict = model_dict['dynamic_graph_model'],
-            fuse_model_dict = model_dict['fuse_model']
-            )
-        
-        # Sinkhorn Layer 
-        self.alpha   = nn.Parameter(torch.ones(1))
-        self.eplison = nn.Parameter(torch.zeros(1))
-
-        self.sinkhornLayer = partial(sinkhorn_unrolled,num_sink = model_dict['SINKHORN_ITERS'])
-        
-        
-
-    def forward(self,tra_graph :Data ,det_graph :Data ) -> torch.Tensor:
-        
+    def inference(self,tra_graph :Data ,det_graph :Data ) -> torch.Tensor:
+        ''' Inference Process'''
         #---------------------------------#
         # This condition handles the test phase and  when processing the first frame, where 
-        # the trajectory graph (tra_graph_batch) is not available (i.e., it lacks 'location_info').
+        # the trajectory graph (tra_graph_batch) is not available (i.e., it lacks 'geometric_info').
         # In such cases, the model simply encodes the detection graph (det_graph_batch) nodes
         # and returns an empty list, bypassing the rest of the forward pass.
         #---------------------------------#
@@ -193,26 +150,16 @@ class GraphModel(nn.Module):
         n1   = torch.norm(tra_node_feats,dim=-1,keepdim=True)
         n2   = torch.norm(det_node_feats,dim=-1,keepdim=True)
         if self.bt_mask: # compute mask to filter out some unmatched nodes
-            dist_mask = ( torch.cdist(tra_graph.location_info[:,6:8],det_graph.location_info[:,6:8]) <= self.dist_thresh ).float()
+            dist_mask = ( torch.cdist(tra_graph.geometric_info[:,6:8],det_graph.geometric_info[:,6:8]) <= self.dist_thresh ).float()
             corr = ( torch.mm(tra_node_feats,det_node_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
         else:
             corr = torch.mm(tra_node_feats,det_node_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
 
         # 2. Prepare the augmented affinity matrix for Sinkhorn
         m , n = corr.shape
-        bins0 = self.alpha.expand(m, 1)
-        bins1 = self.alpha.expand(1, n)
-        alpha = self.alpha.expand(1, 1)
-        couplings = torch.cat([torch.cat([corr,bins0],dim=-1),
-                               torch.cat([bins1,alpha],dim=-1)],dim=0)
-        norm  = 1 / ( m + n )  
-        a_aug = torch.full((m+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-        b_aug = torch.full((n+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-        a_aug[-1] = norm * n
-        b_aug[-1] = norm * m
+        a = torch.ones(m,device=self.eplison.device,dtype=torch.float32) 
+        b = torch.ones(n,device=self.eplison.device,dtype=torch.float32) 
 
-        # to original possibility space 
-        pred_mtx = self.sinkhornLayer(1 - couplings,a_aug,b_aug,
-                                        lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
-        
+        pred_mtx = self.sinkhornLayer(1 - corr,a,b,
+                                lambd_sink = torch.exp(self.eplison) + 0.03)
         return pred_mtx 
