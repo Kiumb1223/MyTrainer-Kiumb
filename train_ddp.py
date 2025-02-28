@@ -53,7 +53,7 @@ def main():
     train_sampler = DistributedSampler(train_dataset) if is_distributed else None
 
     train_loader  = DataLoader(train_dataset,batch_size=cfg.BATCH_SIZE,shuffle=False,sampler=train_sampler,pin_memory=True,
-                               num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)
+                               num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=False)
 
     valid_loader   = DataLoader(test_dataset,batch_size=cfg.BATCH_SIZE,shuffle=True,pin_memory=True,
                                num_workers=cfg.NUM_WORKS,collate_fn=graph_collate_fn,drop_last=True)

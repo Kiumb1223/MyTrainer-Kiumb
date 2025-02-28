@@ -1055,6 +1055,20 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 |        Fast Reid(2) +LayerNorm <br/>+ SwapConv-woloop        | 47.19 | 50.79 | 43.99 | 55.60 | 45.90 | 70.51 | 60.26 | 81.95 |
 | Fast Reid(2) + DIOUd-Cosd6 <br>+LayerNorm + GraphConv-woloop + bigger | 46.54 | 50.80 | 42.81 | 54.59 | 45.05 | 69.26 | 60.12 | 82.03 |
 
+|                    Conditions +[Mask-50]                     | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :----------------------------------------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|                         Vanilla one*                         | 44.96 | 50.55 | 40.17 | 51.64 | 42.64 | 65.45 | 59.04 | 81.96 |
+|               New Vanilla Model \|\| Final-Act               | 46.83 | 50.78 | 43.36 | 54.67 | 45.13 | 69.13 | 60.08 | 81.96 |
+|             New Vanilla Model \|\| wo-Final-Act              | 47.45 | 50.75 | 44.53 | 55.04 | 45.44 | 69.81 | 60.17 | 81.96 |
+|                      k-8 \|\| Final-Act                      | 47.36 | 50.82 | 44.29 | 55.34 | 45.70 | 70.15 | 60.20 | 81.99 |
+|                    k-8 \|\| wo-Final-Act                     | 46.57 | 50.84 | 42.80 | 54.26 | 44.77 | 68.85 | 60.12 | 82.00 |
+|                     k-12 \|\| Final-Act                      | 47.02 | 50.82 | 43.66 | 54.85 | 45.27 | 69.57 | 60.13 | 81.95 |
+|                    k-12 \|\| wo-Final-Act                    | 46.63 | 50.59 | 43.15 | 54.59 | 45.05 | 69.25 | 59.87 | 81.97 |
+|                   Fast Reid(2) + LayerNorm                   | 47.41 | 50.78 | 44.42 | 55.56 | 45.86 | 70.45 | 60.28 | 82.00 |
+|         Fast Reid(2) +LayerNorm  + GraphConv-woloop          | 47.51 | 50.86 | 44.54 | 56.40 | 46.54 | 71.56 | 60.27 | 82.00 |
+|          Fast Reid(2) +LayerNorm  + SwapConv-woloop          | 47.19 | 50.79 | 43.99 | 55.60 | 45.90 | 70.51 | 60.26 | 81.95 |
+| Fast Reid(2) + DIOUd-Cosd6  +LayerNorm + GraphConv-woloop + bigger | 46.54 | 50.80 | 42.81 | 54.59 | 45.05 | 69.26 | 60.12 | 82.03 |
+
 ### 4.11 After Larger Dataset [:tada:]
 
 One of the core and useful experience or intuition in the era of deep learning is that `if you have a large big dataset and you train a very big neural network, then success is guaranted` (quoted from [llya`s speech at NeurlPS conference in 2024](https://www.bilibili.com/video/BV1cSBGYkE9w/?spm_id_from=333.337.search-card.all.click&vd_source=812705912b7abe259d54d8593a97a8b3)) , like CLIP model trained in 400 million dataset.

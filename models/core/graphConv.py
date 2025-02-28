@@ -133,7 +133,8 @@ class SDgraphConv(nn.Module):
                 dims_list  = fuse_model_dict['dims_list'][1],
                 layer_type = fuse_model_dict['layer_type'], layer_bias = fuse_model_dict['layer_bias'],
                 norm_type  = fuse_model_dict['norm_type'], 
-                activate_func = fuse_model_dict['activate_func'], lrelu_slope = fuse_model_dict['lrelu_slope']
+                activate_func = fuse_model_dict['activate_func'], lrelu_slope = fuse_model_dict['lrelu_slope'],
+                final_activation = False
             )
         
     def forward(self,graph:Union[Batch,Data],k:int) -> torch.Tensor:

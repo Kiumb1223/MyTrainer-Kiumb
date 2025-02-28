@@ -514,12 +514,16 @@ class EdgeEncoder(nn.Module):
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         
         
-
+ 
         if self.edge_type == 'DIOUd5':
+            # feat1 = 2 * (target_info[:,6] - source_info[:,6]) /  (source_info[:,5] + target_info[:,5])
+            # feat2 = 2 * (target_info[:,7] - source_info[:,7]) /  (source_info[:,5] + target_info[:,5])
+            # feat3 = torch.log(target_info[:,4] / source_info[:,4])
+            # feat4 = torch.log(target_info[:,5] / source_info[:,5])
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
-            feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
-            feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
+            feat3 = torch.log(source_info[:,4] / target_info[:,4])
+            feat4 = torch.log(source_info[:,5] / target_info[:,5])
             feat5 = 1- calc_iouFamily(source_info,target_info,iou_type='diou')
             return torch.stack([feat1,feat2,feat3,feat4,feat5],dim =1)
         if self.edge_type == 'DIOU5':

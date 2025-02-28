@@ -33,7 +33,7 @@ class Tracker:
 
     _track_id = 0
 
-    def __init__(self,start_frame:int,appearance_feat:torch.Tensor,conf:float,geometric_info:list,
+    def __init__(self,start_frame:int,appearance_feat:torch.Tensor,node_feat:torch.Tensor,conf:float,geometric_info:list,
                  cnt_to_active:int,cnt_to_sleep:int,max_cnt_to_dead:int,feature_list_size:int):
         
         self.track_id   = None # when state: Born to Active, this will be assigned
@@ -48,7 +48,9 @@ class Tracker:
         self.conf = conf
         # self.tlwh = tlwh # (top left x, top left y, width, height)
         self.geometric_info = geometric_info
+        self.node_feats_list = []
         self.appearance_feats_list = []
+        self.node_feats_list.append(node_feat) 
         self.appearance_feats_list.append(appearance_feat) 
         
         self._cnt_to_active     = cnt_to_active
@@ -56,7 +58,7 @@ class Tracker:
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
-    def to_active(self,frame_idx,appearance_feat,conf,geometric_info):
+    def to_active(self,frame_idx,appearance_feat,node_feat,conf,geometric_info):
         
         assert appearance_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {appearance_feat.shape}'
         if self.state  == LifeSpan.Born:
@@ -78,10 +80,14 @@ class Tracker:
         self.conf = conf
         # self.tlwh = tlwh
         self.geometric_info = geometric_info
+        self.node_feats_list.append(node_feat) 
         self.appearance_feats_list.append(appearance_feat)
 
         if len(self.appearance_feats_list) > self._feature_list_size:
             expired_feat = self.appearance_feats_list.pop(0)
+            del expired_feat
+        if len(self.node_feats_list) > self._feature_list_size:
+            expired_feat = self.node_feats_list.pop(0)
             del expired_feat
 
     def to_sleep(self):  
@@ -158,7 +164,7 @@ class Tracker:
 class TrackManager:
     def __init__(self,model :GraphModel,device :str,path_to_weights :str,
         fusion_method :str,EMA_lambda :float,
-        resize_to_cnn :list =[224,224],match_thresh :float =0.1,det2tra_conf :float =0.7,
+        resize_to_cnn :list =[224,224],first_match_thresh :float =0.1,second_match_thresh :float=0.1,third_match_thresh:float= 0.9 ,det2tra_conf :float =0.7,
         cnt_to_active :int =3,cnt_to_sleep :int=10,max_cnt_to_dead :int =100,feature_list_size :int =10):
         
         self.device = device
@@ -170,7 +176,9 @@ class TrackManager:
         self.tracks_list:List[Tracker] = [] # store all the tracks including Born, Active, Sleep, Dead
 
         self._resize_to_cnn   = resize_to_cnn
-        self._match_thresh    = match_thresh
+        self._first_match_thresh    = first_match_thresh
+        self._third_match_thresh    = third_match_thresh
+        self._second_match_thresh   = second_match_thresh
         # necessary attributes when initializing the single track
         self._det2tra_conf    = det2tra_conf
         self._cnt_to_active   = cnt_to_active
@@ -286,7 +294,7 @@ class TrackManager:
         
         node_attr , geometric_info = [] , []
         for track in tracks_list:
-            node_attr.append(track.appearance_feats_list[-1])
+            node_attr.append(track.node_feats_list[-1])
             geometric_info.append(track.geometric_info)
         node_attr = torch.stack(node_attr,dim=0).to(self.device)
         geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32).to(self.device)
@@ -328,7 +336,7 @@ class TrackManager:
     def _graph_match(self,tra_graph:Data,det_graph:Data):
         ''' first phase to match via graph model'''
         pred_mtx = self.model.inference(tra_graph.to(self.device),det_graph.to(self.device))
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx.cpu().numpy(),self._match_thresh)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx.cpu().numpy(),self._first_match_thresh)
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
     def _iou_match(self,tracks_list,highconf_unmatch_dets_tlbr:np.ndarray):      
@@ -341,7 +349,7 @@ class TrackManager:
             ]).astype(np.float32)
 
         iou  = box_iou(tras_tlbr,highconf_unmatch_dets_tlbr)
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(iou,0.1)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(iou,self._second_match_thresh)
 
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 

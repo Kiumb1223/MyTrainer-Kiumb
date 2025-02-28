@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\model_structure[vanillaModel].yaml',
+        MODEL_YAML_PATH   = r'configs\yamlFamily\EdgeMode\NodeDiff.yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -70,10 +70,12 @@ def get_config():
         #  4. TrackManager related
         #---------------------------------#
         PATH_TO_WEIGHTS   = r'model_weights\cur-exp\fastreid\fastreid2+graphConv-woloop+Msg+Dynamic-smooth+Fuse13.pth',
-        FUSION_METHOD     = 'CWFF', # options DFF CWFF EMAFF  CA-EMA
+        FUSION_METHOD     = 'DFF', # options DFF CWFF EMAFF  CA-EMA
         EMA_LAMBDA        = 0.9,
         MIN_DET_CONF      = 0.2,
-        MATCH_THRESH      = 0, # DEFAULT 0.05
+        FIRST_MATCH_THRESH  = 0.05, # DEFAULT 0.05
+        SECOND_MATCH_THRESH = 0.1,
+        THIRD_MATCH_THRESH  = 0.1,
         Det2Tra_CONF      = 0.7,
         CNT_TO_ACTIVE     = 1,
         CNT_TO_SLEEP      = 1,

@@ -54,8 +54,8 @@ class GraphModel(nn.Module):
 
     def forward(self,tra_graph_batch: Batch ,det_graph_batch: Batch) -> list:
         ''' Training Process'''
-        tra_graph_batch = self.nodeEncoder(tra_graph_batch)
-        tra_graph_batch = self.edgeEncoder(tra_graph_batch,self.k,tra_graph_batch.batch)
+        # tra_graph_batch = self.nodeEncoder(tra_graph_batch)
+        # tra_graph_batch = self.edgeEncoder(tra_graph_batch,self.k,tra_graph_batch.batch)
         
         det_graph_batch = self.nodeEncoder(det_graph_batch)
         det_graph_batch = self.edgeEncoder(det_graph_batch,self.k,det_graph_batch.batch)        
@@ -66,7 +66,7 @@ class GraphModel(nn.Module):
         # and return the node feature for each graph 
         #---------------------------------#
 
-        tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
+        # tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
         det_node_feats = self.graphconvLayer(det_graph_batch,self.k)
         
         #---------------------------------#

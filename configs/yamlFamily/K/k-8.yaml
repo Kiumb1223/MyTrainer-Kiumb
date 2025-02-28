@@ -1,0 +1,162 @@
+#---------------------------------#
+#       Hyper Parameters        
+#---------------------------------#
+K_NEIGHBOR: 8
+SINKHORN_ITERS: 8
+BT_DIST_MASK: True
+DIST_THRESH: 50
+
+#---------------------------------#
+#         Model Structure
+#      1. Node_Encoder
+#      2. Edge_Encoder
+#      3. Static_Graph_Model
+#      4. Dynamic_Graph_Model
+#      5. Fuse_Model
+#---------------------------------#
+
+#---------------------------------#
+node_encoder:
+  backbone: 'fastreid_market_BOT_R50_ibn'
+  weight_path: 'model_weights/fastreid/market_bot_R50-ibn.pth'
+  dims_list: [2048,512,128,32,32]
+  layer_type: 'linear'
+  layer_bias: False
+  norm_type: 'batchNorm'
+  activate_func: 'relu'
+  lrelu_slope: 0.0
+
+
+#---------------------------------#
+edge_encoder:
+  #---------------------------------#
+  #  Options : 
+  #            ImgNorm4 | SrcNorm4          | TgtNorm4             | MeanSizeNorm4  | MeanHeightNorm4 
+  #      MeanWidthNorm4 | CorverxNorm4      | MaxNorm4             | IOUd5          | IOU5
+  #      GIOUd5         |  GIOU5            | DIOUd5               | DIOU5          | DIOU-Cos6 
+  #      IouFamily8-vanilla       |   IouFamily8-convex       |    IouFamily8-separate      
+  #      IouFamily8-vanilla-seq   |   IouFamily8-convex-seq   |    IouFamily8-separate-seq
+  #      ConvexNorm4-v2 |   MaxNorm4-v2     | GIOUd5-v2            | GIOU5-v2       | DIOU5-v2
+  #           CIOU5-v2   
+  #---------------------------------#
+  edge_type: 'DIOUd5'
+  dims_list: [5,16,16]
+  layer_type: 'linear'
+  layer_bias: False
+  norm_type: 'layerNorm'
+  activate_func: 'relu'
+  lrelu_slope: 0.0
+  # static graph construction settings
+  bt_cosine: False 
+  bt_self_loop: True
+  bt_directed: True
+
+
+#---------------------------------#
+# Attention about following variables `msgLayer_dims` , `updLayer_dims` and `fuseLayer_dims`:
+#   1. support List type or tuple type 
+#   2. first item means input dimension
+#   3. last item means output dimension
+#   4. the middle items means the hidden dimension no matter how many numbers of items 
+#   
+#   5. if set [] , there is no relavant layers built.
+#      careful to set None
+#
+#   6. When there are two items in the variables,
+#      the first item still means input, and the last one still means output
+#
+#   7. When there are only one items in the variables,
+#      the only item become the input dimension 
+#      and the output dimension is the same as the input dimension
+#---------------------------------#
+
+
+
+
+
+#---------------------------------#
+#   3. Static_Graph_Model
+# There are three GCN , and the dimension of each layer
+# is defined in the following list.
+#---------------------------------#
+static_graph_conv:
+  layers_num: 3  # the number of static graph conv layers , equals to the length of param 'msgLayer_dims' and 'updLayer_dims' 
+  node_update_model:
+    aggr: 'max'
+    message_model:
+      dims_list:
+        - [48,40,32,32]
+        - [96,80,64,64]
+        - [144,120,96,96]
+      layer_type: 'linear'
+      layer_bias: False
+      norm_type: 'LayerNorm'
+      activate_func: 'lrelu'
+      lrelu_slope: 0.1
+    update_model:
+      dims_list:
+        - [32,64,64]
+        - [64,96,96]
+        - [96,128,128]
+      layer_type: 'linear'
+      layer_bias: False
+      norm_type: 'graphNorm'
+      activate_func: 'lrelu'
+      lrelu_slope: 0.1
+  edge_update_model:
+    edge_mode: 'NodeConcat' # optional: NodeConcat NodeDiff None
+    # if NodeDiff 
+    #  [80,56,32,32]  [128,64,48,48]
+    dims_list:
+      - None                # using initiali edge embedding
+      - [144,88,32,32]
+      - [224,136,48,48]
+    layer_type: 'linear'
+    layer_bias: False
+    norm_type: 'layerNorm'
+    activate_func: 'lrelu'
+    lrelu_slope: 0.1
+
+#---------------------------------#
+#   4. Dynamic_Graph_Model
+# There are three GCN , and the dimension of each layer
+# is defined in the following list.
+#---------------------------------#
+dynamic_graph_conv:
+  # dynamic graph construction settings
+  bt_cosine: False 
+  bt_self_loop: True
+  bt_directed: True
+  # module layer settings 
+  layers_num: 2
+  aggr: 'max'
+  message_model:
+    dims_list:
+      - [128,112,96,96]
+      - [192,160,128,128]
+    layer_type: 'linear'
+    layer_bias: False
+    norm_type: 'LayerNorm'
+    activate_func: 'lrelu'
+    lrelu_slope: 0.1
+  update_model:
+    dims_list:
+      - [96,96,96]
+      - [128,128,128]
+    layer_type: 'linear'
+    layer_bias: False
+    norm_type: 'graphNorm'
+    activate_func: 'lrelu'
+    lrelu_slope: 0.1
+
+#---------------------------------#
+fuse_model:
+  # [in_dim , mid_dim, out_dim]
+  dims_list: 
+    - [512,1024]
+    - [1536,768,384,192] 
+  layer_type: 'Conv1d'
+  layer_bias: False
+  norm_type: 'graphNorm'
+  activate_func: 'lrelu'
+  lrelu_slope: 0.2
