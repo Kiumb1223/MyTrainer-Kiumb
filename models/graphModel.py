@@ -54,8 +54,8 @@ class GraphModel(nn.Module):
 
     def forward(self,tra_graph_batch: Batch ,det_graph_batch: Batch) -> list:
         ''' Training Process'''
-        # tra_graph_batch = self.nodeEncoder(tra_graph_batch)
-        # tra_graph_batch = self.edgeEncoder(tra_graph_batch,self.k,tra_graph_batch.batch)
+        tra_graph_batch = self.nodeEncoder(tra_graph_batch)
+        tra_graph_batch = self.edgeEncoder(tra_graph_batch,self.k,tra_graph_batch.batch)
         
         det_graph_batch = self.nodeEncoder(det_graph_batch)
         det_graph_batch = self.edgeEncoder(det_graph_batch,self.k,det_graph_batch.batch)        
@@ -66,7 +66,7 @@ class GraphModel(nn.Module):
         # and return the node feature for each graph 
         #---------------------------------#
 
-        # tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
+        tra_node_feats = self.graphconvLayer(tra_graph_batch,self.k)
         det_node_feats = self.graphconvLayer(det_graph_batch,self.k)
         
         #---------------------------------#
@@ -110,23 +110,9 @@ class GraphModel(nn.Module):
     def inference(self,tra_graph :Data ,det_graph :Data ) -> torch.Tensor:
         ''' Inference Process'''
         #---------------------------------#
-        # This condition handles the test phase and  when processing the first frame, where 
-        # the trajectory graph (tra_graph_batch) is not available (i.e., it lacks 'geometric_info').
-        # In such cases, the model simply encodes the detection graph (det_graph_batch) nodes
-        # and returns an empty list, bypassing the rest of the forward pass.
-        #---------------------------------#
-        if tra_graph.num_nodes == 0:
-            self.nodeEncoder(det_graph)
-            return torch.zeros((tra_graph.num_nodes,det_graph.num_nodes),dtype=torch.float32)
-        
-        #---------------------------------#
         # Initialize the Node and edge embeddings
         #---------------------------------#
-        
-        if len(tra_graph.x.shape) != 2  :   # [N, node_embed_size] or [N,3,224,128]
-            tra_graph = self.nodeEncoder(tra_graph)
-        tra_graph = self.edgeEncoder(tra_graph,self.k)
-        
+                
         det_graph = self.nodeEncoder(det_graph)
         det_graph = self.edgeEncoder(det_graph,self.k)        
 
@@ -136,9 +122,21 @@ class GraphModel(nn.Module):
         # and return the node feature for each graph 
         #---------------------------------#
 
-        tra_node_feats = self.graphconvLayer(tra_graph,self.k)
         det_node_feats = self.graphconvLayer(det_graph,self.k)
+        det_graph.node_feats = det_node_feats        
+
+        #---------------------------------#
+        # This condition handles the test phase and  when processing the first frame, where 
+        # the trajectory graph (tra_graph_batch) is not available (i.e., it lacks 'geometric_info').
+        # In such cases, the model simply encodes the detection graph (det_graph_batch) nodes
+        # and returns an empty list, bypassing the rest of the forward pass.
+        #---------------------------------#
         
+        assert tra_graph.x.shape != 2
+        if tra_graph.num_nodes == 0:
+            return torch.zeros((tra_graph.num_nodes,det_graph.num_nodes),dtype=torch.float32)
+        else:
+            tra_node_feats = tra_graph.node_feats
         #---------------------------------#
         # Optimal transport
         # > Reference: https://github.com/magicleap/SuperGluePretrainedNetwork

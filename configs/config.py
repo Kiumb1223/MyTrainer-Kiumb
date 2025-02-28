@@ -70,17 +70,7 @@ def get_config():
         #  4. TrackManager related
         #---------------------------------#
         PATH_TO_WEIGHTS   = r'model_weights\cur-exp\fastreid\fastreid2+graphConv-woloop+Msg+Dynamic-smooth+Fuse13.pth',
-        FUSION_METHOD     = 'DFF', # options DFF CWFF EMAFF  CA-EMA
-        EMA_LAMBDA        = 0.9,
-        MIN_DET_CONF      = 0.2,
-        FIRST_MATCH_THRESH  = 0.05, # DEFAULT 0.05
-        SECOND_MATCH_THRESH = 0.1,
-        THIRD_MATCH_THRESH  = 0.1,
-        Det2Tra_CONF      = 0.7,
-        CNT_TO_ACTIVE     = 1,
-        CNT_TO_SLEEP      = 1,
-        MAX_CNT_TO_DEAD   = 30,  # Maximum age for tracking an object
-        FEATURE_LIST_SIZE = 10,
+        PATH_TO_TRACKING_CFG = r'configs\tracking_config.yaml',
 
         #---------------------------------#
         # 5. Evalution related

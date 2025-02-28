@@ -1064,6 +1064,7 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 |                    k-8 \|\| wo-Final-Act                     | 46.57 | 50.84 | 42.80 | 54.26 | 44.77 | 68.85 | 60.12 | 82.00 |
 |                     k-12 \|\| Final-Act                      | 47.02 | 50.82 | 43.66 | 54.85 | 45.27 | 69.57 | 60.13 | 81.95 |
 |                    k-12 \|\| wo-Final-Act                    | 46.63 | 50.59 | 43.15 | 54.59 | 45.05 | 69.25 | 59.87 | 81.97 |
+|                                                              |       |       |       |       |       |       |       |       |
 |                   Fast Reid(2) + LayerNorm                   | 47.41 | 50.78 | 44.42 | 55.56 | 45.86 | 70.45 | 60.28 | 82.00 |
 |         Fast Reid(2) +LayerNorm  + GraphConv-woloop          | 47.51 | 50.86 | 44.54 | 56.40 | 46.54 | 71.56 | 60.27 | 82.00 |
 |          Fast Reid(2) +LayerNorm  + SwapConv-woloop          | 47.19 | 50.79 | 43.99 | 55.60 | 45.90 | 70.51 | 60.26 | 81.95 |

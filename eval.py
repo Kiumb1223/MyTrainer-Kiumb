@@ -30,10 +30,7 @@ def main():
 
     cfg   = get_config()
     model = GraphModel(cfg.MODEL_YAML_PATH)
-    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,
-                cfg.FUSION_METHOD,cfg.EMA_LAMBDA,
-                cfg.RESIZE_TO_CNN,cfg.FIRST_MATCH_THRESH,cfg.SECOND_MATCH_THRESH,cfg.THIRD_MATCH_THRESH,cfg.Det2Tra_CONF,
-                cfg.CNT_TO_ACTIVE,cfg.CNT_TO_SLEEP,cfg.MAX_CNT_TO_DEAD,cfg.FEATURE_LIST_SIZE)
+    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,cfg.PATH_TO_TRACKING_CFG)
     
     with open(cfg.JSON_PATH,'r') as f:
         data_json = json.load(f)

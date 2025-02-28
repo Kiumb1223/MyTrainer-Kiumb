@@ -81,36 +81,34 @@ def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
             ]).to(x.device).to(torch.long)
 
 
-def hungarian(affinity_mtx: np.ndarray,match_thresh: float=0.1,is_iou_match:bool=False):
+def hungarian(input_mtx: np.ndarray,match_thresh: float=0.1):
     r"""
     Solve optimal LAP permutation by hungarian algorithm. The time cost is :math:`O(n^3)`.
 
-    :param affinity_mtx: size - :math:`( n_tra \times n_det )`
+    :param input_mtx: size - :math:`( n_tra \times n_det )`
     :param match_thresh: threshold for valid match
-    :param is_iou_match: flag to switch between affinity and IOU-based matching
-
     :return  match_mtx: size - :math:`( n_tra \times n_det )`, match matrix
     :return  match_idx: size - :math:`( 2 \times n_match )`, match index
     :return  unmatch_tra: size - :math:`( n_unmatch_tra )`, unmatched trajectory index
     :return  unmatch_det: size - :math:`( n_unmatch_det )`, unmatched detection index
     """
-    if affinity_mtx.size == 0 : # frame_idx == 1 
-        return np.array([]),[],list(range(affinity_mtx.shape[0])),list(range(affinity_mtx.shape[1]))
+    if input_mtx.size == 0 : # frame_idx == 1 
+        return np.array([]),[],list(range(input_mtx.shape[0])),list(range(input_mtx.shape[1]))
     
-    num_rows , num_cols = affinity_mtx.shape
+    num_rows , num_cols = input_mtx.shape
 
     all_rows = np.arange(num_rows)
     all_cols = np.arange(num_cols)
-    hungarian_mtx = np.zeros_like(affinity_mtx)
+    hungarian_mtx = np.zeros_like(input_mtx)
 
-    cost_mtx = 1 - affinity_mtx
+    cost_mtx = 1 - input_mtx
     
     row, col = opt.linear_sum_assignment(cost_mtx)
     
     hungarian_mtx[row, col] = 1
     valid_mask = (
         (hungarian_mtx == 1) &
-        (affinity_mtx >= match_thresh)
+        (input_mtx >= match_thresh)
     )
     
     match_mtx   = np.where(valid_mask,hungarian_mtx,0)

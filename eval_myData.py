@@ -32,10 +32,7 @@ def main():
     seq_name_list  = ['2024_0909_160937']
     cfg   = get_config()
     model = GraphModel(cfg.MODEL_YAML_PATH)
-    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,
-        cfg.FUSION_METHOD,cfg.EMA_LAMBDA,
-        cfg.RESIZE_TO_CNN,cfg.MATCH_THRESH,cfg.Det2Tra_CONF,
-        cfg.CNT_TO_ACTIVE,cfg.CNT_TO_SLEEP,cfg.MAX_CNT_TO_DEAD,cfg.FEATURE_LIST_SIZE)
+    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,cfg.PATH_TO_TRACKING_CFG)
     
     #---------------------------------#
     #  prepare data 
