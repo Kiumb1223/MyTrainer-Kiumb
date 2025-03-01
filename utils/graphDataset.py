@@ -137,7 +137,12 @@ class GraphDataset(torch.utils.data.Dataset):
             if frame_idx != prev_frame_idx:
                 prev_frame_idx = frame_idx
                 im_path = os.path.join(imgs_dir, f"{frame_idx:06d}.jpg" if date_type in ['MOT17','MOT20'] else f"{frame_idx:08d}.jpg")
-                im_tensor = I.read_image(im_path).to(torch.float32) / 255.0
+                #---------------------------------#
+                #  Notation:
+                #  In fastreid, it will normalize the image value
+                #  So I choose not to normalize the image value here
+                #---------------------------------#
+                im_tensor = I.read_image(im_path).to(torch.float32) 
                 # H , W = im_tensor.shape[1:] 
             
             # if x < 0:

@@ -11,8 +11,7 @@ import yaml
 import torch
 import numpy as np
 from loguru import logger
-from typing import Tuple,List
-import torch.nn.functional as F
+from typing import Union,List
 from enum import Enum,unique,auto
 from torch_geometric.data import Data
 from models.graphModel import GraphModel
@@ -36,7 +35,7 @@ class Tracker:
 
     def __init__(self,
             start_frame:int,
-            appearance_feat:torch.Tensor,
+            app_feat:torch.Tensor,
             node_feat:torch.Tensor,
             conf:float,
             geometric_info:list,
@@ -59,20 +58,21 @@ class Tracker:
 
         self.conf = conf
         # self.tlwh = tlwh # (top left x, top left y, width, height)
-        self.geometric_info = geometric_info
+        self.geometric_info  = geometric_info
+
+        self.app_feats_list  = []
         self.node_feats_list = []
-        self.appearance_feats_list = []
+        self.app_feats_list.append(app_feat) 
         self.node_feats_list.append(node_feat) 
-        self.appearance_feats_list.append(appearance_feat) 
         
         self._cnt_to_active     = cnt_to_active
         self._cnt_to_sleep      = cnt_to_sleep
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
-    def to_active(self,frame_idx,appearance_feat,node_feat,conf,geometric_info):
+    def to_active(self,frame_idx,app_feat,node_feat,conf,geometric_info):
         self.bt_prev_node = True
-        assert appearance_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {appearance_feat.shape}'
+        assert app_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {app_feat.shape}'
         if self.state  == LifeSpan.Born:
             age = frame_idx - self.start_frame
             if age >= self._cnt_to_active:
@@ -92,11 +92,11 @@ class Tracker:
         self.conf = conf
         # self.tlwh = tlwh
         self.geometric_info = geometric_info
+        self.app_feats_list.append(app_feat)
         self.node_feats_list.append(node_feat) 
-        self.appearance_feats_list.append(appearance_feat)
 
-        if len(self.appearance_feats_list) > self._feature_list_size:
-            expired_feat = self.appearance_feats_list.pop(0)
+        if len(self.app_feats_list) > self._feature_list_size:
+            expired_feat = self.app_feats_list.pop(0)
             del expired_feat
         if len(self.node_feats_list) > self._feature_list_size:
             expired_feat = self.node_feats_list.pop(0)
@@ -175,10 +175,8 @@ class Tracker:
         return f"Tracker(id - {self.track_id} || from {self.start_frame} to {self.end_frame})"
 
 class TrackManager:
-    def __init__(self,model :GraphModel,device :str,path_to_weights :str, path_to_tracking_cfg :str):
+    def __init__(self,model :GraphModel,device :str,path_to_weights :str, tracking_dict :dict):
        
-        with open(path_to_tracking_cfg,'r') as f:
-            tracking_dict = yaml.load(f.read(),Loader=yaml.FullLoader)
         self.device = device
         self.model  = model.eval().to(device)
 
@@ -216,21 +214,24 @@ class TrackManager:
         '''
         output_track_list  = []
 
-        high_dets_list , second_dets_list = [] , []
-        for det in current_detections:
+        first_dets_list , second_dets_list = [] , []
+        for idx,det in enumerate(current_detections):
            # format : <top left x> <top left y> <width> <height> <conf>
             if det[4] >= self._det_conf_gate:
-                high_dets_list.append(det)
+                first_dets_list.append(det)
             else:
-                second_dets_list.append(det)
+                second_dets_list.append(idx)
         
         first_match_list , second_match_list , third_match_list = [] , [] , []
         for track in self.tracks_list:
-            if track.bt_prev_node or track.is_Active :
+            # if track.bt_prev_node or track.is_Active :
+            if track.bt_prev_node :
                 first_match_list.append(track)
+            # elif not track.bt_prev_node and track.is_Sleep:
             elif track.is_Sleep:
                 second_match_list.append(track)
-            elif not track.bt_prev_node and track.is_Born :
+            # elif not track.bt_prev_node and track.is_Born :
+            elif track.is_Born :
                 third_match_list.append(track)
 
 
@@ -238,10 +239,12 @@ class TrackManager:
         #                       First matching phase
         #------------------------------------------------------------------#
         tra_graph  = self.construct_tra_graph(first_match_list)
-        det_graph  = self.construct_det_graph(high_dets_list,img_date)
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph)
+        det_graph  = self.construct_det_graph(first_dets_list,img_date)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph,self._first_match_thresh)
         # The inputs `det_graph` & `tra_graph` are modified inside `self.model`, 
         # so their state changes after the function call.
+        det_graph.geometric_info = det_graph.geometric_info.cpu().numpy()
+
         if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
             # @BUG match_idx = [[],[]] 
             tra_idx ,det_idx = match_idx
@@ -252,82 +255,118 @@ class TrackManager:
             det_node_feats = det_graph.node_feats[det_idx]
             det_conf_list  = [current_detections[i][4] for i in det_idx]
 
-            smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list)
-            smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list)
+            smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)
+            smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
             for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
                 first_match_list[tra_id].to_active(
                     frame_idx,smooth_app_feats[i].squeeze(),smooth_node_feats[i].squeeze(),
-                    det_conf_list[i],det_graph.geometric_info[det_id].cpu().numpy()
+                    det_conf_list[i],det_graph.geometric_info[det_id]
                 )
                 if not first_match_list[tra_id].is_Born and not first_match_list[tra_id].is_Sleep:
                     output_track_list.append(first_match_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
             # first_match_list[tra_id].to_sleep()
+            first_match_list[tra_id].bt_prev_node = False
             if not first_match_list[tra_id].is_Born:
                 second_match_list.append(first_match_list[tra_id])
             else:
                 third_match_list.append(first_match_list[tra_id])
 
-        id_map , unmatched_det_list = [] , []
+        id_map , third_dets_list = [] , []
         for det_id in unmatch_det:
             id_map.append(det_id)
-            unmatched_det_list.append(high_dets_list[det_id])   # prepare for the third matching phase
+            third_dets_list.append(first_dets_list[det_id])   # prepare for the third matching phase
 
         #------------------------------------------------------------------#
         #                       Second matching phase
         #------------------------------------------------------------------#
-        if second_match_list :
-            # 发现一个问题 
-            # 不能从低置信度中寻找！
-            match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_reid_match(second_match_list,second_dets_tlbr,second_dets_app)
+        if second_match_list and second_dets_list:
+            #---------------------------------#
+            # need to encode the necessary features of dets whose confidence is relatively lower
+            #---------------------------------#
+            tmp_det_graph = self.construct_det_graph(current_detections,img_date)
+            self.model.inference(Data(num_nodes=0),tmp_det_graph)
+            second_dets_app  = tmp_det_graph.x[second_dets_list]
+            second_dets_node = tmp_det_graph.node_feats[second_dets_list]
+            second_dets_geometric_info = tmp_det_graph.geometric_info[second_dets_list].cpu().numpy()
+            second_dets_conf = current_detections[second_dets_list,4]
+            match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_reid_match(
+                    second_match_list,second_dets_geometric_info[:,:4],
+                    second_dets_app,self._second_match_thresh
+                )
+            
+            if match_idx and len(match_idx[0]) > 0 :    # matched tras and dets
+                tra_idx ,det_idx = match_idx   
+                tra_app_feats, tra_node_feats,tra_conf_list = [] , [] , []
+                for i in tra_idx:
+                    tra_app_feats.append(second_match_list[i].app_feats_list[-1])
+                    tra_node_feats.append(second_match_list[i].node_feats_list[-1])
+                    tra_conf_list.append(second_match_list[i].conf)
+                tra_app_feats  = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.float32)
+                tra_node_feats = torch.stack(tra_node_feats,dim=0).to(self.device).to(torch.float32)
 
-        
+                det_app_feats  = second_dets_app[det_idx]
+                det_node_feats = second_dets_node[det_idx]
+                det_conf_list  = second_dets_conf[det_idx].tolist()
+
+                smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)
+                smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
+                for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
+                    second_match_list[tra_id].to_active(
+                        frame_idx,smooth_app_feats[i].squeeze(),smooth_node_feats[i].squeeze(),
+                        det_conf_list[i],second_dets_geometric_info[det_id]
+                    )
+                    output_track_list.append(second_match_list[tra_id])
+            for tra_id in unmatch_tra:
+                second_match_list[tra_id].to_sleep()
+            #---------------------------------#
+            # Because of the low confidence , it is necessary to abandon the unmatched detecions
+            #---------------------------------#
+
         #------------------------------------------------------------------#
         #                       Third matching phase
         #------------------------------------------------------------------#
-        # highconf_unmatch_dets = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
-        highconf_unmatch_x    = det_graph.x[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf]
-        highconf_unmatch_dets_conf = current_detections[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf][:,4].tolist()
-        highconf_unmatch_dets_geometric_info = det_graph.geometric_info[unmatch_det][current_detections[unmatch_det,4] >= self._det2tra_conf].cpu().numpy()
-        # highconf_to_global_det_idx = [ unmatch_det[i] for i in range(len(highconf_unmatch_dets)) ] 
+        third_dets_app  = det_graph.x[id_map]
+        third_dets_node = det_graph.node_feats[id_map]
+        third_dets_geometric_info = det_graph.geometric_info[id_map]
 
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(third_match_list,highconf_unmatch_dets_geometric_info[:,:4])
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(third_match_list,third_dets_geometric_info[:,:4],self._third_match_thresh)
         if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
             tra_idx ,det_idx = match_idx
-            if third_match_list: # if tra_graph is not empty
-                tra_app_feats = [third_match_list[i].appearance_feats_list[-1] for i in tra_idx]
-                tra_app_feats = torch.stack(tra_app_feats,dim=0)
-                tra_conf_list = [third_match_list[i].conf for i in tra_idx]
-            else:
-                tra_app_feats = None
-                tra_conf_list = None
+            tra_app_feats,tra_node_feats,tra_conf_list = [] , [] , []
+            for i in tra_idx:
+                tra_app_feats.append(third_match_list[i].app_feats_list[-1])
+                tra_node_feats.append(second_match_list[i].node_feats_list[-1])
+                tra_conf_list.append(third_match_list[i].conf)
+            tra_app_feats = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.Tensor)
     
-            # for det_id in det_idx:
-            #     # global_id = highconf_to_global_det_idx[det_id]
-            #     det_feats.append(highconf_unmatch_x[det_id])
-            #     # det_geometric_info.append(det_graph.geometric_info[det_id].cpu().numpy())
-            det_app_feats = highconf_unmatch_x[det_idx]
-            det_conf_list = [highconf_unmatch_dets_conf[i] for i in det_idx]
-            smooth_app_feats = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list)          
+            det_app_feats  = third_dets_app[det_idx]
+            det_node_feats = third_dets_node[det_idx]
+            det_conf_list  = [third_dets_list[i][4] for i in det_idx]
 
+            smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)          
+            smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
             for i,( tra_id, det_id ) in enumerate(zip(tra_idx,det_idx)):
-                third_match_list[tra_id].to_active(frame_idx,smooth_app_feats[i].squeeze(),det_conf_list[i],highconf_unmatch_dets_geometric_info[det_id])
+                third_match_list[tra_id].to_active(
+                    frame_idx,smooth_app_feats[i].squeeze(),smooth_node_feats[i].squeeze(),
+                    det_conf_list[i],third_dets_geometric_info[det_id]
+                )
                 if not third_match_list[tra_id].is_Born:
                     output_track_list.append(third_match_list[tra_id])
         for tra_id in unmatch_tra:  # unmatched tras 
             third_match_list[tra_id].to_sleep()
         for det_id in unmatch_det:
-            # global_id = highconf_to_global_det_idx[det_id]
-            third_match_list.append(
-                Tracker(frame_idx,highconf_unmatch_x[det_id],
-                        highconf_unmatch_dets_conf[det_id],highconf_unmatch_dets_geometric_info[det_id],
-                        self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size)
-            )
+            if third_dets_list[det_id][4] >= self._det2tra_conf:
+                third_match_list.append(
+                    Tracker(
+                        frame_idx,third_dets_app[det_id],
+                        third_dets_node[det_id],third_dets_list[det_id][4],
+                        third_dets_geometric_info[det_id],
+                        self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size
+                    )
+                )
 
-
-
-
-        self.tracks_list = self.remove_dead_tracks(first_match_list + second_match_list + third_match_list)
+        self.tracks_list = self.remove_invalid_tracks(first_match_list + second_match_list + third_match_list)
         return output_track_list
 
     def construct_tra_graph(self,tracks_list:List[Tracker]) -> Data:
@@ -335,21 +374,24 @@ class TrackManager:
         if not tracks_list: # if no tracks 
             return Data(num_nodes=0)
         
-        node_feats , geometric_info = [] , []
+        x , node_feats , geometric_info = [] , [] , []
         for track in tracks_list:
+            x.append(track.app_feats_list[-1])
             node_feats.append(track.node_feats_list[-1])
             geometric_info.append(track.geometric_info)
+        x = torch.stack(x,dim=0).to(self.device)
         node_feats = torch.stack(node_feats,dim=0).to(self.device)
         geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32).to(self.device)
-        return Data(node_feats=node_feats,geometric_info=geometric_info)
+        return Data(x=x,node_feats=node_feats,geometric_info=geometric_info)
     
-    def construct_det_graph(self,high_dets_list:list,img_date:torch.Tensor) -> Data:
+    def construct_det_graph(self,dets_list :Union[list,np.ndarray],img_date:torch.Tensor) -> Data:
         '''construct raw graph of detections'''
 
         h_im,w_im  = img_date.shape[1:]
-        raw_node_attr , geometric_info = [] , []
-        img_date   = img_date.to(self.device).to(torch.float32) / 255.0
-        for det in high_dets_list:
+        img_date   = img_date.to(self.device).to(torch.float32)
+        
+        raw_x , geometric_info = [] , []
+        for det in dets_list:
             x,y,w,h = det[:4]
             w , h   = min(w, w+x)   , min(h,h+y)
             x , y   = max(x ,0)     , max(y,0)
@@ -359,38 +401,45 @@ class TrackManager:
 
             patch = T.crop(img_date,int(y),int(x),int(h),int(w))
             patch = T.resize(patch,self._resize_to_cnn)
-            raw_node_attr.append(patch)
+            raw_x.append(patch)
             geometric_info.append([x,y,x2,y2,w,h,xc,yc,w_im,h_im])  # STORE x,y,x2,y2,w,h,xc,yc, W,H
-        raw_node_attr  = torch.stack(raw_node_attr,dim=0).to(self.device)
+        raw_x = torch.stack(raw_x,dim=0).to(self.device)
         geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32).to(self.device)
-        return Data(x=raw_node_attr,geometric_info=geometric_info)
+        return Data(x=raw_x,geometric_info=geometric_info)
 
-    def _graph_match(self,tra_graph:Data,det_graph:Data):
+    def _graph_match(self,tra_graph:Data,det_graph:Data,match_thresh:float):
         ''' first phase to match via graph model'''
         pred_mtx = self.model.inference(tra_graph.to(self.device),det_graph.to(self.device))
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx.cpu().numpy(),self._first_match_thresh)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(pred_mtx.cpu().numpy(),match_thresh)
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
-    def _iou_reid_match(self,tracks_list:list,dets_tlbr,dets_app_feats:torch.Tensor):
+    def _iou_reid_match(self,tracks_list:list,dets_tlbr,dets_app_feats:torch.Tensor,match_thresh:float):
         ''' second phase to match via IOU and Cosine Distance'''
         
+        num_tras , num_dets = len(tracks_list) , len(dets_tlbr)
+
         tras_tlbr , tras_app_feats = [] ,[]
         for track in tracks_list:
             tras_tlbr.append(track.tlbr)
-            tras_app_feats.append(track.node_feats_list[-1])
+            tras_app_feats.append(track.app_feats_list[-1])
 
         tras_tlbr = np.vstack(tras_tlbr).astype(np.float32)
-        tras_app_feats = tras_app_feats.to(dets_app_feats)
+        tras_app_feats = torch.stack(tras_app_feats,dim=0).to(dets_app_feats)
 
         iou = box_iou(tras_tlbr,dets_tlbr)
-        cos = F.cosine_similarity(tras_app_feats,dets_app_feats).cpu().numpy()
+        
+        n1   = torch.norm(tras_app_feats,dim=-1,keepdim=True)
+        n2   = torch.norm(dets_app_feats,dim=-1,keepdim=True)
+        corr = (torch.mm(tras_app_feats,dets_app_feats.T) / torch.mm(n1,n2.T)).cpu().numpy()
+        # cos = F.cosine_similarity(tras_app_feats,dets_app_feats).reshape(num_tras,num_dets).cpu().numpy()
 
-        affinity_mtx = self._second_match_lambda * cos + (1-self._second_match_lambda) * iou
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(affinity_mtx,self._second_match_thresh)
+        # affinity_mtx = self._second_match_lambda * corr + (1-self._second_match_lambda) * iou
+        affinity_mtx =  iou
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(affinity_mtx,match_thresh)
 
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
-    def _iou_match(self,tracks_list,highconf_unmatch_dets_tlbr:np.ndarray):      
+    def _iou_match(self,tracks_list,highconf_unmatch_dets_tlbr:np.ndarray,match_thresh:float):      
         ''' third phase to match via IOU'''
         if tracks_list == []:
             tras_tlbr = np.array([])
@@ -400,21 +449,25 @@ class TrackManager:
             ]).astype(np.float32)
 
         iou  = box_iou(tras_tlbr,highconf_unmatch_dets_tlbr)
-        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(iou,self._third_match_thresh)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = hungarian(iou,match_thresh)
 
         return match_mtx,match_idx,unmatch_tra,unmatch_det
 
-    def smooth_feature(self,prev_feats :torch.Tensor,cur_feats :torch.Tensor,prev_conf_list:list,cur_conf_list:list) -> torch.Tensor:
+    def smooth_feature(self,
+                prev_feats :torch.Tensor,cur_feats :torch.Tensor,
+                prev_conf_list:list,cur_conf_list:list,
+                fusion_method:str='DFF'
+        ) -> torch.Tensor:
 
-        if self.fusion_method == 'DFF' or prev_feats is None: # Direct Feature Fusion OR EMPTY TRAGRAPH
+        if   fusion_method == 'DFF' or not prev_feats.numel(): # Direct Feature Fusion OR EMPTY TRAGRAPH
             return  cur_feats.split(1,0)
-        elif self.fusion_method == 'CWFF': # Confidence-weight Feature Fusion
+        elif fusion_method == 'CWFF': # Confidence-weight Feature Fusion
             prev_conf_tensor = torch.as_tensor(prev_conf_list).unsqueeze(1).to(prev_feats)
             cur_conf_tensor  = torch.as_tensor(cur_conf_list).unsqueeze(1).to(prev_feats)
             smooth_feature   = ( prev_conf_tensor * prev_feats + cur_conf_tensor * cur_feats ) / (prev_conf_tensor + cur_conf_tensor)
-        elif self.fusion_method == 'EMAFF': # Expositential Moving Average Feature Fusion
+        elif fusion_method == 'EMAFF': # Expositential Moving Average Feature Fusion
             smooth_feature = (1 - self.EMA_lambda) * prev_feats + self.EMA_lambda * cur_feats
-        elif self.fusion_method == 'CA-EMA':
+        elif fusion_method == 'CA-EMA':
             prev_conf_tensor = torch.as_tensor(prev_conf_list).unsqueeze(1).to(prev_feats)
             cur_conf_tensor  = torch.as_tensor(cur_conf_list).unsqueeze(1).to(prev_feats)
             CA_lambda = cur_conf_tensor / (prev_conf_tensor + cur_conf_tensor)
@@ -426,9 +479,19 @@ class TrackManager:
         # return F.normalize(smooth_feature,dim=1).split(1,0)
         return smooth_feature.split(1,0)
         
-    def remove_dead_tracks(self,tracks_list):
-        """Remove all trackers whose state is Dead"""
-        return [track for track in tracks_list if not track.is_Dead]
+    def remove_invalid_tracks(self,tracks_list):
+        """Remove all trackers whose state is Dead and maintain the uniqueness of id """
+        id_list = []
+        new_tracks_list = []
+        for track in tracks_list:
+            if track.is_Dead:
+                continue
+            elif track.is_Born:
+                new_tracks_list.append(track)
+            elif track.track_id not in id_list:
+                id_list.append(track.track_id)
+                new_tracks_list.append(track)
+        return new_tracks_list
 
     def clean_cache(self):
         '''clean cache of all tracks'''

@@ -10,6 +10,7 @@ import os
 import cv2
 import sys
 import time
+import yaml
 import datetime
 import numpy as np
 from tqdm import tqdm
@@ -31,8 +32,10 @@ def main():
     test_root_dir  = 'testVideo'
     seq_name_list  = ['2024_0909_160937']
     cfg   = get_config()
+    with open(cfg.PATH_TO_TRACKING_CFG,'r') as f:
+        tracking_dict = yaml.load(f.read(),Loader=yaml.FullLoader)
     model = GraphModel(cfg.MODEL_YAML_PATH)
-    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,cfg.PATH_TO_TRACKING_CFG)
+    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,tracking_dict)
     
     #---------------------------------#
     #  prepare data 
@@ -45,7 +48,8 @@ def main():
     # move_to_path   = os.path.join(data_json['Trackeval']['TRACKERS_FOLDER'],tracker_name)
 
     for cnt, seq in enumerate(seq_name_list):
-        seq_det_path  = os.path.join( test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
+        seq_det_path  = os.path.join( test_root_dir,seq,'det','det.txt')
+        # seq_det_path  = os.path.join( test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
         seq_img_dir   = os.path.join( test_root_dir,seq,'img1')
         seq_info_path = os.path.join( test_root_dir,seq,'seqinfo.ini')   
         output_txt    = os.path.join(output_dir,tracker_name,seq)
@@ -67,7 +71,7 @@ def main():
         elapsed_times = []
         for frame_id in tqdm(range(min_frame,max_frame+1),total=max_frame,desc=f'processing seq - {seq} ',unit='frame'):
             frame_det = detections[(detections[:,0] == frame_id) & 
-                                   (detections[:,6] > cfg.MIN_DET_CONF)]
+                                   (detections[:,6] > tracking_dict['MIN_DET_CONF'])]
             if frame_det.size == 0 :
                 logger.info(f"no dets in {frame_id}-th frame")
                 continue

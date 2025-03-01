@@ -204,12 +204,12 @@ class NodeEncoder(nn.Module):
             return load_ckpt_FastReid(backbone,weight_path)
 
     def forward(self, graph :Union[Data,Batch]) -> Union[Data,Batch]:
-        graph.x = T.normalize(graph.x, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
         if self.backbone_type.startswith('fastreid_'):
             self.backbone.eval()
             with torch.no_grad():
                 graph.x = self.backbone(graph.x)
         else:
+            graph.x = T.normalize(graph.x , mean=[0.485*255, 0.456*255, 0.406*255], std=[0.229*255, 0.224*255, 0.225*255]) 
             graph.x = self.backbone(graph.x)
         graph.x = self.head(graph.x)
         
@@ -592,8 +592,10 @@ class EdgeEncoder(nn.Module):
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'Max-GIOUd-Cos6':
             max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
             feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
@@ -601,56 +603,70 @@ class EdgeEncoder(nn.Module):
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
-            feat6 = F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,corr],dim =1)
         if self.edge_type == 'Tgt-GIOUd-Cosd6':
             feat1 = (source_info[:,6] - target_info[:,6]) /  target_info[:,4]
             feat2 = (source_info[:,7] - target_info[:,7]) /  target_info[:,5]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'Tgt-GIOUd-Cos6':
             feat1 = (source_info[:,6] - target_info[:,6]) /  target_info[:,4]
             feat2 = (source_info[:,7] - target_info[:,7]) /  target_info[:,5]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
-            feat6 = F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,corr],dim =1)
         if self.edge_type == 'DIOUd-Cosd6':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='diou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'Tgt-DIOUd-Cosd6':
             feat1 = (source_info[:,6] - target_info[:,6]) /  target_info[:,4]
             feat2 = (source_info[:,7] - target_info[:,7]) /  target_info[:,5]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='diou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'GIOUd-Cosd6':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='giou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'CIOUd-Cosd6':
             feat1 = 2 * (source_info[:,6] - target_info[:,6]) /  (source_info[:,5] + target_info[:,5])
             feat2 = 2 * (source_info[:,7] - target_info[:,7]) /  (source_info[:,5] + target_info[:,5])
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='ciou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'Max-CIOUd-Cosd6':
             max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
             feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
@@ -658,8 +674,10 @@ class EdgeEncoder(nn.Module):
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='ciou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'Max-CIOUd-Cos6':
             max_bbox_wh = torch.max(source_info[:, 4:6], target_info[:, 4:6])
             feat1 = (source_info[:,6] - target_info[:,6]) /  max_bbox_wh[:, 0]
@@ -667,24 +685,30 @@ class EdgeEncoder(nn.Module):
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='ciou')
-            feat6 = F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,corr],dim =1)
         if self.edge_type == 'Tgt-CIOUd-Cosd6':
             feat1 = (source_info[:,6] - target_info[:,6]) /  target_info[:,4]
             feat2 = (source_info[:,7] - target_info[:,7]) /  target_info[:,5]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='ciou')
-            feat6 = 1 - F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,1 - corr],dim =1)
         if self.edge_type == 'Tgt-CIOUd-Cos6':
             feat1 = (source_info[:,6] - target_info[:,6]) /  target_info[:,4]
             feat2 = (source_info[:,7] - target_info[:,7]) /  target_info[:,5]
             feat3 = torch.log(source_info[:,4] / (target_info[:,4]))
             feat4 = torch.log(source_info[:,5] / (target_info[:,5]))
             feat5 = 1 - calc_iouFamily(source_info,target_info,iou_type='ciou')
-            feat6 = F.cosine_similarity(source_x,target_x,dim=1)
-            return torch.stack([feat1,feat2,feat3,feat4,feat5,feat6],dim =1)
+            norm_source_x = F.normalize(source_x,p=2,dim=-1)
+            norm_target_x = F.normalize(target_x,p=2,dim=-1)
+            corr  = torch.mm(norm_source_x,norm_target_x.T)
+            return torch.stack([feat1,feat2,feat3,feat4,feat5,corr],dim =1)
         
         if self.edge_type == 'IouFamily6-convex':
             converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])

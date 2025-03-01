@@ -132,7 +132,6 @@ class GraphModel(nn.Module):
         # and returns an empty list, bypassing the rest of the forward pass.
         #---------------------------------#
         
-        assert tra_graph.x.shape != 2
         if tra_graph.num_nodes == 0:
             return torch.zeros((tra_graph.num_nodes,det_graph.num_nodes),dtype=torch.float32)
         else:

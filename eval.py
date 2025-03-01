@@ -10,6 +10,7 @@ import os
 import cv2
 import time
 import json 
+import yaml
 import shutil
 import datetime
 import numpy as np
@@ -29,8 +30,10 @@ def main():
 
 
     cfg   = get_config()
+    with open(cfg.PATH_TO_TRACKING_CFG,'r') as f:
+        tracking_dict = yaml.load(f.read(),Loader=yaml.FullLoader)
     model = GraphModel(cfg.MODEL_YAML_PATH)
-    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,cfg.PATH_TO_TRACKING_CFG)
+    trackManager = TrackManager(model,cfg.DEVICE,cfg.PATH_TO_WEIGHTS,tracking_dict)
     
     with open(cfg.JSON_PATH,'r') as f:
         data_json = json.load(f)
@@ -75,14 +78,15 @@ def main():
         elapsed_times = []
         for frame_id in tqdm(range(min_frame,max_frame+1),total=max_frame,desc=f'processing seq - {seq} ',unit='frame'):
             frame_det = detections[(detections[:,0] == frame_id) & 
-                                   (detections[:,6] > cfg.MIN_DET_CONF)]
+                                   (detections[:,6] > tracking_dict['MIN_DET_CONF'])]
             if frame_det.size == 0 :
                 logger.info(f"no dets in {frame_id}-th frame")
                 continue
             start = time.perf_counter()
             img_data  = I.read_image(os.path.join(seq_img_dir,f'{frame_id:06d}.jpg'))
             img_cv    = img_data.clone().permute(1,2,0).numpy()[...,::-1].astype(np.uint8)
-            
+            # if frame_id == 42:
+            #     print('here')
             trackers_list = trackManager.update(frame_id,frame_det[:,2:],img_data) # need to be careful with the input format
             
             end = time.perf_counter()
