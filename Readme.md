@@ -1073,6 +1073,20 @@ Inspired by the conclusion and conjecture in [Sec 4.7](#sec4.7), I wanna conduct
 |          Fast Reid(2) +LayerNorm  + SwapConv-woloop          | 47.19 | 50.79 | 43.99 | 55.60 | 45.90 | 70.51 | 60.26 | 81.95 |
 | Fast Reid(2) + DIOUd-Cosd6  +LayerNorm + GraphConv-woloop + bigger | 46.54 | 50.80 | 42.81 | 54.59 | 45.05 | 69.26 | 60.12 | 82.03 |
 
+
+
+| Conditions +[Mask-50] | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|    New Vanilla one    | 44.40 | 50.66 | 39.11 | 50.57 | 41.75 | 64.12 | 59.17 | 81.95 |
+|         K - 4         | 45.02 | 51.36 | 39.60 | 52.04 | 43.29 | 65.22 | 60.66 | 81.82 |
+|        K - 12         | 45.41 | 51.38 | 40.25 | 53.50 | 44.49 | 67.08 | 60.66 | 81.83 |
+|     K-12 + woloop     | 46.37 | 51.36 | 42.01 | 54.87 | 45.65 | 68.77 | 60.54 | 81.81 |
+|                       |       |       |       |       |       |       |       |       |
+| K - 12 [My computer]  | 45.91 | 51.00 | 41.45 | 53.88 | 44.50 | 68.28 | 60.17 | 81.90 |
+|                       |       |       |       |       |       |       |       |       |
+
+
+
 ### 4.11 After Larger Dataset [:tada:]
 
 One of the core and useful experience or intuition in the era of deep learning is that `if you have a large big dataset and you train a very big neural network, then success is guaranted` (quoted from [llya`s speech at NeurlPS conference in 2024](https://www.bilibili.com/video/BV1cSBGYkE9w/?spm_id_from=333.337.search-card.all.click&vd_source=812705912b7abe259d54d8593a97a8b3)) , like CLIP model trained in 400 million dataset.

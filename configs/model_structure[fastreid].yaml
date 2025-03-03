@@ -48,7 +48,7 @@ edge_encoder:
   lrelu_slope: 0.0
   # static graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
 
 
@@ -125,7 +125,7 @@ static_graph_conv:
 dynamic_graph_conv:
   # dynamic graph construction settings
   bt_cosine: False 
-  bt_self_loop: True
+  bt_self_loop: False
   bt_directed: True
   # module layer settings 
   layers_num: 2
@@ -160,3 +160,13 @@ fuse_model:
   norm_type: 'graphNorm'
   activate_func: 'lrelu'
   lrelu_slope: 0.2
+
+#---------------------------------#
+affinity_model:
+  # [in_dim , mid_dim, out_dim]
+  dims_list: [3,1]
+  layer_type: 'linear'
+  layer_bias: False
+  norm_type: 'None'
+  activate_func: 'relu'
+  lrelu_slope: 0

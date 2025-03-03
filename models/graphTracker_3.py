@@ -70,7 +70,12 @@ class Tracker:
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
-    def to_active(self,frame_idx,app_feat,node_feat,conf,geometric_info):
+    def update_node(self,node_feat):
+        self.node_feats_list.append(node_feat)
+        if len(self.node_feats_list) > self._feature_list_size:
+            expired_feat = self.node_feats_list.pop(0)
+            del expired_feat
+    def to_active(self,frame_idx,app_feat,conf,geometric_info):
         self.bt_prev_node = True
         assert app_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {app_feat.shape}'
         if self.state  == LifeSpan.Born:
@@ -93,15 +98,14 @@ class Tracker:
         # self.tlwh = tlwh
         self.geometric_info = geometric_info
         self.app_feats_list.append(app_feat)
-        self.node_feats_list.append(node_feat) 
+        # self.node_feats_list.append(node_feat) 
 
         if len(self.app_feats_list) > self._feature_list_size:
             expired_feat = self.app_feats_list.pop(0)
             del expired_feat
-        if len(self.node_feats_list) > self._feature_list_size:
-            expired_feat = self.node_feats_list.pop(0)
-            del expired_feat
-
+        # if len(self.node_feats_list) > self._feature_list_size:
+        #     expired_feat = self.node_feats_list.pop(0)
+        #     del expired_feat
     def to_sleep(self):  
         self.bt_prev_node = False
         if self.state == LifeSpan.Born:
@@ -122,6 +126,11 @@ class Tracker:
     def end_frame(self) -> int:
         '''Returns the frame_idx of the object'''
         return self.frame_idx
+    
+    @property
+    def age(self) -> int:
+        '''Returns the age of the object'''
+        return self.frame_idx - self.start_frame
 
     @property
     def is_Born(self) -> bool:
@@ -208,38 +217,38 @@ class TrackManager:
         else:
             logger.info(f"No weights loaded, use default weights")
     @torch.no_grad()
-    def update(self,frame_idx:int,current_detections:np.ndarray,img_date:torch.Tensor) -> List[Tracker]:
+    def update(self,cur_frame:int,current_detections:np.ndarray,img_date:torch.Tensor) -> List[Tracker]:
         '''
         current_detections =np.ndarray(tlwh,conf)  and have already filtered by conf > 0.1 
         '''
-        output_track_list  = []
+        output_track_list = []
 
         first_dets_list , second_dets_list = [] , []
         for idx,det in enumerate(current_detections):
            # format : <top left x> <top left y> <width> <height> <conf>
             if det[4] >= self._det_conf_gate:
-                first_dets_list.append(det)
+                first_dets_list.append(idx)
             else:
                 second_dets_list.append(idx)
         
-        first_match_list , second_match_list , third_match_list = [] , [] , []
+        first_tras_list , second_tras_list , third_tras_list = [] , [] , []
         for track in self.tracks_list:
-            # if track.bt_prev_node or track.is_Active :
-            if track.bt_prev_node :
-                first_match_list.append(track)
-            # elif not track.bt_prev_node and track.is_Sleep:
-            elif track.is_Sleep:
-                second_match_list.append(track)
-            # elif not track.bt_prev_node and track.is_Born :
-            elif track.is_Born :
-                third_match_list.append(track)
+            if track.bt_prev_node or track.is_Active :
+            # if track.bt_prev_node :
+                first_tras_list.append(track)
+            elif not track.bt_prev_node and track.is_Sleep:
+            # elif track.is_Sleep:
+                second_tras_list.append(track)
+            elif not track.bt_prev_node and track.is_Born :
+            # elif track.is_Born :
+                third_tras_list.append(track)
 
 
         #------------------------------------------------------------------#
         #                       First matching phase
         #------------------------------------------------------------------#
-        tra_graph  = self.construct_tra_graph(first_match_list)
-        det_graph  = self.construct_det_graph(first_dets_list,img_date)
+        tra_graph  = self.construct_tra_graph(first_tras_list)
+        det_graph  = self.construct_det_graph(current_detections[first_dets_list],img_date)
         match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph,self._first_match_thresh)
         # The inputs `det_graph` & `tra_graph` are modified inside `self.model`, 
         # so their state changes after the function call.
@@ -249,28 +258,28 @@ class TrackManager:
             # @BUG match_idx = [[],[]] 
             tra_idx ,det_idx = match_idx
             tra_app_feats  = tra_graph.x[tra_idx]
-            tra_node_feats = tra_graph.node_feats[tra_idx]
-            tra_conf_list  = [first_match_list[i].conf for i in tra_idx]
+            # tra_node_feats = tra_graph.node_feats[tra_idx]
+            tra_conf_list  = [first_tras_list[i].conf for i in tra_idx]
             det_app_feats  = det_graph.x[det_idx]
-            det_node_feats = det_graph.node_feats[det_idx]
-            det_conf_list  = [current_detections[i][4] for i in det_idx]
+            # det_node_feats = det_graph.node_feats[det_idx]
+            det_conf_list  = [current_detections[first_dets_list[i]][4] for i in det_idx]
 
             smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)
-            smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
+            # smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
             for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
-                first_match_list[tra_id].to_active(
-                    frame_idx,smooth_app_feats[i].squeeze(),smooth_node_feats[i].squeeze(),
+                first_tras_list[tra_id].to_active(
+                    cur_frame,smooth_app_feats[i].squeeze(),
                     det_conf_list[i],det_graph.geometric_info[det_id]
                 )
-                if not first_match_list[tra_id].is_Born and not first_match_list[tra_id].is_Sleep:
-                    output_track_list.append(first_match_list[tra_id])        
+                if not first_tras_list[tra_id].is_Born and not first_tras_list[tra_id].is_Sleep:
+                    output_track_list.append(first_tras_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
             # first_match_list[tra_id].to_sleep()
-            first_match_list[tra_id].bt_prev_node = False
-            if not first_match_list[tra_id].is_Born:
-                second_match_list.append(first_match_list[tra_id])
+            first_tras_list[tra_id].bt_prev_node = False
+            if not first_tras_list[tra_id].is_Born:
+                second_tras_list.append(first_tras_list[tra_id])
             else:
-                third_match_list.append(first_match_list[tra_id])
+                third_tras_list.append(first_tras_list[tra_id])
 
         id_map , third_dets_list = [] , []
         for det_id in unmatch_det:
@@ -280,52 +289,47 @@ class TrackManager:
         #------------------------------------------------------------------#
         #                       Second matching phase
         #------------------------------------------------------------------#
-        if second_match_list :
+        if second_tras_list :
             if second_dets_list:
                 #---------------------------------#
                 # need to encode the necessary features of dets whose confidence is relatively lower
                 #---------------------------------#
-                tmp_det_graph = self.construct_det_graph(current_detections,img_date)
-                self.model.inference(Data(num_nodes=0),tmp_det_graph)
-                second_dets_app  = tmp_det_graph.x[second_dets_list]
-                second_dets_node = tmp_det_graph.node_feats[second_dets_list]
-                second_dets_geometric_info = tmp_det_graph.geometric_info[second_dets_list].cpu().numpy()
+                tmp_det_graph = self.construct_det_graph(current_detections[second_dets_list],img_date)
+                self.model.gen_appFeats(tmp_det_graph)
+                # second_dets_node = tmp_det_graph.node_feats[second_dets_list]
+                tmp_det_graph.geometric_info = tmp_det_graph.geometric_info.cpu().numpy()
                 second_dets_conf = current_detections[second_dets_list,4]
                 match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_reid_match(
-                        second_match_list,second_dets_geometric_info[:,:4],
-                        second_dets_app,self._second_match_thresh
+                        second_tras_list,tmp_det_graph.geometric_info[:,:4],
+                        tmp_det_graph.x,self._second_match_thresh
                     )
                 
                 if match_idx and len(match_idx[0]) > 0 :    # matched tras and dets
                     tra_idx ,det_idx = match_idx   
-                    tra_app_feats, tra_node_feats,tra_conf_list = [] , [] , []
+                    tra_app_feats,tra_conf_list = [] , []
                     for i in tra_idx:
-                        tra_app_feats.append(second_match_list[i].app_feats_list[-1])
-                        tra_node_feats.append(second_match_list[i].node_feats_list[-1])
-                        tra_conf_list.append(second_match_list[i].conf)
+                        tra_app_feats.append(second_tras_list[i].app_feats_list[-1])
+                        tra_conf_list.append(second_tras_list[i].conf)
                     tra_app_feats  = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.float32)
-                    tra_node_feats = torch.stack(tra_node_feats,dim=0).to(self.device).to(torch.float32)
 
-                    det_app_feats  = second_dets_app[det_idx]
-                    det_node_feats = second_dets_node[det_idx]
+                    det_app_feats  = tmp_det_graph.x[det_idx]
                     det_conf_list  = second_dets_conf[det_idx].tolist()
 
                     smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)
-                    smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
                     for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
-                        second_match_list[tra_id].to_active(
-                            frame_idx,smooth_app_feats[i].squeeze(),smooth_node_feats[i].squeeze(),
-                            det_conf_list[i],second_dets_geometric_info[det_id]
+                        second_tras_list[tra_id].to_active(
+                            cur_frame,smooth_app_feats[i].squeeze(),
+                            det_conf_list[i],tmp_det_graph.geometric_info[det_id]
                         )
-                        output_track_list.append(second_match_list[tra_id])
+                        output_track_list.append(second_tras_list[tra_id])
                 for tra_id in unmatch_tra:
-                    second_match_list[tra_id].to_sleep()
+                    second_tras_list[tra_id].to_sleep()
                 #---------------------------------#
                 # Because of the low confidence , it is necessary to abandon the unmatched detecions
                 #---------------------------------#
             else:
-                for tra_id in range(len(second_match_list)):
-                    second_match_list[tra_id].to_sleep()
+                for tra_id in range(len(second_tras_list)):
+                    second_tras_list[tra_id].to_sleep()
         #------------------------------------------------------------------#
         #                       Third matching phase
         #------------------------------------------------------------------#
@@ -333,44 +337,60 @@ class TrackManager:
         third_dets_node = det_graph.node_feats[id_map]
         third_dets_geometric_info = det_graph.geometric_info[id_map]
 
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(third_match_list,third_dets_geometric_info[:,:4],self._third_match_thresh)
+        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(third_tras_list,third_dets_geometric_info[:,:4],self._third_match_thresh)
         if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
             tra_idx ,det_idx = match_idx
-            tra_app_feats,tra_node_feats,tra_conf_list = [] , [] , []
+            tra_app_feats,tra_conf_list = [] , []
             for i in tra_idx:
-                tra_app_feats.append(third_match_list[i].app_feats_list[-1])
-                tra_node_feats.append(third_match_list[i].node_feats_list[-1])
-                tra_conf_list.append(third_match_list[i].conf)
+                tra_app_feats.append(third_tras_list[i].app_feats_list[-1])
+                tra_conf_list.append(third_tras_list[i].conf)
             tra_app_feats  = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.float32)
-            tra_node_feats = torch.stack(tra_node_feats,dim=0).to(self.device).to(torch.float32)
             
             det_app_feats  = third_dets_app[det_idx]
-            det_node_feats = third_dets_node[det_idx]
-            det_conf_list  = [third_dets_list[i][4] for i in det_idx]
+            det_conf_list  = [current_detections[third_dets_list[i]][4] for i in det_idx]
 
             smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)          
-            smooth_node_feats = self.smooth_feature(tra_node_feats,det_node_feats,tra_conf_list,det_conf_list,self.fusion_method)
             for i,( tra_id, det_id ) in enumerate(zip(tra_idx,det_idx)):
-                third_match_list[tra_id].to_active(
-                    frame_idx,smooth_app_feats[i].squeeze(),smooth_node_feats[i].squeeze(),
+                third_tras_list[tra_id].to_active(
+                    cur_frame,smooth_app_feats[i].squeeze(),
                     det_conf_list[i],third_dets_geometric_info[det_id]
                 )
-                if not third_match_list[tra_id].is_Born:
-                    output_track_list.append(third_match_list[tra_id])
+                if not third_tras_list[tra_id].is_Born:
+                    output_track_list.append(third_tras_list[tra_id])
         for tra_id in unmatch_tra:  # unmatched tras 
-            third_match_list[tra_id].to_sleep()
+            third_tras_list[tra_id].to_sleep()
         for det_id in unmatch_det:
-            if third_dets_list[det_id][4] >= self._det2tra_conf:
-                third_match_list.append(
+            if current_detections[third_dets_list[det_id]][4] >= self._det2tra_conf:
+                third_tras_list.append(
                     Tracker(
-                        frame_idx,third_dets_app[det_id],
-                        third_dets_node[det_id],third_dets_list[det_id][4],
+                        cur_frame,third_dets_app[det_id],
+                        third_dets_node[det_id],current_detections[third_dets_list[det_id]][4],
                         third_dets_geometric_info[det_id],
                         self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size
                     )
                 )
 
-        self.tracks_list = self.remove_invalid_tracks(first_match_list + second_match_list + third_match_list)
+        #------------------------------------------------------------------#
+        #                   Remove invalid tracks
+        #------------------------------------------------------------------#
+        self.tracks_list = self.remove_invalid_tracks(first_tras_list + second_tras_list + third_tras_list)
+
+        #------------------------------------------------------------------#
+        #                   Update NODE feats
+        #------------------------------------------------------------------#
+        if output_track_list:
+            tmp_tra_graph  = self.construct_tra_graph(output_track_list)
+            tra_node_feats = self.model.gen_nodeFeats(tmp_tra_graph)
+            for idx,track in enumerate(output_track_list):
+                new_node_feats = tra_node_feats[idx]
+
+                if track.age > self._max_cnt_to_dead / 2:
+                    # when the track is too old, the node feats will be directly updated
+                    track.update_node(new_node_feats)
+                else:
+                    smooth_feats = self.smooth_feature(track.node_feats_list[-1],new_node_feats,None,None,'EMAFF')
+                    track.update_node(smooth_feats)
+            
         return output_track_list
 
     def construct_tra_graph(self,tracks_list:List[Tracker]) -> Data:
@@ -388,7 +408,8 @@ class TrackManager:
         geometric_info = torch.as_tensor(geometric_info,dtype=torch.float32).to(self.device)
         return Data(x=x,node_feats=node_feats,geometric_info=geometric_info)
     
-    def construct_det_graph(self,dets_list :Union[list,np.ndarray],img_date:torch.Tensor) -> Data:
+    
+    def construct_det_graph(self,dets_list :np.ndarray ,img_date:torch.Tensor) -> Data:
         '''construct raw graph of detections'''
 
         h_im,w_im  = img_date.shape[1:]
@@ -481,7 +502,10 @@ class TrackManager:
             smooth_feature = (1 - CA_lambda) * prev_feats + CA_lambda * cur_feats
             
         # return F.normalize(smooth_feature,dim=1).split(1,0)
-        return smooth_feature.split(1,0)
+        if smooth_feature.dim() == 2:
+            return smooth_feature.split(1,0)
+        elif smooth_feature.dim() == 1:
+            return smooth_feature
         
     def remove_invalid_tracks(self,tracks_list):
         """Remove all trackers whose state is Dead and maintain the uniqueness of id """

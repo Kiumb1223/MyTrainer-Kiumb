@@ -69,7 +69,7 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\Exp_2025\VanilaModel[wo-Final].pth',
+        PATH_TO_WEIGHTS   = r'model_weights\Exp_2025\K\k-12+woloop+AffinityLayer.pth',
         PATH_TO_TRACKING_CFG = r'configs\tracking_config.yaml',
 
         #---------------------------------#

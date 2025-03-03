@@ -4,11 +4,10 @@
 import torch
 import numpy as np
 from typing import Tuple
-from loguru import logger
 import scipy.optimize as opt
 import torch.nn.functional as F
 
-__all__ = ['knn','hungarian','box_iou','box_ciou','sinkhorn_unrolled','Sinkhorn','compute_f1_score']
+__all__ = ['knn','hungarian','calc_cosineSim','box_iou','calc_iou','calc_iouFamily','sinkhorn_unrolled','Sinkhorn','compute_f1_score']
 
 
 def knn(x: torch.tensor, k: int, bt_cosine: bool=False,
@@ -123,7 +122,7 @@ def hungarian(input_mtx: np.ndarray,match_thresh: float=0.1):
 
 
 def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
-    ''' Return intersection-over-union (Jaccard index) of boxes.
+    ''' [Support np.ndarray type data]Return intersection-over-union (Jaccard index) of boxes.
      
     Args:
         boxes1 (np.ndarray): shape (n1, 4)  || (min x, min y, max x, max y)  
@@ -152,8 +151,52 @@ def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
 
     return iou
 
+def calc_cosineSim(tra_feats :torch.Tensor,det_feats:torch.Tensor) -> torch.Tensor:
+    '''
+    
+    Args:
+        tra_feats (torch.Tensor): Tensor of shape [M, C], representing the first set of features.
+        det_feats (torch.Tensor): Tensor of shape [N, C], representing the second set of features.
+    Returns:
+        cosineSim (torch.Tensor): Tensor of shape [M, N], representing the cosine similarity between each pair of features.
+    '''
+    tra_feats_norm = F.normalize(tra_feats,p=2,dim=1)
+    det_feats_norm = F.normalize(det_feats,p=2,dim=1)
+    cosineSim = torch.matmul(tra_feats_norm, det_feats_norm.T)
+    return cosineSim
+def calc_iou(tra_box :torch.Tensor,det_box:torch.Tensor,iou_type:str='iou',eps = 1e-8) -> torch.Tensor:
+    ''' Only support tensor type data 
+    Args:
+        tra_box (torch.Tensor): Tensor of shape [M, 4], representing the first set of bounding boxes.
+            Each box is represented by the following elements:
+            [x_min, y_min, x_max, y_max].
+        det_box (torch.Tensor): Tensor of shape [N, 4], representing the second set of bounding boxes.
+            Each box is represented by the same elements as `tra_box`.
+        iou_type (str, optional): The type of IoU to calculate. Optionals: 'iou' , 'Hiou'.
+    Returns:
+        iou (torch.Tensor): Tensor of shape [M, N], representing the IoU between each pair of boxes.
+    '''
+    iou_type = iou_type.lower()
+    assert iou_type in ['iou','hiou'] , "iou_type must be 'iou' or 'hiou'"
 
+    tra_area  = ((tra_box[..., 2] - tra_box[..., 0]) * (tra_box[..., 3] - tra_box[..., 1])).unsqueeze(-1)
+    det_area  = ((det_box[..., 2] - det_box[..., 0]) * (det_box[..., 3] - det_box[..., 1])).unsqueeze(0)
 
+    lt = torch.max(tra_box[:,None,:2],det_box[None,:,:2])
+    rb = torch.min(tra_box[:,None,2:],det_box[None,:,2:])
+    inter_wh = torch.clamp(rb-lt,min=0)
+    inter_area = inter_wh[...,0] * inter_wh[...,1]
+    union_area = tra_area + det_area - inter_area 
+    iou = inter_area / (union_area + eps)
+    if iou_type == 'iou':
+        return iou 
+    elif iou_type == 'hiou':
+        inter_h = inter_wh[...,1]
+        convex_lt = torch.min(tra_box[:,None,:2],det_box[None,:,:2])
+        convex_rb = torch.max(tra_box[:,None,2:],det_box[None,:,2:])
+        convex_h  = convex_rb[...,1] - convex_lt[...,1]
+        hiou = iou * (inter_h / (convex_h + eps))
+        return hiou
 def calc_iouFamily(source_info: torch.Tensor, target_info: torch.Tensor, iou_type: str = 'iou' ,eps = 1e-8) -> torch.Tensor:
     """
     This is specially designed for my project and not so uniformed
@@ -207,14 +250,14 @@ def calc_iouFamily(source_info: torch.Tensor, target_info: torch.Tensor, iou_typ
     source_w, source_h, source_center= source_info[:, 4],source_info[:, 5],source_info[:, 6:8]
     target_w, target_h, target_center= target_info[:, 4],target_info[:, 5],target_info[:, 6:8]
 
-    converx_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
-    converx_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])# [M, 2]
-    converx_bbox_wh = torch.clamp((converx_bbox_lt - converx_bbox_rb), min=0)  # converx bbox 
-    converx_area = converx_bbox_wh[:, 0] * converx_bbox_wh[:, 1]      
+    convex_bbox_lt = torch.max(source_info[:, 2:4], target_info[:, 2:4])
+    convex_bbox_rb = torch.min(source_info[:, :2], target_info[:, :2])# [M, 2]
+    convex_bbox_wh = torch.clamp((convex_bbox_lt - convex_bbox_rb), min=0)  # convex bbox 
+    convex_area = convex_bbox_wh[:, 0] * convex_bbox_wh[:, 1]      
     #---------------------------------#
     if iou_type == 'giou':
-        return iou - (converx_area - union_area) / (converx_area + eps)
-    outer_diag = (converx_bbox_wh[:, 0] ** 2) + (converx_bbox_wh[:, 1] ** 2)  # convex diagonal squard length
+        return iou - (convex_area - union_area) / (convex_area + eps)
+    outer_diag = (convex_bbox_wh[:, 0] ** 2) + (convex_bbox_wh[:, 1] ** 2)  # convex diagonal squard length
     inter_diag = (source_center[:, 0] - target_center[:, 0]) ** 2 + (source_center[:, 1] - target_center[:, 1]) ** 2
     #---------------------------------#
     if iou_type == 'diou':
@@ -240,9 +283,9 @@ def calc_iouFamily(source_info: torch.Tensor, target_info: torch.Tensor, iou_typ
         u = inter_diag / outer_diag
         dis_w =  (source_w - target_w) ** 2
         dis_h =  (source_h - target_h) ** 2
-        converx_bbox_w_square = converx_bbox_wh[:,0] ** 2 
-        converx_bbox_h_square = converx_bbox_wh[:,1] ** 2 
-        eiou = iou - (u + dis_w / (converx_bbox_w_square + eps) + dis_h / (converx_bbox_h_square + eps))
+        convex_bbox_w_square = convex_bbox_wh[:,0] ** 2 
+        convex_bbox_h_square = convex_bbox_wh[:,1] ** 2 
+        eiou = iou - (u + dis_w / (convex_bbox_w_square + eps) + dis_h / (convex_bbox_h_square + eps))
         return eiou
     
 '''

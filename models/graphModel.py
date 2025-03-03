@@ -14,8 +14,8 @@ import torch.nn as nn
 from functools import partial
 from torch_geometric.data import Batch,Data
 from models.core.graphConv import SDgraphConv
-from models.graphToolkit import sinkhorn_unrolled
-from models.core.graphLayers import NodeEncoder,EdgeEncoder
+from models.graphToolkit import sinkhorn_unrolled,calc_iou,calc_cosineSim
+from models.core.graphLayers import NodeEncoder,EdgeEncoder,SequentialBlock
 
 __all__ =['GraphModel']
 
@@ -44,6 +44,16 @@ class GraphModel(nn.Module):
             fuse_model_dict = model_dict['fuse_model']
             )
         
+        #---------------------------------#
+        # Affinity Layer
+        #---------------------------------#
+
+        self.affinityLayer = SequentialBlock(
+            model_dict['affinity_model']['dims_list'],
+            model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
+            model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
+        )
+
         #---------------------------------#
         # Sinkhorn Layer 
         #---------------------------------#
@@ -82,19 +92,26 @@ class GraphModel(nn.Module):
         for graph_idx in range(num_graphs):
 
             # Slice node features for the current graph 
-            tra_feats = tra_node_feats[tra_batch_indices == graph_idx]  
-            det_feats = det_node_feats[det_batch_indices == graph_idx]  
+            tra_node = tra_node_feats[tra_batch_indices == graph_idx]  
+            det_node = det_node_feats[det_batch_indices == graph_idx]  
+            
+            tra_app  = tra_graph_batch.x[tra_batch_indices == graph_idx]
+            det_app  = det_graph_batch.x[det_batch_indices == graph_idx]
+
+            tra_xyxy = tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,:4]
+            det_xyxy = det_graph_batch.geometric_info[det_batch_indices == graph_idx,:4]
+
             # 1. Compute affinity matrix for the current graph 
-            n1   = torch.norm(tra_feats,dim=-1,keepdim=True)
-            n2   = torch.norm(det_feats,dim=-1,keepdim=True)
+            node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
+            app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
+            iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='iou').unsqueeze(-1)
+            
+            corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
 
             if self.bt_mask: # compute mask to filter out some unmatched nodes
-                dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx][:,6:8],
-                                        det_graph_batch.geometric_info[det_batch_indices == graph_idx][:,6:8]) <= self.dist_thresh ).float()
-                corr = ( torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
-            else:
-                corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
-                
+                dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,6:8],det_graph_batch.geometric_info[det_batch_indices == graph_idx,6:8]) <= self.dist_thresh ).float()
+                corr = corr  * dist_mask
+
             # 2. Prepare the augmented affinity matrix for Sinkhorn
             m , n = corr.shape
             a = torch.ones(m,device=self.eplison.device,dtype=torch.float32) 
@@ -108,7 +125,7 @@ class GraphModel(nn.Module):
         return pred_mtx_list 
 
     def inference(self,tra_graph :Data ,det_graph :Data ) -> torch.Tensor:
-        ''' Inference Process'''
+        ''' Inference Process [In Track Management phase]'''
         #---------------------------------#
         # Initialize the Node and edge embeddings
         #---------------------------------#
@@ -136,23 +153,19 @@ class GraphModel(nn.Module):
             return torch.zeros((tra_graph.num_nodes,det_graph.num_nodes),dtype=torch.float32)
         else:
             tra_node_feats = tra_graph.node_feats
-        #---------------------------------#
-        # Optimal transport
-        # > Reference: https://github.com/magicleap/SuperGluePretrainedNetwork
-        #   1. compute the affinity matrix
-        #   2. perform matrix augumentation 
-        #---------------------------------#
 
-        # 1. Compute affinity matrix for the current graph 
-        n1   = torch.norm(tra_node_feats,dim=-1,keepdim=True)
-        n2   = torch.norm(det_node_feats,dim=-1,keepdim=True)
+        node_sim = calc_cosineSim(tra_node_feats,det_node_feats).unsqueeze(-1)
+        app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
+        iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='iou').unsqueeze(-1)
+        
+        corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
+
+
         if self.bt_mask: # compute mask to filter out some unmatched nodes
             dist_mask = ( torch.cdist(tra_graph.geometric_info[:,6:8],det_graph.geometric_info[:,6:8]) <= self.dist_thresh ).float()
-            corr = ( torch.mm(tra_node_feats,det_node_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0)) ) * dist_mask
-        else:
-            corr = torch.mm(tra_node_feats,det_node_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+            corr = corr * dist_mask
 
-        # 2. Prepare the augmented affinity matrix for Sinkhorn
+
         m , n = corr.shape
         a = torch.ones(m,device=self.eplison.device,dtype=torch.float32) 
         b = torch.ones(n,device=self.eplison.device,dtype=torch.float32) 
@@ -160,3 +173,27 @@ class GraphModel(nn.Module):
         pred_mtx = self.sinkhornLayer(1 - corr,a,b,
                                 lambd_sink = torch.exp(self.eplison) + 0.03)
         return pred_mtx 
+    
+    def gen_appFeats(self,det_graph :Data):
+        '''
+        In Track Management phase,
+        input:
+            det_graph(x :torch.Tensor || Size:(node_num,3,256,128),geometric_info)
+        retures:
+            det_graph(x :torch.Tensor || Size:(node_num,32),geometric_info)
+        '''
+        self.nodeEncoder(det_graph)
+    
+    def gen_nodeFeats(self,tra_graph :Data) -> torch.Tensor:
+        '''
+        In Track Management phase,
+        input:
+            tra_graph(x :torch.Tensor || Size:(node_num,32),geometric_info)
+        retures:
+            node_feats: torch.Tensor || Size:(node_num,198)
+        '''
+
+        assert tra_graph.x.shape == (tra_graph.num_nodes,32)
+        tra_graph = self.edgeEncoder(tra_graph,self.k)
+        tra_node_feats = self.graphconvLayer(tra_graph,self.k)
+        return tra_node_feats
