@@ -1,7 +1,7 @@
 #---------------------------------#
 #       Hyper Parameters        
 #---------------------------------#
-K_NEIGHBOR: 12
+K_NEIGHBOR: 2
 SINKHORN_ITERS: 8
 BT_DIST_MASK: True
 DIST_THRESH: 50
@@ -85,24 +85,35 @@ static_graph_conv:
     aggr: 'max'
     message_model:
       dims_list:
-        - [48,40,32,32]
-        - [96,80,64,64]
-        - [144,120,96,96]
+        - [48,64,64]
+        - [80,96,96]
+        - [112,128,128]
       layer_type: 'linear'
       layer_bias: False
       norm_type: 'LayerNorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1
-    update_model:
+    res_model:
       dims_list:
-        - [32,64,64]
-        - [64,96,96]
-        - [96,128,128]
+        - [32,64]
+        - [64,96]
+        - [96,128]
       layer_type: 'linear'
       layer_bias: False
       norm_type: 'graphNorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1
+    update_model:
+      dims_list:
+        - [64,64]
+        - [96,96]
+        - [128,128]
+      layer_type: 'linear'
+      layer_bias: False
+      norm_type: 'graphNorm'
+      activate_func: 'lrelu'
+      lrelu_slope: 0.1  
+#----------------Deprecated-----------------#
   edge_update_model:
     edge_mode: 'NodeConcat' # optional: NodeConcat NodeDiff None
     # if NodeDiff 
@@ -168,5 +179,5 @@ affinity_model:
   layer_type: 'linear'
   layer_bias: False
   norm_type: 'None'
-  activate_func: 'relu'
+  activate_func: 'sigmoid'
   lrelu_slope: 0

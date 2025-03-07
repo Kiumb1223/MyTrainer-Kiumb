@@ -48,16 +48,16 @@ class GraphModel(nn.Module):
         # Affinity Layer
         #---------------------------------#
 
-        self.affinityLayer = SequentialBlock(
-            model_dict['affinity_model']['dims_list'],
-            model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
-            model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
-        )
+        # self.affinityLayer = SequentialBlock(
+        #     model_dict['affinity_model']['dims_list'],
+        #     model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
+        #     model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
+        # )
 
         #---------------------------------#
         # Sinkhorn Layer 
         #---------------------------------#
-
+        self.alpha   = nn.Parameter(torch.ones(1))
         self.eplison = nn.Parameter(torch.zeros(1))
         self.sinkhornLayer = partial(sinkhorn_unrolled,num_sink = model_dict['SINKHORN_ITERS'])
         
@@ -102,34 +102,59 @@ class GraphModel(nn.Module):
             det_xyxy = det_graph_batch.geometric_info[det_batch_indices == graph_idx,:4]
 
             # 1. Compute affinity matrix for the current graph 
-            node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
-            app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
-            iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='iou').unsqueeze(-1)
+            node_sim = calc_cosineSim(tra_node,det_node)
+            # node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
+            # app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
+            # iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='iou').unsqueeze(-1)
             
-            corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
+            # corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
 
             if self.bt_mask: # compute mask to filter out some unmatched nodes
                 dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,6:8],det_graph_batch.geometric_info[det_batch_indices == graph_idx,6:8]) <= self.dist_thresh ).float()
-                corr = corr  * dist_mask
+                corr = node_sim  * dist_mask
+                # corr = corr  * dist_mask
 
             # 2. Prepare the augmented affinity matrix for Sinkhorn
             m , n = corr.shape
-            a = torch.ones(m,device=self.eplison.device,dtype=torch.float32) 
-            b = torch.ones(n,device=self.eplison.device,dtype=torch.float32) 
+            bins0 = self.alpha.expand(m, 1)
+            bins1 = self.alpha.expand(1, n)
+            alpha = self.alpha.expand(1, 1)
+            couplings = torch.cat([torch.cat([corr,bins0],dim=-1),
+                                torch.cat([bins1,alpha],dim=-1)],dim=0)
+            norm  = 1 / ( m + n )  
+            a_aug = torch.full((m+1,),norm,device=self.alpha.device,dtype=torch.float32) 
+            b_aug = torch.full((n+1,),norm,device=self.alpha.device,dtype=torch.float32) 
+            a_aug[-1] = norm * n
+            b_aug[-1] = norm * m            
+           
 
-            pred_mtx = self.sinkhornLayer(1 - corr,a,b,
-                                          lambd_sink = torch.exp(self.eplison) + 0.03)
+            pred_mtx = self.sinkhornLayer(1 - couplings,a_aug,b_aug,
+                                          lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
             
-            pred_mtx_list.append(pred_mtx)
+            pred_mtx_list.append(pred_mtx[:-1,:-1])
 
         return pred_mtx_list 
 
     def inference(self,tra_graph :Data ,det_graph :Data ) -> torch.Tensor:
         ''' Inference Process [In Track Management phase]'''
         #---------------------------------#
+        # This condition handles the test phase and  when processing the first frame, where 
+        # the trajectory graph (tra_graph_batch) is not available (i.e., it lacks 'geometric_info').
+        # In such cases, the model simply encodes the detection graph (det_graph_batch) nodes
+        # and returns an empty list, bypassing the rest of the forward pass.
+        #---------------------------------#
+        
+        if tra_graph.num_nodes == 0:
+            self.nodeEncoder(det_graph)
+            return torch.zeros((tra_graph.num_nodes,det_graph.num_nodes),dtype=torch.float32)
+
+        #---------------------------------#
         # Initialize the Node and edge embeddings
         #---------------------------------#
-                
+        if tra_graph.x.dim() != 2:
+            tra_graph = self.nodeEncoder(tra_graph)
+        tra_graph = self.edgeEncoder(tra_graph,self.k)
+
         det_graph = self.nodeEncoder(det_graph)
         det_graph = self.edgeEncoder(det_graph,self.k)        
 
@@ -139,40 +164,37 @@ class GraphModel(nn.Module):
         # and return the node feature for each graph 
         #---------------------------------#
 
+        tra_node_feats = self.graphconvLayer(tra_graph,self.k)
         det_node_feats = self.graphconvLayer(det_graph,self.k)
-        det_graph.node_feats = det_node_feats        
 
-        #---------------------------------#
-        # This condition handles the test phase and  when processing the first frame, where 
-        # the trajectory graph (tra_graph_batch) is not available (i.e., it lacks 'geometric_info').
-        # In such cases, the model simply encodes the detection graph (det_graph_batch) nodes
-        # and returns an empty list, bypassing the rest of the forward pass.
-        #---------------------------------#
+        node_sim = calc_cosineSim(tra_node_feats,det_node_feats)
+        # node_sim = calc_cosineSim(tra_node_feats,det_node_feats).unsqueeze(-1)
+        # app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
+        # iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='iou').unsqueeze(-1)
         
-        if tra_graph.num_nodes == 0:
-            return torch.zeros((tra_graph.num_nodes,det_graph.num_nodes),dtype=torch.float32)
-        else:
-            tra_node_feats = tra_graph.node_feats
-
-        node_sim = calc_cosineSim(tra_node_feats,det_node_feats).unsqueeze(-1)
-        app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
-        iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='iou').unsqueeze(-1)
-        
-        corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
+        # corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
 
 
         if self.bt_mask: # compute mask to filter out some unmatched nodes
             dist_mask = ( torch.cdist(tra_graph.geometric_info[:,6:8],det_graph.geometric_info[:,6:8]) <= self.dist_thresh ).float()
-            corr = corr * dist_mask
-
+            # corr = corr * dist_mask
+            corr = node_sim * dist_mask
 
         m , n = corr.shape
-        a = torch.ones(m,device=self.eplison.device,dtype=torch.float32) 
-        b = torch.ones(n,device=self.eplison.device,dtype=torch.float32) 
+        bins0 = self.alpha.expand(m, 1)
+        bins1 = self.alpha.expand(1, n)
+        alpha = self.alpha.expand(1, 1)
+        couplings = torch.cat([torch.cat([corr,bins0],dim=-1),
+                               torch.cat([bins1,alpha],dim=-1)],dim=0)
+        norm  = 1 / ( m + n )  
+        a_aug = torch.full((m+1,),norm,device=self.alpha.device,dtype=torch.float32) 
+        b_aug = torch.full((n+1,),norm,device=self.alpha.device,dtype=torch.float32) 
+        a_aug[-1] = norm * n
+        b_aug[-1] = norm * m
 
-        pred_mtx = self.sinkhornLayer(1 - corr,a,b,
-                                lambd_sink = torch.exp(self.eplison) + 0.03)
-        return pred_mtx 
+        pred_mtx = self.sinkhornLayer(1 - couplings,a_aug,b_aug,
+                                lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
+        return pred_mtx[:-1,:-1]
     
     def gen_appFeats(self,det_graph :Data):
         '''

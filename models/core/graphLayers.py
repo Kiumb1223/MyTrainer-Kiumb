@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+from functools import partial
 from torchvision import models
 import torch.nn.functional as F
 from typing import Union,Optional
@@ -78,12 +79,14 @@ class SequentialBlock(nn.Module):
         activation_map = {
             'relu': nn.ReLU(inplace=True),
             'lrelu': nn.LeakyReLU(negative_slope=lrelu_slope, inplace=True),
+            'sigmoid': nn.Sigmoid(),
         }
         normalization_map = {
             'none'      : None,
             'batchnorm' : nn.BatchNorm1d,
             'layernorm' : nn.LayerNorm,
             'graphnorm' : norm.GraphNorm,
+            'l2norm'    : partial(torch.norm,p=2,dim=1),
         }
         layer_type    = layer_type.lower()
         activate_func = activate_func.lower()
@@ -219,13 +222,14 @@ class NodeEncoder(nn.Module):
 
 class NodeUpdater(MessagePassing):
     def __init__(self,
-        idx : int, 
-        node_update_model_dict: dict
+            idx : int, 
+            node_update_model_dict: dict
         ):
 
         super().__init__(aggr=node_update_model_dict['aggr']) 
         
         msg_model_dict = node_update_model_dict['message_model']
+        res_model_dict = node_update_model_dict['res_model']
         upd_model_dict = node_update_model_dict['update_model']
 
         self.msg_layer    = SequentialBlock(
@@ -234,7 +238,15 @@ class NodeUpdater(MessagePassing):
                 norm_type  = msg_model_dict['norm_type'], 
                 activate_func = msg_model_dict['activate_func'], lrelu_slope = msg_model_dict['lrelu_slope']
             )
-
+        if res_model_dict['dims_list'][idx] is not None:
+            self.res_layer = SequentialBlock(
+                    dims_list  = res_model_dict['dims_list'][idx],
+                    layer_type = res_model_dict['layer_type'], layer_bias = res_model_dict['layer_bias'],
+                    norm_type  = res_model_dict['norm_type'],
+                    activate_func = res_model_dict['activate_func'], lrelu_slope = res_model_dict['lrelu_slope']
+                )
+        else:
+            self.res_layer = lambda x , batch: x
         self.upd_layer = SequentialBlock(
                 dims_list  = upd_model_dict['dims_list'][idx],
                 layer_type = upd_model_dict['layer_type'] , layer_bias = upd_model_dict['layer_bias'],
@@ -256,14 +268,15 @@ class NodeUpdater(MessagePassing):
 
 
     def update(self, msg:torch.Tensor,x:torch.Tensor,batch:torch.Tensor) -> torch.Tensor:
-
+        x = self.res_layer(x,batch)
+        # return self.upd_layer(x + msg,batch)
         return self.upd_layer(x + msg,batch)
 
 class EdgeUpdater(nn.Module):
 
     def __init__(self, 
-        idx :str,
-        edge_update_model_dict :dict,
+            idx :str,
+            edge_update_model_dict :dict,
         ):
         super(EdgeUpdater, self).__init__()
 
@@ -289,7 +302,7 @@ class EdgeUpdater(nn.Module):
 class EdgeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
     def __init__(self, 
-        edge_encode_model_dict :dict,
+            edge_encode_model_dict :dict,
         ):
         super(EdgeEncoder, self).__init__()
         

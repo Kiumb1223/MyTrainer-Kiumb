@@ -83,10 +83,12 @@ There are 5 parts of my whole model:
 
 So there is some quantitative results when **GCNNMatch training on MOT17-half**  tests on **my validation set**.
 
-|   Validation set   | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
-| :----------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  MOT17-half(SDP)   | 48.68 | 48.43 | 49.00 | 57.39 | 46.20 | 75.72 | 56.44 | 83.56 |
-| Indoor Day(YOLOv8) | 36.11 | 66.81 | 19.67 | 33.18 | 32.53 | 33.86 | 87.51 | 76.07 |
+|         Validation set          | HOTA  | DetA  | AssA  | IDF1  |  IDR  |  IDP  | MOTA  | MOTP  |
+| :-----------------------------: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|         MOT17-half(SDP)         | 48.68 | 48.43 | 49.00 | 57.39 | 46.20 | 75.72 | 56.44 | 83.56 |
+|       Indoor Day(YOLOv8)        | 36.11 | 66.81 | 19.67 | 33.18 | 32.53 | 33.86 | 87.51 | 76.07 |
+|  MOT17-half(SDP  \|\| retrain)  | 36.69 | 39.27 | 34.38 | 39.31 | 29.32 | 59.62 | 42.99 | 83.78 |
+| Indoor Day(YOLOv8 \|\| retrain) | 32.24 | 66.60 | 15.77 | 30.18 | 29.60 | 30.77 | 86.65 | 76.07 |
 
 And the GCNNMatch is :warning:**extremely time-consuming**, which takes about 2 seconds to process each frame in a 30fps, 1080p video.
 

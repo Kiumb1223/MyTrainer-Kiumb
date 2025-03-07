@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\model_structure[fastreid].yaml',
+        MODEL_YAML_PATH   = 'configs/fastreid.yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -69,7 +69,8 @@ def get_config():
         #---------------------------------#
         #  4. TrackManager related
         #---------------------------------#
-        PATH_TO_WEIGHTS   = r'model_weights\Exp_2025\K\k-12+woloop+AffinityLayer.pth',
+        # PATH_TO_WEIGHTS   = r'model_weights\Exp_2025\K\k-12+woloop+AffinityLayer.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\fastreid\fastreid2+graphConv-woloop+Msg+Dynamic-smooth+Fuse13.pth',
         PATH_TO_TRACKING_CFG = r'configs\tracking_config.yaml',
 
         #---------------------------------#

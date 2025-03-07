@@ -121,15 +121,19 @@ def hungarian(input_mtx: np.ndarray,match_thresh: float=0.1):
 
 
 
-def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
+def box_iou(boxes1:np.ndarray, boxes2:np.ndarray,iou_type:str = 'iou') -> np.ndarray:
     ''' [Support np.ndarray type data]Return intersection-over-union (Jaccard index) of boxes.
      
     Args:
         boxes1 (np.ndarray): shape (n1, 4)  || (min x, min y, max x, max y)  
         boxes2 (np.ndarray): shape (n2, 4)  || (min x, min y, max x, max y)
+        iou_type (str): iou type, 'iou' or 'giou'
+    Note:
+        When `iou_type` is set to 'giou', the output values range from [0,1], unlike standard GIoU, which ranges from [-1,1].
     Returns:
         iou (np.ndarray): shape (n1, n2)
     '''
+    
     iou = np.zeros((len(boxes1),len(boxes2)),dtype=np.float32)
     if iou.size == 0 :
         return iou
@@ -148,9 +152,17 @@ def box_iou(boxes1:np.ndarray, boxes2:np.ndarray) -> np.ndarray:
 
     # cal IoU
     iou = inter_area / union_area
-
-    return iou
-
+    if iou_type == 'iou':
+        return iou
+    elif iou_type == 'giou':
+        convex_lt = np.minimum(boxes1[:,None, :2], boxes2[..., :2])
+        convex_rb = np.maximum(boxes1[:,None, 2:], boxes2[..., 2:])
+        convex_wh = convex_rb - convex_lt
+        convex_area = convex_wh[:,:, 0] * convex_wh[:,:, 1]
+        # mark sure the value ranges from  [0,1] ,which is the same as iou
+        # Reference: SCGTracker: Spatio-temporal correlation and graph neural networks for multiple object tracking
+        giou = (iou - (convex_area - union_area) / convex_area + 1) / 2.
+        return giou
 def calc_cosineSim(tra_feats :torch.Tensor,det_feats:torch.Tensor) -> torch.Tensor:
     '''
     
@@ -164,6 +176,7 @@ def calc_cosineSim(tra_feats :torch.Tensor,det_feats:torch.Tensor) -> torch.Tens
     det_feats_norm = F.normalize(det_feats,p=2,dim=1)
     cosineSim = torch.matmul(tra_feats_norm, det_feats_norm.T)
     return cosineSim
+
 def calc_iou(tra_box :torch.Tensor,det_box:torch.Tensor,iou_type:str='iou',eps = 1e-8) -> torch.Tensor:
     ''' Only support tensor type data 
     Args:
@@ -172,12 +185,12 @@ def calc_iou(tra_box :torch.Tensor,det_box:torch.Tensor,iou_type:str='iou',eps =
             [x_min, y_min, x_max, y_max].
         det_box (torch.Tensor): Tensor of shape [N, 4], representing the second set of bounding boxes.
             Each box is represented by the same elements as `tra_box`.
-        iou_type (str, optional): The type of IoU to calculate. Optionals: 'iou' , 'Hiou'.
+        iou_type (str, optional): The type of IoU to calculate. Optionals: 'iou' , 'Hiou' , 'Giou'
     Returns:
         iou (torch.Tensor): Tensor of shape [M, N], representing the IoU between each pair of boxes.
     '''
     iou_type = iou_type.lower()
-    assert iou_type in ['iou','hiou'] , "iou_type must be 'iou' or 'hiou'"
+    assert iou_type in ['iou','hiou','giou'] , "iou_type must be 'iou' , 'hiou' or 'giou"
 
     tra_area  = ((tra_box[..., 2] - tra_box[..., 0]) * (tra_box[..., 3] - tra_box[..., 1])).unsqueeze(-1)
     det_area  = ((det_box[..., 2] - det_box[..., 0]) * (det_box[..., 3] - det_box[..., 1])).unsqueeze(0)
@@ -190,13 +203,19 @@ def calc_iou(tra_box :torch.Tensor,det_box:torch.Tensor,iou_type:str='iou',eps =
     iou = inter_area / (union_area + eps)
     if iou_type == 'iou':
         return iou 
-    elif iou_type == 'hiou':
+    convex_lt = torch.min(tra_box[:,None,:2],det_box[None,:,:2])
+    convex_rb = torch.max(tra_box[:,None,2:],det_box[None,:,2:])
+    if iou_type == 'hiou':
         inter_h = inter_wh[...,1]
-        convex_lt = torch.min(tra_box[:,None,:2],det_box[None,:,:2])
-        convex_rb = torch.max(tra_box[:,None,2:],det_box[None,:,2:])
         convex_h  = convex_rb[...,1] - convex_lt[...,1]
         hiou = iou * (inter_h / (convex_h + eps))
         return hiou
+    if iou_type == 'giou':
+        convex_wh = torch.clamp((convex_lt - convex_rb), min=0)  # convex bbox 
+        convex_area = convex_wh[...,0] * convex_wh[...,1]
+        giou = iou - (convex_area - union_area) / (convex_area + eps)
+        return giou
+
 def calc_iouFamily(source_info: torch.Tensor, target_info: torch.Tensor, iou_type: str = 'iou' ,eps = 1e-8) -> torch.Tensor:
     """
     This is specially designed for my project and not so uniformed

@@ -22,7 +22,8 @@ class StaticConv(nn.Module):
         node_encode_model_dict = static_graph_conv_dict['node_update_model']
         edge_update_model_dict = static_graph_conv_dict['edge_update_model']
         self.node_update_model = NodeUpdater(idx,node_encode_model_dict)
-        if idx == 0:
+        # if idx == 0:
+        if True:
             self.edge_update_model = None
         else:
             self.edge_update_model = EdgeUpdater(idx,edge_update_model_dict)

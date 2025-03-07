@@ -20,7 +20,7 @@ import torchvision.io.image as I
 from configs.config import get_config
 from models.graphModel import GraphModel
 from utils.visualize import plot_tracking
-from models.graphTracker import TrackManager
+from models.graphTracker_old import TrackManager
 
 @logger.catch
 def main():
