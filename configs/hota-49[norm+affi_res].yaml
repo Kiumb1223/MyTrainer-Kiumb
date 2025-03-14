@@ -23,8 +23,8 @@ node_encoder:
   layer_type: 'linear'
   layer_bias: False
   norm_type: 'batchNorm'
-  activate_func: 'relu'
-  lrelu_slope: 0.0
+  activate_func: 'lrelu'
+  lrelu_slope: 0.1
 
 
 #---------------------------------#
@@ -44,8 +44,8 @@ edge_encoder:
   layer_type: 'linear'
   layer_bias: False
   norm_type: 'batchNorm'
-  activate_func: 'relu'
-  lrelu_slope: 0.0
+  activate_func: 'lrelu'
+  lrelu_slope: 0.1
   # static graph construction settings
   bt_cosine: False 
   bt_self_loop: False
@@ -85,12 +85,12 @@ static_graph_conv:
     aggr: 'max'
     message_model:
       dims_list:
-        - [48,64,64]
-        - [80,96,96]
-        - [112,128,128]
+        - [48,64,32]
+        - [80,96,64]
+        - [112,128,96]
       layer_type: 'linear'
       layer_bias: False
-      norm_type: 'batchNorm'
+      norm_type: 'graphnorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1
     res_model:
@@ -98,19 +98,22 @@ static_graph_conv:
         - [32,64]
         - [64,96]
         - [96,128]
+        # - []
+        # - []
+        # - []
       layer_type: 'linear'
       layer_bias: False
-      norm_type: 'batchNorm'
+      norm_type: 'graphnorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1
     update_model:
       dims_list:
-        - [64,64]
-        - [96,96]
-        - [128,128]
+        - [32,64]
+        - [64,96]
+        - [96,128]
       layer_type: 'linear'
       layer_bias: False
-      norm_type: 'batchNorm'
+      norm_type: 'graphnorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1  
 #----------------Deprecated-----------------#
@@ -119,12 +122,12 @@ static_graph_conv:
     # if NodeDiff 
     #  [80,56,32,32]  [128,64,48,48]
     dims_list:
-      - None                # using initiali edge embedding
+      - []                # using initiali edge embedding
       - [144,88,32,32]
       - [224,136,48,48]
     layer_type: 'linear'
     layer_bias: False
-    norm_type: 'batchNorm'
+    norm_type: 'graphnorm'
     activate_func: 'lrelu'
     lrelu_slope: 0.1
 
@@ -147,7 +150,7 @@ dynamic_graph_conv:
       - [192,160,128,128]
     layer_type: 'linear'
     layer_bias: False
-    norm_type: 'batchNorm'
+    norm_type: 'graphnorm'
     activate_func: 'lrelu'
     lrelu_slope: 0.1
   update_model:
@@ -158,7 +161,7 @@ dynamic_graph_conv:
       # - [128,128,128]
     layer_type: 'linear'
     layer_bias: False
-    norm_type: 'batchNorm'
+    norm_type: 'graphnorm'
     activate_func: 'lrelu'
     lrelu_slope: 0.1
 
@@ -170,7 +173,7 @@ fuse_model:
     - [1536,768,384,192,192] 
   layer_type: 'Conv1d'
   layer_bias: False
-  norm_type: 'batchNorm'
+  norm_type: 'graphnorm'
   activate_func: 'lrelu'
   lrelu_slope: 0.2
 

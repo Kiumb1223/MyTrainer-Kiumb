@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = 'configs/fastreid.yaml',
+        MODEL_YAML_PATH   = r'configs\hota-49[norm+affi_res].yaml',
         
         #---------------------------------#
         #  3. Dataset related

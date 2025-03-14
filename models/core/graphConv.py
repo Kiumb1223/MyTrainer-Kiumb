@@ -6,7 +6,7 @@ import torch.nn as nn
 from typing import Union,Optional
 from torch_geometric.data import Batch,Data
 from torch_geometric.nn import MessagePassing
-from models.core.graphLayers import SequentialBlock,NodeUpdater,EdgeEncoder,EdgeUpdater
+from models.core.graphLayers import SequentialBlock,MsgBlock,NodeUpdater,EdgeEncoder,EdgeUpdater
 
 __all__ = ['SDgraphConv']
 
@@ -15,13 +15,13 @@ class StaticConv(nn.Module):
         reference: from torch_geometric.nn import MetaLayer, with a minor modification
     '''
     def __init__(self,
-        idx : int,
-        static_graph_conv_dict: dict,
+            idx : int,
+            static_graph_conv_dict: dict,
         ):
         super(StaticConv,self).__init__()
-        node_encode_model_dict = static_graph_conv_dict['node_update_model']
+        node_update_model_dict = static_graph_conv_dict['node_update_model']
         edge_update_model_dict = static_graph_conv_dict['edge_update_model']
-        self.node_update_model = NodeUpdater(idx,node_encode_model_dict)
+        self.node_update_model = NodeUpdater(idx,node_update_model_dict)
         # if idx == 0:
         if True:
             self.edge_update_model = None
@@ -38,13 +38,61 @@ class StaticConv(nn.Module):
         x = self.node_update_model(x,edge_index,edge_attr,batch)
 
         return x,edge_attr
+# class StaticConv(MessagePassing):
+#     '''graph in and graph out '''
+#     def __init__(self,
+#             idx : int,
+#             static_graph_conv_dict: dict,
+#         ):
+#         node_update_model_dict = static_graph_conv_dict['node_update_model']
+#         super().__init__(aggr=node_update_model_dict['aggr']) 
 
+#         msg_model_dict = node_update_model_dict['message_model']
+#         res_model_dict = node_update_model_dict['res_model']
+#         upd_model_dict = node_update_model_dict['update_model']
+
+#         self.msg_func    = SequentialBlock(
+#                 dims_list  = msg_model_dict['dims_list'][idx],
+#                 layer_type = msg_model_dict['layer_type'], layer_bias = msg_model_dict['layer_bias'],
+#                 norm_type  = msg_model_dict['norm_type'], 
+#                 activate_func = msg_model_dict['activate_func'], lrelu_slope = msg_model_dict['lrelu_slope']
+#             )
+#         if res_model_dict['dims_list'][idx] is not None:
+#             self.res_node_func = SequentialBlock(
+#                     dims_list  = res_model_dict['dims_list'][idx],
+#                     layer_type = res_model_dict['layer_type'], layer_bias = res_model_dict['layer_bias'],
+#                     norm_type  = res_model_dict['norm_type'],
+#                     activate_func = res_model_dict['activate_func'], lrelu_slope = res_model_dict['lrelu_slope']
+#                 )
+#         else:
+#             self.res_node_func = lambda x , batch: x
+#         self.update_func = SequentialBlock(
+#                 dims_list  = upd_model_dict['dims_list'][idx],
+#                 layer_type = upd_model_dict['layer_type'] , layer_bias = upd_model_dict['layer_bias'],
+#                 norm_type  = upd_model_dict['norm_type']  , 
+#                 activate_func = upd_model_dict['activate_func'] , lrelu_slope = upd_model_dict['lrelu_slope']
+#             )
+
+        
+#     def forward(self,node_emb :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor,batch) -> torch.Tensor:
+#         # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
+#         return self.propagate(edge_index,edge_attr=edge_attr,x=node_emb,batch=batch),edge_attr
+    
+#     def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor,batch) -> torch.Tensor:
+#         '''
+#         x_i : target nodes 
+#         x_j : source nodes
+#         '''
+#         return self.msg_func(torch.cat([edge_attr,x_j - x_i], dim=1),batch)
+
+#     def update(self, msg:torch.Tensor,x:torch.Tensor,batch) -> torch.Tensor:
+#         return self.update_func(self.res_node_func(x) + msg,batch)
 
 
 class DynamicConv(MessagePassing):
     def __init__(self,
-        idx :int,
-        dynamic_graph_conv_dict :dict
+            idx :int,
+            dynamic_graph_conv_dict :dict
         ):
 
         super().__init__(aggr=dynamic_graph_conv_dict['aggr'])
@@ -56,7 +104,7 @@ class DynamicConv(MessagePassing):
         message_model_dict = dynamic_graph_conv_dict['message_model']
         update_model_dict  = dynamic_graph_conv_dict['update_model']
 
-        self.msg_layer = SequentialBlock(
+        self.msg_layer = MsgBlock(
                 dims_list  = message_model_dict['dims_list'][idx], 
                 layer_type = message_model_dict['layer_type'], layer_bias = message_model_dict['layer_bias'],
                 norm_type  = message_model_dict['norm_type'] , 
@@ -64,40 +112,46 @@ class DynamicConv(MessagePassing):
             )
 
         if update_model_dict['dims_list'][idx] != []:
-            self.upd_layer = SequentialBlock(
+            self.update_layer = SequentialBlock(
                 dims_list  = update_model_dict['dims_list'][idx], 
                 layer_type = update_model_dict['layer_type'], layer_bias = update_model_dict['layer_bias'],
                 norm_type  = update_model_dict['norm_type'] , 
                 activate_func = update_model_dict['activate_func'], lrelu_slope = update_model_dict['lrelu_slope']
                 )
         else:
-            self.upd_layer = lambda msg,batch : msg
+            self.update_layer = lambda msg,batch : msg
 
     def forward(self,x :torch.Tensor,graph :Union[Batch,Data],k:int,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
         
         graph.x = x
-        edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed) 
-        x = self.propagate(edge_index,x=x,batch=batch)
+        
+        edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed,bt_input_x=True) 
+        if batch is not None:
+            edge_batch = batch[edge_index[-1]] # source to target
+        else:
+            edge_batch = None
+
+        x = self.propagate(edge_index,x=x,batch=batch,edge_batch=edge_batch)
         
         return x
     
-    def message(self, x_i:torch.Tensor,x_j:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
+    def message(self, x_i:torch.Tensor,x_j:torch.Tensor,edge_batch:Optional[torch.Tensor]=None) -> torch.Tensor:
         '''
         x_i : target nodes 
         x_j : source nodes
         '''
-        return self.msg_layer(torch.cat([x_i,x_j-x_i],dim=1),batch)        
+        return self.msg_layer(torch.cat([x_i,x_j-x_i],dim=1),edge_batch)        
     def update(self, msg:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
-        return self.upd_layer(msg,batch)    
+        return self.update_layer(msg,batch)    
 
 class SDgraphConv(nn.Module):
     '''
     graph in and node emb out 
     '''
     def __init__(self,
-        static_graph_conv_dict :dict, 
-        dynamic_graph_conv_dict :dict,
-        fuse_model_dict :dict
+            static_graph_conv_dict :dict, 
+            dynamic_graph_conv_dict :dict,
+            fuse_model_dict :dict
         ):
 
         super().__init__()
@@ -110,7 +164,7 @@ class SDgraphConv(nn.Module):
             sgConv = StaticConv(
                 i,static_graph_conv_dict
             )
-            self.add_module(f'sgConv_{i}',sgConv)
+            self.add_module(f'sgConv_{i+1}',sgConv)
         #---------------------------------# 
         # Instantiate dynamic graph convolutional layer
         #---------------------------------#
@@ -119,23 +173,23 @@ class SDgraphConv(nn.Module):
             dgConv = DynamicConv(
                 i,dynamic_graph_conv_dict
             )
-            self.add_module(f'dgConv_{i}',dgConv)
+            self.add_module(f'dgConv_{i+1}',dgConv)
         #---------------------------------#
         # Instantiate fusion layer
         # there are two fusion layers
         #---------------------------------#
-        self.fuseLayer_0 = SequentialBlock(
+        self.fuseLayer_1 = SequentialBlock(
                 dims_list  = fuse_model_dict['dims_list'][0],
                 layer_type = fuse_model_dict['layer_type'], layer_bias = fuse_model_dict['layer_bias'],
                 norm_type  = fuse_model_dict['norm_type'], 
                 activate_func = fuse_model_dict['activate_func'], lrelu_slope = fuse_model_dict['lrelu_slope']
             )
-        self.fuseLayer_1 = SequentialBlock(
+        self.fuseLayer_2 = SequentialBlock(
                 dims_list  = fuse_model_dict['dims_list'][1],
                 layer_type = fuse_model_dict['layer_type'], layer_bias = fuse_model_dict['layer_bias'],
                 norm_type  = fuse_model_dict['norm_type'], 
                 activate_func = fuse_model_dict['activate_func'], lrelu_slope = fuse_model_dict['lrelu_slope'],
-                # final_activation = False
+                final_activation = False
             )
         
     def forward(self,graph:Union[Batch,Data],k:int) -> torch.Tensor:
@@ -166,7 +220,7 @@ class SDgraphConv(nn.Module):
         # Static Graph Convolution Layers
         #---------------------------------#
         for i in range(self.sgConv_num):
-            sgConv = getattr(self,f'sgConv_{i}')
+            sgConv = getattr(self,f'sgConv_{i+1}')
             x_res ,edge_attr_res= sgConv(x, graph.edge_index,
                         edge_attr, batch = graph.batch if bt_batch else None)
             x , edge_attr = x_res ,edge_attr_res 
@@ -177,7 +231,7 @@ class SDgraphConv(nn.Module):
         #---------------------------------#
         x = sgConv_x_list[0]
         for i in range(self.dgConv_num):
-            dgConv = getattr(self,f'dgConv_{i}')
+            dgConv = getattr(self,f'dgConv_{i+1}')
             x_res = dgConv(x,graph_copy,k,batch = graph.batch if bt_batch else None)
             x = x_res
             dgConv_x_list.append(x_res)
@@ -187,8 +241,8 @@ class SDgraphConv(nn.Module):
         #  Fusion Module
         #---------------------------------#
         node_emb_cat1 = torch.cat([sgConv_x_list[0],*dgConv_x_list,*sgConv_x_list[1:]],dim=1).unsqueeze(-1)
-        node_emb_fuse1 = self.fuseLayer_0(node_emb_cat1,batch = graph.batch if bt_batch else None) 
+        node_emb_fuse1 = self.fuseLayer_1(node_emb_cat1,batch = graph.batch if bt_batch else None) 
         node_emb_cat2  = torch.cat([node_emb_fuse1,node_emb_cat1],dim=1)  
-        node_emb_output= self.fuseLayer_1(node_emb_cat2,batch = graph.batch if bt_batch else None)
+        node_emb_output= self.fuseLayer_2(node_emb_cat2,batch = graph.batch if bt_batch else None)
         
         return node_emb_output.squeeze(-1)

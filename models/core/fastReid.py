@@ -19,7 +19,6 @@ import torch
 from pathlib import Path
 from collections import OrderedDict
 
-
 # Enable imports from the fast-reid directory
 root = Path(__file__).parent.parent.parent
 _FASTREID_ROOT = os.path.join(root,'thirdparty','fast-reid')
@@ -53,7 +52,6 @@ _FASTREID_MODEL_ZOO = {
 
     # MGN
     'market_mgn_R50_ibn': 'configs/Market1501/mgn_R50-ibn.yml'
-                        
 }    
 
 
@@ -67,6 +65,7 @@ def _get_cfg(fastreid_cfg_file):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.MODEL.BACKBONE.PRETRAIN = False
+    cfg.MODEL.DEVICE = 'cpu'
 
     return cfg
 

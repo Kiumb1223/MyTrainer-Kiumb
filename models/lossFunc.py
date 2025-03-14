@@ -45,7 +45,8 @@ class GraphLoss(nn.Module):
 
         loss = self.alpha * focal_weight * ce_loss
 
-        return loss.sum() / target.sum()
+        # return loss.sum() / target.sum()
+        return loss.sum() 
 
     def dice_loss(self,pred:Tensor,target:Tensor):
         pred_labels = (pred > 0.5).float()
@@ -67,7 +68,7 @@ class GraphLoss(nn.Module):
             # loss += (self.beta[0] * self.focal_loss(pred_mtx, gt_mtx) + self.beta[1] * self.dice_loss(pred_mtx,gt_mtx))
             loss +=  self.focal_loss(pred_mtx, gt_mtx)
 
-        return loss 
+        return loss / (num_graphs * 1.)
 
 
 class PermutationLossHung(nn.Module):

@@ -100,7 +100,7 @@ static_graph_conv:
         - [96,128]
       layer_type: 'linear'
       layer_bias: False
-      norm_type: 'batchNorm'
+      norm_type: 'graphnorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1
     update_model:
@@ -110,7 +110,7 @@ static_graph_conv:
         - [128,128]
       layer_type: 'linear'
       layer_bias: False
-      norm_type: 'batchNorm'
+      norm_type: 'graphnorm'
       activate_func: 'lrelu'
       lrelu_slope: 0.1  
 #----------------Deprecated-----------------#
@@ -158,7 +158,7 @@ dynamic_graph_conv:
       # - [128,128,128]
     layer_type: 'linear'
     layer_bias: False
-    norm_type: 'batchNorm'
+    norm_type: 'graphnorm'
     activate_func: 'lrelu'
     lrelu_slope: 0.1
 
@@ -166,11 +166,11 @@ dynamic_graph_conv:
 fuse_model:
   # [in_dim , mid_dim, out_dim]
   dims_list: 
-    - [512,512,1024]
-    - [1536,768,384,192,192] 
+    - [512,1024]
+    - [1536,768,384,192] 
   layer_type: 'Conv1d'
   layer_bias: False
-  norm_type: 'batchNorm'
+  norm_type: 'graphnorm'
   activate_func: 'lrelu'
   lrelu_slope: 0.2
 
@@ -181,5 +181,5 @@ affinity_model:
   layer_type: 'linear'
   layer_bias: False
   norm_type: 'None'
-  activate_func: 'relu'
+  activate_func: 'sigmoid'
   lrelu_slope: 0

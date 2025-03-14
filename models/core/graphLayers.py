@@ -53,6 +53,113 @@ def parse_layer_dimension(layer_dims: Union[list, tuple]):
     in_dim , *hidden_dim , out_dim = layer_dims
     return in_dim, hidden_dim, out_dim 
 
+class l2Norm(nn.Module):
+    def __init__(self,dim=1,eps=1e-8):
+        super().__init__()
+        self.dim = dim
+        self.eps = eps
+    def forward(self,x):
+        return x / (torch.norm(x,p=2,dim=self.dim,keepdim=True) + self.eps)
+
+
+class MsgBlock(nn.Module):    
+    def __init__(self,
+            dims_list  :Union[list,tuple], 
+            layer_type :str, layer_bias :bool,
+            norm_type  :str ,
+            activate_func :str, lrelu_slope:float =0.0,
+            dropout_rate :float=.1
+        ):
+        '''
+        :param dims_list: A list of  dimensions for each layer.
+        :param layer_type: The type of layer to use, e.g., 'linear', 'conv1d'.
+        :param layer_bias: Whether to use bias in Conv1d or Linear layers.        
+        :param norm_type: Thy type of normalization layer to use , e.g., 'None','batchNorm' , 'LayerNorm' ,'graphNorm'.
+        :param activate_func: Activation function type, e.g., 'relu', 'lrelu'.
+        :param lrelu_slope: Negative slope for LeakyReLU activation.
+        '''
+        super(MsgBlock, self).__init__()
+        activation_map = {
+            'relu': nn.ReLU(inplace=True),
+            'lrelu': nn.LeakyReLU(negative_slope=lrelu_slope, inplace=True),
+            'sigmoid': nn.Sigmoid(),
+        }
+        normalization_map = {
+            'none'      : None,
+            'batchnorm' : nn.BatchNorm1d,
+            'layernorm' : nn.LayerNorm,
+            'graphnorm' : norm.GraphNorm,
+            'l2norm'    : l2Norm,
+        }
+        layer_type    = layer_type.lower()
+        activate_func = activate_func.lower()
+        norm_type     = norm_type.lower()
+        
+        assert layer_type in ['linear','conv1d'] , f"Unsupported layer type: {layer_type}. "
+        assert activate_func in activation_map , f"Unsupported activation function: {activate_func}. " + f"Supported functions are: {list(activation_map.keys())}"
+        assert norm_type in normalization_map , f"Unsupported normalization layer type: {norm_type}."
+        
+        assert len(dims_list) > 0 , "dims_list should not be empty"
+        #---------------------------------#
+        #  dims_list : [in_dim, hidden_dim , out_dim]
+        #---------------------------------#
+        in_dim = dims_list[0]
+        if len(dims_list) > 1 :
+            dims_list = dims_list[1:]
+
+        layers = []
+
+        length = len(dims_list)
+
+        norm_layer     = normalization_map[norm_type]   
+        activate_layer = activation_map[activate_func]
+        
+        for cnt,dim in enumerate(dims_list):
+            if layer_type == 'conv1d':
+                layers.append(nn.Conv1d(in_dim, dim, kernel_size=1, bias=layer_bias))
+            elif layer_type == 'linear':
+                layers.append(nn.Linear(in_dim, dim, bias=layer_bias))
+
+            if cnt < length - 1 :
+                layers.append(activate_layer)
+                layers.append(nn.Dropout(dropout_rate))
+            else:
+                if norm_layer is not None:
+                    layers.append(
+                        norm_layer(dim) if norm_type != 'l2norm' else norm_layer()
+                    )
+            in_dim = dim
+        self.layers = nn.Sequential(*layers)
+
+        self._initialize_weights(lrelu_slope)
+
+    def _initialize_weights(self,lrelu_slope):
+        for m in self.layers:
+            if isinstance(m,nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.Conv1d):
+                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope,mode='fan_out')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m,nn.BatchNorm1d) or isinstance(m,nn.LayerNorm):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m,norm.GraphNorm):
+                if hasattr(m, 'reset_parameters'):
+                    m.reset_parameters()
+    def forward(self, input,edge_batch:Optional[torch.Tensor]=None):
+        for layer in self.layers:
+            if isinstance(layer,norm.GraphNorm):
+                if input.dim() == 3 : # conv1d
+                    input = layer(input.squeeze(-1),edge_batch).unsqueeze(-1)
+                else:  
+                    input = layer(input,edge_batch)
+            
+            else:
+                input = layer(input)
+        return input
 
 class SequentialBlock(nn.Module):
     '''
@@ -86,7 +193,7 @@ class SequentialBlock(nn.Module):
             'batchnorm' : nn.BatchNorm1d,
             'layernorm' : nn.LayerNorm,
             'graphnorm' : norm.GraphNorm,
-            'l2norm'    : partial(torch.norm,p=2,dim=1),
+            'l2norm'    : l2Norm,
         }
         layer_type    = layer_type.lower()
         activate_func = activate_func.lower()
@@ -119,7 +226,9 @@ class SequentialBlock(nn.Module):
 
             if cnt < length - 1 or final_activation:
                 if norm_layer is not None:
-                    layers.append(norm_layer(dim))
+                    layers.append(
+                        norm_layer(dim) if norm_type != 'l2norm' else norm_layer()
+                    )
                 layers.append(activate_layer)
             in_dim = dim
         self.layers = nn.Sequential(*layers)
@@ -232,13 +341,13 @@ class NodeUpdater(MessagePassing):
         res_model_dict = node_update_model_dict['res_model']
         upd_model_dict = node_update_model_dict['update_model']
 
-        self.msg_layer    = SequentialBlock(
+        self.msg_layer    = MsgBlock(
                 dims_list  = msg_model_dict['dims_list'][idx],
                 layer_type = msg_model_dict['layer_type'], layer_bias = msg_model_dict['layer_bias'],
                 norm_type  = msg_model_dict['norm_type'], 
                 activate_func = msg_model_dict['activate_func'], lrelu_slope = msg_model_dict['lrelu_slope']
             )
-        if res_model_dict['dims_list'][idx] is not None:
+        if res_model_dict['dims_list'][idx] :
             self.res_layer = SequentialBlock(
                     dims_list  = res_model_dict['dims_list'][idx],
                     layer_type = res_model_dict['layer_type'], layer_bias = res_model_dict['layer_bias'],
@@ -257,14 +366,18 @@ class NodeUpdater(MessagePassing):
 
     def forward(self,x :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
         # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
-        return self.propagate(edge_index,edge_attr=edge_attr,x=x,batch=batch)
+        if batch is not None:
+            edge_batch = batch[edge_index[0]]
+        else:
+            edge_batch = None
+        return self.propagate(edge_index,edge_attr=edge_attr,x=x,batch=batch,edge_batch=edge_batch)
     
-    def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor,batch:torch.Tensor) -> torch.Tensor:
+    def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor,edge_batch:torch.Tensor) -> torch.Tensor:
         '''
         x_i : target nodes 
         x_j : source nodes
         '''
-        return self.msg_layer(torch.cat([edge_attr,x_j - x_i], dim=1),batch)
+        return self.msg_layer(torch.cat([edge_attr,x_j - x_i], dim=1),edge_batch)
 
 
     def update(self, msg:torch.Tensor,x:torch.Tensor,batch:torch.Tensor) -> torch.Tensor:
@@ -331,7 +444,7 @@ class EdgeEncoder(nn.Module):
     
     @staticmethod
     def construct_edge_index(batch: Union[Batch,Data], k, bt_cosine: bool=False,
-        bt_self_loop: bool=False,bt_directed: bool=True) -> torch.Tensor:
+        bt_self_loop: bool=False,bt_directed: bool=True,bt_input_x:bool = False) -> torch.Tensor:
         """
         Construct edge_index in either the Batch or Data.
         > construct KNN for each subgraph in the Batch
@@ -348,7 +461,8 @@ class EdgeEncoder(nn.Module):
         """
 
         if not hasattr(batch,'num_graphs'): # Date Type
-            edge_index = knn(batch.geometric_info[:,6:8],k, bt_cosine=bt_cosine,bt_self_loop= bt_self_loop,bt_directed=bt_directed)
+            input =  batch.x if bt_input_x else batch.geometric_info[:,6:8]
+            edge_index = knn(input,k, bt_cosine=bt_cosine,bt_self_loop= bt_self_loop,bt_directed=bt_directed)
             return edge_index
         
         # Batch Type
@@ -356,9 +470,9 @@ class EdgeEncoder(nn.Module):
         for i in range(batch.num_graphs):
             start, end = batch.ptr[i:i+2]
             
-            sub_positions = batch.geometric_info[start:end,6:8]
+            sub_input = batch.x[start:end,:] if bt_input_x else batch.geometric_info[start:end,6:8]
             
-            edge_index = knn(sub_positions, k, bt_cosine= bt_cosine,bt_self_loop= bt_self_loop,bt_directed= bt_directed)
+            edge_index = knn(sub_input, k, bt_cosine= bt_cosine,bt_self_loop= bt_self_loop,bt_directed= bt_directed)
             
             all_edge_index.append(edge_index + start)
         

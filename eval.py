@@ -51,7 +51,7 @@ def main():
 
     seq_name_list    = data_json['valid_seq'][dataset_name]['seq_name']
     for cnt, seq in enumerate(seq_name_list):
-        # if seq != 'MOT20-05':
+        # if seq != 'MOT17-05':
         #     continue
         # seq_det_path  = os.path.join(test_root_dir,seq,'det','2024_0909_160937(yolov8-det).txt')
         if dataset_name in ['MOT17','MOT20']:
@@ -85,7 +85,7 @@ def main():
             start = time.perf_counter()
             img_data  = I.read_image(os.path.join(seq_img_dir,f'{frame_id:06d}.jpg'))
             img_cv    = img_data.clone().permute(1,2,0).numpy()[...,::-1].astype(np.uint8)
-            # if frame_id == 42:
+            # if frame_id == 23:
             #     print('here')
             trackers_list = trackManager.update(frame_id,frame_det[:,2:],img_data) # need to be careful with the input format
             

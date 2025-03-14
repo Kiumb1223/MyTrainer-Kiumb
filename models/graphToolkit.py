@@ -154,10 +154,15 @@ def box_iou(boxes1:np.ndarray, boxes2:np.ndarray,iou_type:str = 'iou') -> np.nda
     iou = inter_area / union_area
     if iou_type == 'iou':
         return iou
+    convex_lt = np.minimum(boxes1[:,None, :2], boxes2[..., :2])
+    convex_rb = np.maximum(boxes1[:,None, 2:], boxes2[..., 2:])
+    convex_wh = convex_rb - convex_lt
+    if iou_type == 'hiou':
+        inter_h = inter[:,:, 1]
+        convex_h = convex_wh[:,:,1]
+        hiou = iou * (inter_h / convex_h)
+        return hiou
     elif iou_type == 'giou':
-        convex_lt = np.minimum(boxes1[:,None, :2], boxes2[..., :2])
-        convex_rb = np.maximum(boxes1[:,None, 2:], boxes2[..., 2:])
-        convex_wh = convex_rb - convex_lt
         convex_area = convex_wh[:,:, 0] * convex_wh[:,:, 1]
         # mark sure the value ranges from  [0,1] ,which is the same as iou
         # Reference: SCGTracker: Spatio-temporal correlation and graph neural networks for multiple object tracking
@@ -172,10 +177,10 @@ def calc_cosineSim(tra_feats :torch.Tensor,det_feats:torch.Tensor) -> torch.Tens
     Returns:
         cosineSim (torch.Tensor): Tensor of shape [M, N], representing the cosine similarity between each pair of features.
     '''
-    tra_feats_norm = F.normalize(tra_feats,p=2,dim=1)
-    det_feats_norm = F.normalize(det_feats,p=2,dim=1)
-    cosineSim = torch.matmul(tra_feats_norm, det_feats_norm.T)
-    return cosineSim
+    n1 = torch.norm(tra_feats,dim=-1,keepdim=True)
+    n2 = torch.norm(det_feats,dim=-1,keepdim=True)
+    corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+    return corr
 
 def calc_iou(tra_box :torch.Tensor,det_box:torch.Tensor,iou_type:str='iou',eps = 1e-8) -> torch.Tensor:
     ''' Only support tensor type data 

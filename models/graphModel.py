@@ -39,20 +39,20 @@ class GraphModel(nn.Module):
         # Graph Layer
         #---------------------------------#
         self.graphconvLayer = SDgraphConv(
-            static_graph_conv_dict = model_dict['static_graph_conv'],
-            dynamic_graph_conv_dict = model_dict['dynamic_graph_conv'],
-            fuse_model_dict = model_dict['fuse_model']
+                static_graph_conv_dict = model_dict['static_graph_conv'],
+                dynamic_graph_conv_dict = model_dict['dynamic_graph_conv'],
+                fuse_model_dict = model_dict['fuse_model']
             )
         
         #---------------------------------#
         # Affinity Layer
         #---------------------------------#
 
-        # self.affinityLayer = SequentialBlock(
-        #     model_dict['affinity_model']['dims_list'],
-        #     model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
-        #     model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
-        # )
+        self.affinityLayer = SequentialBlock(
+            model_dict['affinity_model']['dims_list'],
+            model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
+            model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
+        )
 
         #---------------------------------#
         # Sinkhorn Layer 
@@ -102,17 +102,17 @@ class GraphModel(nn.Module):
             det_xyxy = det_graph_batch.geometric_info[det_batch_indices == graph_idx,:4]
 
             # 1. Compute affinity matrix for the current graph 
-            node_sim = calc_cosineSim(tra_node,det_node)
-            # node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
-            # app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
-            # iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='iou').unsqueeze(-1)
+            # node_sim = calc_cosineSim(tra_node,det_node)
+            node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
+            app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
+            iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='hiou').unsqueeze(-1)
             
-            # corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
+            corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
 
             if self.bt_mask: # compute mask to filter out some unmatched nodes
                 dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,6:8],det_graph_batch.geometric_info[det_batch_indices == graph_idx,6:8]) <= self.dist_thresh ).float()
-                corr = node_sim  * dist_mask
-                # corr = corr  * dist_mask
+                # corr = node_sim  * dist_mask
+                corr = corr  * dist_mask
 
             # 2. Prepare the augmented affinity matrix for Sinkhorn
             m , n = corr.shape
@@ -121,15 +121,15 @@ class GraphModel(nn.Module):
             alpha = self.alpha.expand(1, 1)
             couplings = torch.cat([torch.cat([corr,bins0],dim=-1),
                                 torch.cat([bins1,alpha],dim=-1)],dim=0)
-            norm  = 1 / ( m + n )  
-            a_aug = torch.full((m+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-            b_aug = torch.full((n+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-            a_aug[-1] = norm * n
-            b_aug[-1] = norm * m            
+            # norm  = 1 / ( m + n )  
+            a_aug = torch.full((m+1,),1,device=self.alpha.device,dtype=torch.float32) 
+            b_aug = torch.full((n+1,),1,device=self.alpha.device,dtype=torch.float32) 
+            a_aug[-1] =  n
+            b_aug[-1] =  m            
            
 
-            pred_mtx = self.sinkhornLayer(1 - couplings,a_aug,b_aug,
-                                          lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
+            pred_mtx = self.sinkhornLayer( - couplings,a_aug,b_aug,
+                                          lambd_sink = torch.exp(self.eplison) + 0.03)
             
             pred_mtx_list.append(pred_mtx[:-1,:-1])
 
@@ -167,18 +167,18 @@ class GraphModel(nn.Module):
         tra_node_feats = self.graphconvLayer(tra_graph,self.k)
         det_node_feats = self.graphconvLayer(det_graph,self.k)
 
-        node_sim = calc_cosineSim(tra_node_feats,det_node_feats)
-        # node_sim = calc_cosineSim(tra_node_feats,det_node_feats).unsqueeze(-1)
-        # app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
-        # iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='iou').unsqueeze(-1)
+        # node_sim = calc_cosineSim(tra_node_feats,det_node_feats)
+        node_sim = calc_cosineSim(tra_node_feats,det_node_feats).unsqueeze(-1)
+        app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
+        iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='hiou').unsqueeze(-1)
         
-        # corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
+        corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
 
 
         if self.bt_mask: # compute mask to filter out some unmatched nodes
             dist_mask = ( torch.cdist(tra_graph.geometric_info[:,6:8],det_graph.geometric_info[:,6:8]) <= self.dist_thresh ).float()
-            # corr = corr * dist_mask
-            corr = node_sim * dist_mask
+            corr = corr * dist_mask
+            # corr = node_sim * dist_mask
 
         m , n = corr.shape
         bins0 = self.alpha.expand(m, 1)
@@ -186,14 +186,14 @@ class GraphModel(nn.Module):
         alpha = self.alpha.expand(1, 1)
         couplings = torch.cat([torch.cat([corr,bins0],dim=-1),
                                torch.cat([bins1,alpha],dim=-1)],dim=0)
-        norm  = 1 / ( m + n )  
-        a_aug = torch.full((m+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-        b_aug = torch.full((n+1,),norm,device=self.alpha.device,dtype=torch.float32) 
-        a_aug[-1] = norm * n
-        b_aug[-1] = norm * m
+        # norm  = 1 / ( m + n )  
+        a_aug = torch.full((m+1,),1,device=self.alpha.device,dtype=torch.float32) 
+        b_aug = torch.full((n+1,),1,device=self.alpha.device,dtype=torch.float32) 
+        a_aug[-1] =  n
+        b_aug[-1] =  m
 
-        pred_mtx = self.sinkhornLayer(1 - couplings,a_aug,b_aug,
-                                lambd_sink = torch.exp(self.eplison) + 0.03) * (m + n)
+        pred_mtx = self.sinkhornLayer( - couplings,a_aug,b_aug,
+                                lambd_sink = torch.exp(self.eplison) + 0.03) 
         return pred_mtx[:-1,:-1]
     
     def gen_appFeats(self,det_graph :Data):

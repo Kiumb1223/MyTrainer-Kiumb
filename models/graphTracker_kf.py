@@ -19,7 +19,7 @@ from torch_geometric.data import Data
 from models.graphModel import GraphModel
 import torchvision.transforms.functional as T
 from models.graphToolkit import hungarian,box_iou
-
+from models.core.kalman_filter import KalmanFilter
 __all__ = ['TrackManager']
 
 @unique
@@ -34,18 +34,24 @@ class Tracker:
     '''the tracker class'''
 
     _track_id = 0
-
+    shared_kalman = KalmanFilter()
     def __init__(self,
             start_frame:int,
             app_feat:torch.Tensor,
             conf:float,
-            geometric_info:np.ndarray,
+            tlwh:np.ndarray,
             cnt_to_active:int,
             cnt_to_sleep:int,
             max_cnt_to_dead:int,
             feature_list_size:int
         ):
-        
+
+        #---------------------------------#
+        self.kalman_filter = None
+        self.mean, self.covariance = None, None
+        #---------------------------------#
+
+
         self.track_id   = None # when state: Born to Active, this will be assigned
         self.track_len  = 0
         self.sleep_cnt  = 0 
@@ -56,8 +62,7 @@ class Tracker:
         self.frame_idx     = start_frame
 
         self.conf = conf
-        # self.tlwh = tlwh # (top left x, top left y, width, height)
-        self.geometric_info  = geometric_info
+        self.real_tlwh  = tlwh # (top left x, top left y, width, height)
 
         self.app_feats_list  = []
         self.app_feats_list.append(app_feat) 
@@ -67,27 +72,41 @@ class Tracker:
         self._max_cnt_to_dead   = max_cnt_to_dead  
         self._feature_list_size = feature_list_size
 
-    def to_active(self,frame_idx,app_feat,conf,geometric_info):
+    def to_active(self,frame_idx,app_feat,conf,tlwh):
         assert app_feat.shape[-1] == 32 , f'plz confirm the feature size is 32, but got {app_feat.shape}'
         if self.state  == LifeSpan.Born:
             age = frame_idx - self.start_frame
             if age >= self._cnt_to_active:
                 self.state = LifeSpan.Active
                 self.track_id = Tracker.get_track_id()
+                # for kalman filter 
+                self.kalman_filter = KalmanFilter()
+                self.mean , self.covariance = self.kalman_filter.initiate(
+                    self.tlwh_to_xyah(tlwh)
+                )
+
                 # del self._cnt_to_active
         elif self.state == LifeSpan.Sleep:
             self.track_len = 0
             self.sleep_cnt = 0
             self.state     = LifeSpan.Active
+            # for kalman filter
+            self.mean , self.covariance = self.kalman_filter.update(
+                self.mean,self.covariance,self.tlwh_to_xyah(tlwh)
+            )
         else:
+            # for kalman filter
             self.state = LifeSpan.Active
+            self.mean,self.covariance = self.kalman_filter.update(
+                self.mean,self.covariance,self.tlwh_to_xyah(tlwh)
+            )
         
         self.active_cnt = 0
         self.track_len += 1 
         self.frame_idx = frame_idx
         self.conf = conf
-        # self.tlwh = tlwh
-        self.geometric_info = geometric_info
+
+        self.real_tlwh = tlwh
         self.app_feats_list.append(app_feat)
 
         if len(self.app_feats_list) > self._feature_list_size:
@@ -135,21 +154,53 @@ class Tracker:
     
     @property
     def tlwh(self):
-        """Convert bounding box to format `(top left x, top left y, width, height)`."""
-        top_left_x = self.geometric_info[0]
-        top_left_y = self.geometric_info[1]
-        width   = self.geometric_info[4]
-        height  = self.geometric_info[5]
-        return [top_left_x, top_left_y, width, height]
+        """Get current position in bounding box format `(top left x, top left y,
+                width, height)`.
+        """
+        if self.mean is None:
+            return self.real_tlwh.copy()
+        ret = self.mean[:4].copy()
+        ret[2] *= ret[3]
+        ret[:2] -= ret[2:] / 2
+        return ret
 
     @property
     def tlbr(self):
         """Convert bounding box to format `(min x, min y, max x, max y)`."""
-        min_x = self.geometric_info[0]
-        min_y = self.geometric_info[1]
-        max_x = self.geometric_info[2]
-        max_y = self.geometric_info[3]
-        return [min_x, min_y, max_x, max_y]
+        ret = self.tlwh.copy()
+        ret[2:] += ret[:2]
+        return ret
+    @property
+    def xyah(self):
+        '''(center x, center y, aspect ratio, height)'''
+        ret = self.tlwh.copy()
+        ret[:2] += ret[2:] / 2
+        ret[2]  /= ret[3]
+        return ret
+    
+    @property
+    def geometric_info(self):
+        '''8-dim data :`(min x , min y , max x , max y , width , height , center x , center y)`'''
+        ret = np.zeros(8)
+        ret[:4]  = self.tlbr
+        ret[4:6] = self.tlwh[2:]
+        ret[6:]  = self.xyah[:2]
+        return ret
+    
+    @staticmethod
+    def tlwh_to_xyah(tlwh):
+        '''Convert bounding box to format `(center x, center y, aspect ratio, height)`'''
+        ret = np.asarray(tlwh).copy()
+        ret[:2] += ret[2:] / 2
+        ret[2] /= ret[3]
+        return ret
+    
+    @staticmethod
+    def tlwh_to_tlbr(tlwh):
+        ''' tlwh.shape [N,4] '''
+        ret = np.asarray(tlwh).copy()
+        ret[:,2:] += ret[:,:2]
+        return ret
     
     @staticmethod
     def get_track_id():
@@ -163,6 +214,19 @@ class Tracker:
 
     def __repr__(self) -> str:
         return f"Tracker(id - {self.track_id} || from {self.start_frame} to {self.end_frame})"
+    
+    @staticmethod
+    def multi_predict(trackers:list):
+        if len(trackers) > 0:
+            multi_mean = np.asarray([track.mean.copy() for track in trackers])
+            multi_covariance = np.asarray([track.covariance for track in trackers])
+            for i , track in enumerate(trackers):
+                if not track.is_Active:
+                    multi_mean[i][7] = 0
+            multi_mean , multi_covariance = Tracker.shared_kalman.multi_predict(multi_mean,multi_covariance)
+            for i,(mean,cov) in enumerate(zip(multi_mean,multi_covariance)):
+                trackers[i].mean = mean
+                trackers[i].covariance = cov
 
 class TrackManager:
     def __init__(self,model :GraphModel,device :str,path_to_weights :str, tracking_dict :dict):
@@ -211,7 +275,8 @@ class TrackManager:
                 first_dets_list.append(det)
             else:
                 second_dets_list.append(det)
-        
+        first_dets_list  = np.asarray(first_dets_list)
+        second_dets_list = np.asarray(second_dets_list)
         first_tras_list , second_tras_list , third_tras_list = [] , [] , []
         for track in self.tracks_list:
             if track.is_Active :
@@ -224,7 +289,7 @@ class TrackManager:
             # elif track.is_Born :
                 third_tras_list.append(track)
 
-
+        Tracker.multi_predict(first_tras_list + second_tras_list)
         #------------------------------------------------------------------#
         #                       First matching phase
         #------------------------------------------------------------------#
@@ -233,7 +298,7 @@ class TrackManager:
         match_mtx,match_idx,unmatch_tra,unmatch_det = self._graph_match(tra_graph,det_graph,self._first_match_thresh)
         # The inputs `det_graph` & `tra_graph` are modified inside `self.model`, 
         # so their state changes after the function call.
-        det_graph.geometric_info = det_graph.geometric_info.cpu().numpy()
+        det_tlwh = first_dets_list[:,:4]
 
         if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
             # @BUG match_idx = [[],[]] 
@@ -247,39 +312,40 @@ class TrackManager:
             for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
                 first_tras_list[tra_id].to_active(
                     cur_frame,smooth_app_feats[i].squeeze(),
-                    det_conf_list[i],det_graph.geometric_info[det_id]
+                    det_conf_list[i],det_tlwh[det_id]
                 )
                 if not first_tras_list[tra_id].is_Born and not first_tras_list[tra_id].is_Sleep:
                     output_track_list.append(first_tras_list[tra_id])        
         for tra_id in unmatch_tra:   # unmatched tras 
-            # first_match_list[tra_id].to_sleep()
-            if not first_tras_list[tra_id].is_Born:
-                second_tras_list.append(first_tras_list[tra_id])
-            else:
-                third_tras_list.append(first_tras_list[tra_id])
+            first_tras_list[tra_id].to_sleep()
+            # if not first_tras_list[tra_id].is_Born:
+            #     second_tras_list.append(first_tras_list[tra_id])
+            # else:
+            #     third_tras_list.append(first_tras_list[tra_id])
 
         id_map , third_dets_list = [] , []
         for det_id in unmatch_det:
             id_map.append(det_id)
             third_dets_list.append(first_dets_list[det_id])   # prepare for the third matching phase
+        third_dets_list = np.asarray(third_dets_list)
 
         #------------------------------------------------------------------#
         #                       Second matching phase
         #------------------------------------------------------------------#
         if second_tras_list :
-            if second_dets_list:
-            # if []:
+            # if second_dets_list.size:
+            if []:
                 #---------------------------------#
                 # need to encode the necessary features of dets whose confidence is relatively lower
                 #---------------------------------#
                 second_det_graph = self.construct_det_graph(second_dets_list,img_date)
                 second_det_graph.x.to(self.device)
-                second_det_graph.geometric_info = second_det_graph.geometric_info.numpy()
-                diff_t = cur_frame - np.asarray([track.end_frame for track in second_tras_list]).reshape(len(second_tras_list),1).repeat(len(second_dets_list),1).astype(np.float32)
+                second_det_tlwh  = second_dets_list[:,:4]
+                diff_t = cur_frame - np.array([track.end_frame for track in second_tras_list]).reshape(len(second_tras_list),1).repeat(len(second_dets_list),1).astype(np.float32)
                 self.model.gen_appFeats(second_det_graph)
                 # second_dets_conf = current_detections[second_dets_list,4]
                 match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_reid_match(
-                        second_tras_list,second_det_graph.geometric_info[:,:4],
+                        second_tras_list,Tracker.tlwh_to_tlbr(second_det_tlwh),
                         second_det_graph.x,diff_t,self._second_match_thresh
                     )
                 
@@ -298,7 +364,7 @@ class TrackManager:
                     for i,(tra_id, det_id) in enumerate(zip(tra_idx,det_idx)):
                         second_tras_list[tra_id].to_active(
                             cur_frame,smooth_app_feats[i].squeeze(),
-                            det_conf_list[i],second_det_graph.geometric_info[det_id]
+                            det_conf_list[i],second_det_tlwh[det_id]
                         )
                         output_track_list.append(second_tras_list[tra_id])
                 for tra_id in unmatch_tra:
@@ -312,41 +378,45 @@ class TrackManager:
         #------------------------------------------------------------------#
         #                       Third matching phase
         #------------------------------------------------------------------#
-        third_dets_app  = det_graph.x[id_map]
-        third_dets_geometric_info = det_graph.geometric_info[id_map]
+        if third_dets_list.size:
+            third_dets_app  = det_graph.x[id_map]
+            third_dets_tlwh = third_dets_list[:,:4]
 
-        match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(third_tras_list,third_dets_geometric_info[:,:4],self._third_match_thresh)
-        if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
-            tra_idx ,det_idx = match_idx
-            tra_app_feats,tra_conf_list = [] , []
-            for i in tra_idx:
-                tra_app_feats.append(third_tras_list[i].app_feats_list[-1])
-                tra_conf_list.append(third_tras_list[i].conf)
-            tra_app_feats  = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.float32)
-            
-            det_app_feats  = third_dets_app[det_idx]
-            det_conf_list  = [third_dets_list[i][4] for i in det_idx]
-
-            smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)          
-            for i,( tra_id, det_id ) in enumerate(zip(tra_idx,det_idx)):
-                third_tras_list[tra_id].to_active(
-                    cur_frame,smooth_app_feats[i].squeeze(),
-                    det_conf_list[i],third_dets_geometric_info[det_id]
+            match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_match(
+                    third_tras_list,Tracker.tlwh_to_tlbr(third_dets_tlwh),
+                    self._third_match_thresh
                 )
-                if not third_tras_list[tra_id].is_Born:
-                    output_track_list.append(third_tras_list[tra_id])
-        for tra_id in unmatch_tra:  # unmatched tras 
-            third_tras_list[tra_id].to_sleep()
-        for det_id in unmatch_det:
-            if third_dets_list[det_id][4] >= self._det2tra_conf:
-                third_tras_list.append(
-                    Tracker(
-                        cur_frame,third_dets_app[det_id],
-                        third_dets_list[det_id][4],
-                        third_dets_geometric_info[det_id],
-                        self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size
+            if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
+                tra_idx ,det_idx = match_idx
+                tra_app_feats,tra_conf_list = [] , []
+                for i in tra_idx:
+                    tra_app_feats.append(third_tras_list[i].app_feats_list[-1])
+                    tra_conf_list.append(third_tras_list[i].conf)
+                tra_app_feats  = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.float32)
+                
+                det_app_feats  = third_dets_app[det_idx]
+                det_conf_list  = [third_dets_list[i][4] for i in det_idx]
+
+                smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)          
+                for i,( tra_id, det_id ) in enumerate(zip(tra_idx,det_idx)):
+                    third_tras_list[tra_id].to_active(
+                        cur_frame,smooth_app_feats[i].squeeze(),
+                        det_conf_list[i],third_dets_tlwh[det_id]
                     )
-                )
+                    if not third_tras_list[tra_id].is_Born:
+                        output_track_list.append(third_tras_list[tra_id])
+            for tra_id in unmatch_tra:  # unmatched tras 
+                third_tras_list[tra_id].to_sleep()
+            for det_id in unmatch_det:
+                if third_dets_list[det_id][4] >= self._det2tra_conf:
+                    third_tras_list.append(
+                        Tracker(
+                            cur_frame,third_dets_app[det_id],
+                            third_dets_list[det_id][4],
+                            third_dets_tlwh[det_id],
+                            self._cnt_to_active,self._cnt_to_sleep,self._max_cnt_to_dead,self._feature_list_size
+                        )
+                    )
 
         self.tracks_list = self.remove_invalid_tracks(first_tras_list + second_tras_list + third_tras_list)
         return output_track_list
@@ -408,6 +478,7 @@ class TrackManager:
         tras_app_feats = torch.stack(tras_app_feats,dim=0).to(dets_app_feats)
 
         iou = box_iou(tras_tlbr,dets_tlbr,iou_type='hiou')
+
 
 
         n1   = torch.norm(tras_app_feats,dim=-1,keepdim=True)
