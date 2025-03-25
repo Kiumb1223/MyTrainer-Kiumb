@@ -168,18 +168,34 @@ def box_iou(boxes1:np.ndarray, boxes2:np.ndarray,iou_type:str = 'iou') -> np.nda
         # Reference: SCGTracker: Spatio-temporal correlation and graph neural networks for multiple object tracking
         giou = (iou - (convex_area - union_area) / convex_area + 1) / 2.
         return giou
-def calc_cosineSim(tra_feats :torch.Tensor,det_feats:torch.Tensor) -> torch.Tensor:
+def calc_cosineSim(tra_feats: torch.Tensor, det_feats: torch.Tensor, use_softmax: bool = False) -> torch.Tensor:
     '''
-    
     Args:
         tra_feats (torch.Tensor): Tensor of shape [M, C], representing the first set of features.
         det_feats (torch.Tensor): Tensor of shape [N, C], representing the second set of features.
+        use_softmax (bool): If True, use softmax-based method for similarity calculation.
+                             If False, use the standard cosine similarity.
+
     Returns:
         cosineSim (torch.Tensor): Tensor of shape [M, N], representing the cosine similarity between each pair of features.
     '''
-    n1 = torch.norm(tra_feats,dim=-1,keepdim=True)
-    n2 = torch.norm(det_feats,dim=-1,keepdim=True)
-    corr = torch.mm(tra_feats,det_feats.transpose(1,0)) / torch.mm(n1,n2.transpose(1,0))
+
+    corr = torch.mm(tra_feats, det_feats.transpose(1, 0)) 
+
+    if not use_softmax:
+        n1 = torch.norm(tra_feats, dim=-1, keepdim=True)
+        n2 = torch.norm(det_feats, dim=-1, keepdim=True)
+        
+        corr = corr / torch.mm(n1, n2.transpose(1, 0))
+    
+    else:
+        # Compute dot product between tra_feats and det_feats
+        feature_len = tra_feats.shape[-1]
+        corr = corr / feature_len ** 0.5
+        
+        # Apply softmax to normalize the scores (convert to probability distribution)
+        corr = torch.softmax(corr, dim=-1)
+
     return corr
 
 def calc_iou(tra_box :torch.Tensor,det_box:torch.Tensor,iou_type:str='iou',eps = 1e-8) -> torch.Tensor:

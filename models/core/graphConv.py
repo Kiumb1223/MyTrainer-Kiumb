@@ -6,7 +6,7 @@ import torch.nn as nn
 from typing import Union,Optional
 from torch_geometric.data import Batch,Data
 from torch_geometric.nn import MessagePassing
-from models.core.graphLayers import SequentialBlock,MsgBlock,NodeUpdater,EdgeEncoder,EdgeUpdater
+from models.core.graphLayers import SequentialBlock,NodeUpdater,EdgeEncoder,EdgeUpdater
 
 __all__ = ['SDgraphConv']
 
@@ -22,7 +22,7 @@ class StaticConv(nn.Module):
         node_update_model_dict = static_graph_conv_dict['node_update_model']
         edge_update_model_dict = static_graph_conv_dict['edge_update_model']
         self.node_update_model = NodeUpdater(idx,node_update_model_dict)
-        # if idx == 0:
+        # if edge_update_model_dict['dims_list'][idx] == []:
         if True:
             self.edge_update_model = None
         else:
@@ -38,55 +38,6 @@ class StaticConv(nn.Module):
         x = self.node_update_model(x,edge_index,edge_attr,batch)
 
         return x,edge_attr
-# class StaticConv(MessagePassing):
-#     '''graph in and graph out '''
-#     def __init__(self,
-#             idx : int,
-#             static_graph_conv_dict: dict,
-#         ):
-#         node_update_model_dict = static_graph_conv_dict['node_update_model']
-#         super().__init__(aggr=node_update_model_dict['aggr']) 
-
-#         msg_model_dict = node_update_model_dict['message_model']
-#         res_model_dict = node_update_model_dict['res_model']
-#         upd_model_dict = node_update_model_dict['update_model']
-
-#         self.msg_func    = SequentialBlock(
-#                 dims_list  = msg_model_dict['dims_list'][idx],
-#                 layer_type = msg_model_dict['layer_type'], layer_bias = msg_model_dict['layer_bias'],
-#                 norm_type  = msg_model_dict['norm_type'], 
-#                 activate_func = msg_model_dict['activate_func'], lrelu_slope = msg_model_dict['lrelu_slope']
-#             )
-#         if res_model_dict['dims_list'][idx] is not None:
-#             self.res_node_func = SequentialBlock(
-#                     dims_list  = res_model_dict['dims_list'][idx],
-#                     layer_type = res_model_dict['layer_type'], layer_bias = res_model_dict['layer_bias'],
-#                     norm_type  = res_model_dict['norm_type'],
-#                     activate_func = res_model_dict['activate_func'], lrelu_slope = res_model_dict['lrelu_slope']
-#                 )
-#         else:
-#             self.res_node_func = lambda x , batch: x
-#         self.update_func = SequentialBlock(
-#                 dims_list  = upd_model_dict['dims_list'][idx],
-#                 layer_type = upd_model_dict['layer_type'] , layer_bias = upd_model_dict['layer_bias'],
-#                 norm_type  = upd_model_dict['norm_type']  , 
-#                 activate_func = upd_model_dict['activate_func'] , lrelu_slope = upd_model_dict['lrelu_slope']
-#             )
-
-        
-#     def forward(self,node_emb :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor,batch) -> torch.Tensor:
-#         # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
-#         return self.propagate(edge_index,edge_attr=edge_attr,x=node_emb,batch=batch),edge_attr
-    
-#     def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor,batch) -> torch.Tensor:
-#         '''
-#         x_i : target nodes 
-#         x_j : source nodes
-#         '''
-#         return self.msg_func(torch.cat([edge_attr,x_j - x_i], dim=1),batch)
-
-#     def update(self, msg:torch.Tensor,x:torch.Tensor,batch) -> torch.Tensor:
-#         return self.update_func(self.res_node_func(x) + msg,batch)
 
 
 class DynamicConv(MessagePassing):
@@ -104,7 +55,7 @@ class DynamicConv(MessagePassing):
         message_model_dict = dynamic_graph_conv_dict['message_model']
         update_model_dict  = dynamic_graph_conv_dict['update_model']
 
-        self.msg_layer = MsgBlock(
+        self.msg_layer = SequentialBlock(
                 dims_list  = message_model_dict['dims_list'][idx], 
                 layer_type = message_model_dict['layer_type'], layer_bias = message_model_dict['layer_bias'],
                 norm_type  = message_model_dict['norm_type'] , 
@@ -128,6 +79,7 @@ class DynamicConv(MessagePassing):
         edge_index = EdgeEncoder.construct_edge_index(graph,k,bt_cosine=self.bt_cosine,bt_self_loop=self.bt_self_loop,bt_directed=self.bt_directed,bt_input_x=True) 
         if batch is not None:
             edge_batch = batch[edge_index[-1]] # source to target
+            # edge_batch = edge_index[-1]
         else:
             edge_batch = None
 

@@ -61,106 +61,6 @@ class l2Norm(nn.Module):
     def forward(self,x):
         return x / (torch.norm(x,p=2,dim=self.dim,keepdim=True) + self.eps)
 
-
-class MsgBlock(nn.Module):    
-    def __init__(self,
-            dims_list  :Union[list,tuple], 
-            layer_type :str, layer_bias :bool,
-            norm_type  :str ,
-            activate_func :str, lrelu_slope:float =0.0,
-            dropout_rate :float=.1
-        ):
-        '''
-        :param dims_list: A list of  dimensions for each layer.
-        :param layer_type: The type of layer to use, e.g., 'linear', 'conv1d'.
-        :param layer_bias: Whether to use bias in Conv1d or Linear layers.        
-        :param norm_type: Thy type of normalization layer to use , e.g., 'None','batchNorm' , 'LayerNorm' ,'graphNorm'.
-        :param activate_func: Activation function type, e.g., 'relu', 'lrelu'.
-        :param lrelu_slope: Negative slope for LeakyReLU activation.
-        '''
-        super(MsgBlock, self).__init__()
-        activation_map = {
-            'relu': nn.ReLU(inplace=True),
-            'lrelu': nn.LeakyReLU(negative_slope=lrelu_slope, inplace=True),
-            'sigmoid': nn.Sigmoid(),
-        }
-        normalization_map = {
-            'none'      : None,
-            'batchnorm' : nn.BatchNorm1d,
-            'layernorm' : nn.LayerNorm,
-            'graphnorm' : norm.GraphNorm,
-            'l2norm'    : l2Norm,
-        }
-        layer_type    = layer_type.lower()
-        activate_func = activate_func.lower()
-        norm_type     = norm_type.lower()
-        
-        assert layer_type in ['linear','conv1d'] , f"Unsupported layer type: {layer_type}. "
-        assert activate_func in activation_map , f"Unsupported activation function: {activate_func}. " + f"Supported functions are: {list(activation_map.keys())}"
-        assert norm_type in normalization_map , f"Unsupported normalization layer type: {norm_type}."
-        
-        assert len(dims_list) > 0 , "dims_list should not be empty"
-        #---------------------------------#
-        #  dims_list : [in_dim, hidden_dim , out_dim]
-        #---------------------------------#
-        in_dim = dims_list[0]
-        if len(dims_list) > 1 :
-            dims_list = dims_list[1:]
-
-        layers = []
-
-        length = len(dims_list)
-
-        norm_layer     = normalization_map[norm_type]   
-        activate_layer = activation_map[activate_func]
-        
-        for cnt,dim in enumerate(dims_list):
-            if layer_type == 'conv1d':
-                layers.append(nn.Conv1d(in_dim, dim, kernel_size=1, bias=layer_bias))
-            elif layer_type == 'linear':
-                layers.append(nn.Linear(in_dim, dim, bias=layer_bias))
-
-            if cnt < length - 1 :
-                layers.append(activate_layer)
-                layers.append(nn.Dropout(dropout_rate))
-            else:
-                if norm_layer is not None:
-                    layers.append(
-                        norm_layer(dim) if norm_type != 'l2norm' else norm_layer()
-                    )
-            in_dim = dim
-        self.layers = nn.Sequential(*layers)
-
-        self._initialize_weights(lrelu_slope)
-
-    def _initialize_weights(self,lrelu_slope):
-        for m in self.layers:
-            if isinstance(m,nn.Linear):
-                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m,nn.Conv1d):
-                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope,mode='fan_out')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m,nn.BatchNorm1d) or isinstance(m,nn.LayerNorm):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m,norm.GraphNorm):
-                if hasattr(m, 'reset_parameters'):
-                    m.reset_parameters()
-    def forward(self, input,edge_batch:Optional[torch.Tensor]=None):
-        for layer in self.layers:
-            if isinstance(layer,norm.GraphNorm):
-                if input.dim() == 3 : # conv1d
-                    input = layer(input.squeeze(-1),edge_batch).unsqueeze(-1)
-                else:  
-                    input = layer(input,edge_batch)
-            
-            else:
-                input = layer(input)
-        return input
-
 class SequentialBlock(nn.Module):
     '''
     A dynamic module constructor that uses `layer_type` to dynamically select layer types 
@@ -263,6 +163,39 @@ class SequentialBlock(nn.Module):
                 input = layer(input)
         return input
 
+
+class AffinityLayer(nn.Module):
+    def __init__(self, affinity_encode_model_dict :dict):
+        super(AffinityLayer, self).__init__()
+
+        self.use_attn = affinity_encode_model_dict['use_attn']
+        self.softmax = nn.Softmax(dim=-1)
+        self.linear = SequentialBlock(
+                affinity_encode_model_dict['dims_list'],
+                affinity_encode_model_dict['layer_type'], affinity_encode_model_dict['layer_bias'],
+                affinity_encode_model_dict['norm_type'], 
+                affinity_encode_model_dict['activate_func'],affinity_encode_model_dict['lrelu_slope']                
+        )
+    def forward(self, x):
+        """
+        x : [num_node_tra,num_node_det,3]
+        output_tensor : [num_node_tra,num_node_det]
+        """
+        num_tra,num_det,c = x.shape
+
+        if self.use_attn:
+            #---------------------------------#
+            #  self-attention mechanism
+            #---------------------------------#
+            x = x.reshape(num_tra * num_det,c)
+            attn_scores = torch.matmul(x,x.transpose(-2,-1)) / c ** 0.5
+            attn_prob   = self.softmax(attn_scores)
+            x = torch.matmul(attn_prob,x) 
+            x = x.reshape(num_tra,num_det,c)
+        # linear 
+        x = self.linear(x)
+        return x.squeeze(-1)
+
 class NodeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
     def __init__(self, node_encode_model_dict :dict):
@@ -341,7 +274,7 @@ class NodeUpdater(MessagePassing):
         res_model_dict = node_update_model_dict['res_model']
         upd_model_dict = node_update_model_dict['update_model']
 
-        self.msg_layer    = MsgBlock(
+        self.msg_layer    = SequentialBlock(
                 dims_list  = msg_model_dict['dims_list'][idx],
                 layer_type = msg_model_dict['layer_type'], layer_bias = msg_model_dict['layer_bias'],
                 norm_type  = msg_model_dict['norm_type'], 
@@ -366,10 +299,10 @@ class NodeUpdater(MessagePassing):
 
     def forward(self,x :torch.Tensor,edge_index:torch.Tensor,edge_attr:torch.Tensor,batch:Optional[torch.Tensor]=None) -> torch.Tensor:
         # return self.lin(x) + self.propagate(edge_index,edge_attr=edge_attr,x=x)
-        if batch is not None:
-            edge_batch = batch[edge_index[0]]
-        else:
-            edge_batch = None
+        # if batch is not None:
+        edge_batch = batch[edge_index[1]] if batch is not None else None
+        # else:
+            # edge_batch = None
         return self.propagate(edge_index,edge_attr=edge_attr,x=x,batch=batch,edge_batch=edge_batch)
     
     def message(self, x_i:torch.Tensor, x_j:torch.Tensor,edge_attr:torch.Tensor,edge_batch:torch.Tensor) -> torch.Tensor:
@@ -439,7 +372,9 @@ class EdgeEncoder(nn.Module):
                         bt_cosine=self.bt_cosine,bt_self_loop= self.bt_self_loop,bt_directed=self.bt_directed)
         raw_edge_attr    = self.compute_edge_attr(graph)
         
-        graph.edge_attr = self.encoder(raw_edge_attr,batch)
+        edge_batch = batch[graph.edge_index[-1]] if graph.batch is not None else None
+        # edge_batch = graph.edge_index[-1]
+        graph.edge_attr = self.encoder(raw_edge_attr,edge_batch)
         return graph 
     
     @staticmethod

@@ -372,7 +372,7 @@ class TrackManager:
         
         raw_x , geometric_info = [] , []
         for det in dets_list:
-            x,y,w,h = det[:4]
+            x,y,w,h = map(int,det[:4])
             w , h   = min(w, w+x)   , min(h,h+y)
             x , y   = max(x ,0)     , max(y,0)
             w , h   = min(w, w_im-x), min(h,h_im-y)

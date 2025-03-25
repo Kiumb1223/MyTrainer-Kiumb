@@ -15,7 +15,7 @@ from functools import partial
 from torch_geometric.data import Batch,Data
 from models.core.graphConv import SDgraphConv
 from models.graphToolkit import sinkhorn_unrolled,calc_iou,calc_cosineSim
-from models.core.graphLayers import NodeEncoder,EdgeEncoder,SequentialBlock
+from models.core.graphLayers import NodeEncoder,EdgeEncoder,SequentialBlock,AffinityLayer
 
 __all__ =['GraphModel']
 
@@ -53,6 +53,7 @@ class GraphModel(nn.Module):
             model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
             model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
         )
+# /        self.affinityLayer = AffinityLayer(model_dict['affinity_model'])
 
         #---------------------------------#
         # Sinkhorn Layer 
@@ -106,8 +107,8 @@ class GraphModel(nn.Module):
             node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
             app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
             iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='hiou').unsqueeze(-1)
-            
-            corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
+            corr = torch.cat([node_sim,app_sim,iou],dim=-1)
+            corr = self.affinityLayer(corr).squeeze(-1)
 
             if self.bt_mask: # compute mask to filter out some unmatched nodes
                 dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,6:8],det_graph_batch.geometric_info[det_batch_indices == graph_idx,6:8]) <= self.dist_thresh ).float()
@@ -172,7 +173,9 @@ class GraphModel(nn.Module):
         app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
         iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='hiou').unsqueeze(-1)
         
-        corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
+        corr = torch.cat([node_sim,app_sim,iou],dim=-1)
+        corr = self.affinityLayer(corr).squeeze(-1)
+
 
 
         if self.bt_mask: # compute mask to filter out some unmatched nodes
