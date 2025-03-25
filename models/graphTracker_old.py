@@ -382,9 +382,9 @@ class TrackManager:
         if match_idx_first and len(match_idx_first[0]) > 0 :         # matched tras and dets 
             # @BUG match_idx = [[],[]]
             tra_idx ,det_idx = match_idx_first
-            tra_feats = tra_graph.x[tra_idx]
+            tra_feats = tra_graph.app[tra_idx]
             tra_conf_list = [first_match_list[i].conf for i in tra_idx]
-            det_feats = det_graph.x[det_idx]
+            det_feats = det_graph.app[det_idx]
             det_conf_list = [current_detections[i][4] for i in det_idx]
 
             smooth_features = self.smooth_feature(tra_feats,det_feats,tra_conf_list,det_conf_list)

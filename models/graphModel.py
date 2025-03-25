@@ -15,7 +15,7 @@ from functools import partial
 from torch_geometric.data import Batch,Data
 from models.core.graphConv import SDgraphConv
 from models.graphToolkit import sinkhorn_unrolled,calc_iou,calc_cosineSim
-from models.core.graphLayers import NodeEncoder,EdgeEncoder,SequentialBlock
+from models.core.graphLayers import NodeEncoder,EdgeEncoder,SequentialBlock,AffinityLayer
 
 __all__ =['GraphModel']
 
@@ -48,11 +48,17 @@ class GraphModel(nn.Module):
         # Affinity Layer
         #---------------------------------#
 
+        # self.affinityLayer = AffinityLayer(
+        #         model_dict['affinity_model']
+        #     )
+
+
         self.affinityLayer = SequentialBlock(
             model_dict['affinity_model']['dims_list'],
             model_dict['affinity_model']['layer_type'],model_dict['affinity_model']['layer_bias'],
             model_dict['affinity_model']['norm_type'],model_dict['affinity_model']['activate_func'],
         )
+
 
         #---------------------------------#
         # Sinkhorn Layer 
@@ -91,12 +97,12 @@ class GraphModel(nn.Module):
         det_batch_indices = det_graph_batch.batch      # Batch indices for detection graph
         for graph_idx in range(num_graphs):
 
-            # Slice node features for the current graph 
+            # Slice node features for   the current graph 
             tra_node = tra_node_feats[tra_batch_indices == graph_idx]  
             det_node = det_node_feats[det_batch_indices == graph_idx]  
             
-            tra_app  = tra_graph_batch.x[tra_batch_indices == graph_idx]
-            det_app  = det_graph_batch.x[det_batch_indices == graph_idx]
+            tra_app  = tra_graph_batch.app[tra_batch_indices == graph_idx]
+            det_app  = det_graph_batch.app[det_batch_indices == graph_idx]
 
             tra_xyxy = tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,:4]
             det_xyxy = det_graph_batch.geometric_info[det_batch_indices == graph_idx,:4]
@@ -106,8 +112,8 @@ class GraphModel(nn.Module):
             node_sim = calc_cosineSim(tra_node,det_node).unsqueeze(-1)
             app_sim  = calc_cosineSim(tra_app,det_app).unsqueeze(-1)
             iou      = calc_iou(tra_xyxy,det_xyxy,iou_type='hiou').unsqueeze(-1)
-            
-            corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)
+            corr     = torch.cat([node_sim,app_sim,iou],dim=-1)
+            corr = self.affinityLayer(corr)
 
             if self.bt_mask: # compute mask to filter out some unmatched nodes
                 dist_mask = ( torch.cdist(tra_graph_batch.geometric_info[tra_batch_indices == graph_idx,6:8],det_graph_batch.geometric_info[det_batch_indices == graph_idx,6:8]) <= self.dist_thresh ).float()
@@ -151,8 +157,8 @@ class GraphModel(nn.Module):
         #---------------------------------#
         # Initialize the Node and edge embeddings
         #---------------------------------#
-        if tra_graph.x.dim() != 2:
-            tra_graph = self.nodeEncoder(tra_graph)
+        # if tra_graph.x.dim() != 2:
+        tra_graph = self.nodeEncoder(tra_graph)
         tra_graph = self.edgeEncoder(tra_graph,self.k)
 
         det_graph = self.nodeEncoder(det_graph)
@@ -169,10 +175,10 @@ class GraphModel(nn.Module):
 
         # node_sim = calc_cosineSim(tra_node_feats,det_node_feats)
         node_sim = calc_cosineSim(tra_node_feats,det_node_feats).unsqueeze(-1)
-        app_sim  = calc_cosineSim(tra_graph.x,det_graph.x).unsqueeze(-1)
+        app_sim  = calc_cosineSim(tra_graph.app,det_graph.app).unsqueeze(-1)
         iou      = calc_iou(tra_graph.geometric_info[:,:4],det_graph.geometric_info[:,:4],iou_type='hiou').unsqueeze(-1)
-        
-        corr = self.affinityLayer(torch.cat([node_sim,app_sim,iou],dim=-1)).squeeze(-1)    
+        corr     = torch.cat([node_sim,app_sim,iou],dim=-1) # [tra_nodes,det_nodes,3]
+        corr = self.affinityLayer(corr).squeeze(-1)  # [tra_nodes,det_nodes]
 
 
         if self.bt_mask: # compute mask to filter out some unmatched nodes

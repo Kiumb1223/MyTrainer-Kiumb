@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
+import math
 import torch
 import torch.nn as nn
 from functools import partial
@@ -14,7 +15,7 @@ import torchvision.transforms.functional as T
 from models.graphToolkit import knn,calc_iouFamily
 from models.core.fastReid import load_fastreid_model,load_ckpt_FastReid
 
-__all__ = ['parse_layer_dimension','SequentialBlock','NodeEncoder','NodeUpdater','EdgeUpdater','EdgeEncoder']
+__all__ = ['SequentialBlock','AffinityLayer','NodeEncoder','NodeUpdater','EdgeUpdater','EdgeEncoder']
 
 def parse_layer_dimension(layer_dims: Union[list, tuple]):
     """
@@ -61,105 +62,6 @@ class l2Norm(nn.Module):
     def forward(self,x):
         return x / (torch.norm(x,p=2,dim=self.dim,keepdim=True) + self.eps)
 
-
-class MsgBlock(nn.Module):    
-    def __init__(self,
-            dims_list  :Union[list,tuple], 
-            layer_type :str, layer_bias :bool,
-            norm_type  :str ,
-            activate_func :str, lrelu_slope:float =0.0,
-            dropout_rate :float=.1
-        ):
-        '''
-        :param dims_list: A list of  dimensions for each layer.
-        :param layer_type: The type of layer to use, e.g., 'linear', 'conv1d'.
-        :param layer_bias: Whether to use bias in Conv1d or Linear layers.        
-        :param norm_type: Thy type of normalization layer to use , e.g., 'None','batchNorm' , 'LayerNorm' ,'graphNorm'.
-        :param activate_func: Activation function type, e.g., 'relu', 'lrelu'.
-        :param lrelu_slope: Negative slope for LeakyReLU activation.
-        '''
-        super(MsgBlock, self).__init__()
-        activation_map = {
-            'relu': nn.ReLU(inplace=True),
-            'lrelu': nn.LeakyReLU(negative_slope=lrelu_slope, inplace=True),
-            'sigmoid': nn.Sigmoid(),
-        }
-        normalization_map = {
-            'none'      : None,
-            'batchnorm' : nn.BatchNorm1d,
-            'layernorm' : nn.LayerNorm,
-            'graphnorm' : norm.GraphNorm,
-            'l2norm'    : l2Norm,
-        }
-        layer_type    = layer_type.lower()
-        activate_func = activate_func.lower()
-        norm_type     = norm_type.lower()
-        
-        assert layer_type in ['linear','conv1d'] , f"Unsupported layer type: {layer_type}. "
-        assert activate_func in activation_map , f"Unsupported activation function: {activate_func}. " + f"Supported functions are: {list(activation_map.keys())}"
-        assert norm_type in normalization_map , f"Unsupported normalization layer type: {norm_type}."
-        
-        assert len(dims_list) > 0 , "dims_list should not be empty"
-        #---------------------------------#
-        #  dims_list : [in_dim, hidden_dim , out_dim]
-        #---------------------------------#
-        in_dim = dims_list[0]
-        if len(dims_list) > 1 :
-            dims_list = dims_list[1:]
-
-        layers = []
-
-        length = len(dims_list)
-
-        norm_layer     = normalization_map[norm_type]   
-        activate_layer = activation_map[activate_func]
-        
-        for cnt,dim in enumerate(dims_list):
-            if layer_type == 'conv1d':
-                layers.append(nn.Conv1d(in_dim, dim, kernel_size=1, bias=layer_bias))
-            elif layer_type == 'linear':
-                layers.append(nn.Linear(in_dim, dim, bias=layer_bias))
-
-            if cnt < length - 1 :
-                layers.append(activate_layer)
-                layers.append(nn.Dropout(dropout_rate))
-            else:
-                if norm_layer is not None:
-                    layers.append(
-                        norm_layer(dim) if norm_type != 'l2norm' else norm_layer()
-                    )
-            in_dim = dim
-        self.layers = nn.Sequential(*layers)
-
-        self._initialize_weights(lrelu_slope)
-
-    def _initialize_weights(self,lrelu_slope):
-        for m in self.layers:
-            if isinstance(m,nn.Linear):
-                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m,nn.Conv1d):
-                nn.init.kaiming_normal_(m.weight.data,a=lrelu_slope,mode='fan_out')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m,nn.BatchNorm1d) or isinstance(m,nn.LayerNorm):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m,norm.GraphNorm):
-                if hasattr(m, 'reset_parameters'):
-                    m.reset_parameters()
-    def forward(self, input,edge_batch:Optional[torch.Tensor]=None):
-        for layer in self.layers:
-            if isinstance(layer,norm.GraphNorm):
-                if input.dim() == 3 : # conv1d
-                    input = layer(input.squeeze(-1),edge_batch).unsqueeze(-1)
-                else:  
-                    input = layer(input,edge_batch)
-            
-            else:
-                input = layer(input)
-        return input
 
 class SequentialBlock(nn.Module):
     '''
@@ -262,7 +164,99 @@ class SequentialBlock(nn.Module):
             else:
                 input = layer(input)
         return input
+    
+class PositionEmbeddingSineGraph(nn.Module):
+    """
+    This class generates position embeddings for the nodes in a graph. The position encoding is based on the 
+    center point coordinates of the bounding boxes (bboxes) of detected objects in the image.
+    """
 
+    def __init__(self, num_pos_feats, temperatureH=10000, temperatureW=10000, normalize=False, scale=None):
+        super().__init__()
+
+        self.num_pos_feats = num_pos_feats
+        self.temperatureH = temperatureH
+        self.temperatureW = temperatureW
+        self.normalize = normalize
+
+        if scale is not None and normalize is False:
+            raise ValueError("normalize should be True if scale is passed")
+        
+        if scale is None:
+            scale = 2 * math.pi  # Default scaling factor
+        self.scale = scale
+
+    def forward(self, xcyc: torch.Tensor, wh_im: torch.Tensor):
+        """
+        Args:
+            xcyc (Tensor): Tensor of shape (num_nodes, 2), representing the center coordinates (x, y)
+                            of each bounding box in the image.
+            wh_im (Tensor): Tensor of shape (num_nodes, 2), representing the width and height of the image for each node.
+        
+        Returns:
+            Tensor: A tensor of position embeddings of shape (num_nodes, 2 * num_pos_feats)
+        """
+        # Normalize the coordinates to [0, 1] range based on image dimensions
+        x_embed = xcyc[:, 0] / wh_im[:,0]
+        y_embed = xcyc[:, 1] / wh_im[:,1]
+        
+        if self.normalize:
+            eps = 1e-6
+            # Scale the coordinates to the range [0, 2*pi]
+            x_embed = x_embed * self.scale
+            y_embed = y_embed * self.scale
+
+        # Calculate the position encoding for x and y coordinates
+        dim_tx = torch.arange(self.num_pos_feats, dtype=torch.float32, device=xcyc.device)
+        dim_tx = self.temperatureW ** (2 * (dim_tx // 2) / self.num_pos_feats)
+        pos_x = x_embed[:, None] / dim_tx
+
+        dim_ty = torch.arange(self.num_pos_feats, dtype=torch.float32, device=xcyc.device)
+        dim_ty = self.temperatureH ** (2 * (dim_ty // 2) / self.num_pos_feats)
+        pos_y = y_embed[:, None] / dim_ty
+
+        # Apply sine and cosine transformations
+        pos_x = torch.stack((pos_x[:, 0::2].sin(), pos_x[:, 1::2].cos()), dim=1).flatten(1)
+        pos_y = torch.stack((pos_y[:, 0::2].sin(), pos_y[:, 1::2].cos()), dim=1).flatten(1)
+
+        # Concatenate both position embeddings and return the final position encoding
+        pos = torch.cat((pos_x, pos_y), dim=1)
+        
+        return pos
+
+class AffinityLayer(nn.Module):
+    def __init__(self, affinity_encode_model_dict :dict):
+        super(AffinityLayer, self).__init__()
+
+        self.use_attn = affinity_encode_model_dict['use_attn']
+        self.softmax = nn.Softmax(dim=-1)
+        self.linear = SequentialBlock(
+                affinity_encode_model_dict['dims_list'],
+                affinity_encode_model_dict['layer_type'], affinity_encode_model_dict['layer_bias'],
+                affinity_encode_model_dict['norm_type'], 
+                affinity_encode_model_dict['activate_func'],affinity_encode_model_dict['lrelu_slope']                
+        )
+    def forward(self, x):
+        """
+        x : [num_node_tra,num_node_det,3]
+        output_tensor : [num_node_tra,num_node_det]
+        """
+        num_tra,num_det,c = x.shape
+
+        if self.use_attn:
+            #---------------------------------#
+            #  self-attention mechanism
+            #---------------------------------#
+            x = x.reshape(num_tra * num_det,c)
+            attn_scores = torch.matmul(x,x.transpose(-2,-1)) / c ** 0.5
+            attn_prob   = self.softmax(attn_scores)
+            x = torch.matmul(attn_prob,x) 
+            x = x.reshape(num_tra,num_det,c)
+        # linear 
+        x = self.linear(x)
+        return x.squeeze(-1)
+
+    
 class NodeEncoder(nn.Module):
     ''' graph-in and graph-out Module'''
     def __init__(self, node_encode_model_dict :dict):
@@ -305,6 +299,27 @@ class NodeEncoder(nn.Module):
             for param in self.backbone.parameters():
                 param.required_grad = False
 
+        #---------------------------------#
+        #  Position Encoding
+        #---------------------------------#
+        if node_encode_model_dict['bt_pe']:
+            self.fusion_way = node_encode_model_dict['fusion_way']
+            self.pos_encoder = PositionEmbeddingSineGraph(
+                node_encode_model_dict['dims_list'][-1] // 2,
+                node_encode_model_dict['temperatureH'],
+                node_encode_model_dict['temperatureW'],
+                node_encode_model_dict['normalize'],
+                node_encode_model_dict['scale'],
+            )
+            #---------------------------------#
+            # Linear Transform Layer
+            #---------------------------------#
+            # self.linear =nn.Linear(
+            #     node_encode_model_dict['dims_list'][-1] * 2, node_encode_model_dict['dims_list'][-1],bias=False
+            # )
+            
+        else:
+            self.pos_encoder = None
 
     def gen_backbone(self,backbone:str,weight_path:str):
         # assert backbone in ['densenet121','fastreid']
@@ -317,15 +332,24 @@ class NodeEncoder(nn.Module):
             return load_ckpt_FastReid(backbone,weight_path)
 
     def forward(self, graph :Union[Data,Batch]) -> Union[Data,Batch]:
-        if self.backbone_type.startswith('fastreid_'):
-            self.backbone.eval()
-            with torch.no_grad():
+        if graph.x.dim() == 4 :
+            if self.backbone_type.startswith('fastreid_'):
+                self.backbone.eval()
+                with torch.no_grad():
+                    graph.x = self.backbone(graph.x)
+            else:
+                graph.x = T.normalize(graph.x , mean=[0.485*255, 0.456*255, 0.406*255], std=[0.229*255, 0.224*255, 0.225*255]) 
                 graph.x = self.backbone(graph.x)
-        else:
-            graph.x = T.normalize(graph.x , mean=[0.485*255, 0.456*255, 0.406*255], std=[0.229*255, 0.224*255, 0.225*255]) 
-            graph.x = self.backbone(graph.x)
-        graph.x = self.head(graph.x)
+            graph.x = self.head(graph.x)
         
+        graph.app = graph.x.clone()
+        if self.pos_encoder:
+            pe = self.pos_encoder(graph.geometric_info[:,6:8],graph.geometric_info[:,8:10]) 
+            if self.fusion_way == 'add':
+                graph.x = graph.x + pe
+            elif self.fusion_way =='concate':
+                graph.x = torch.cat([graph.x,pe],dim=-1)
+                # graph.x = self.linear(graph.x)
         return graph
 
 
@@ -341,7 +365,7 @@ class NodeUpdater(MessagePassing):
         res_model_dict = node_update_model_dict['res_model']
         upd_model_dict = node_update_model_dict['update_model']
 
-        self.msg_layer    = MsgBlock(
+        self.msg_layer    = SequentialBlock(
                 dims_list  = msg_model_dict['dims_list'][idx],
                 layer_type = msg_model_dict['layer_type'], layer_bias = msg_model_dict['layer_bias'],
                 norm_type  = msg_model_dict['norm_type'], 
@@ -381,7 +405,7 @@ class NodeUpdater(MessagePassing):
 
 
     def update(self, msg:torch.Tensor,x:torch.Tensor,batch:torch.Tensor) -> torch.Tensor:
-        x = self.res_layer(x,batch)
+        x = self.res_layer(x)
         # return self.upd_layer(x + msg,batch)
         return self.upd_layer(x + msg,batch)
 
@@ -439,7 +463,9 @@ class EdgeEncoder(nn.Module):
                         bt_cosine=self.bt_cosine,bt_self_loop= self.bt_self_loop,bt_directed=self.bt_directed)
         raw_edge_attr    = self.compute_edge_attr(graph)
         
-        graph.edge_attr = self.encoder(raw_edge_attr,batch)
+        edge_batch = batch[graph.edge_index[-1]] if graph.batch is not None else None
+        # edge_batch = graph.edge_index[-1]
+        graph.edge_attr = self.encoder(raw_edge_attr,edge_batch)
         return graph 
     
     @staticmethod

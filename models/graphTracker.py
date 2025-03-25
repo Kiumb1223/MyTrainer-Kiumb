@@ -238,9 +238,9 @@ class TrackManager:
         if match_idx and len(match_idx[0]) > 0 :         # matched tras and dets 
             # @BUG match_idx = [[],[]] 
             tra_idx ,det_idx = match_idx
-            tra_app_feats  = tra_graph.x[tra_idx]
+            tra_app_feats  = tra_graph.app[tra_idx]
             tra_conf_list  = [first_tras_list[i].conf for i in tra_idx]
-            det_app_feats  = det_graph.x[det_idx]
+            det_app_feats  = det_graph.app[det_idx]
             det_conf_list  = [first_dets_list[i][4] for i in det_idx]
 
             smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)
@@ -280,7 +280,7 @@ class TrackManager:
                 # second_dets_conf = current_detections[second_dets_list,4]
                 match_mtx,match_idx,unmatch_tra,unmatch_det = self._iou_reid_match(
                         second_tras_list,second_det_graph.geometric_info[:,:4],
-                        second_det_graph.x,diff_t,self._second_match_thresh
+                        second_det_graph.app,diff_t,self._second_match_thresh
                     )
                 
                 if match_idx and len(match_idx[0]) > 0 :    # matched tras and dets
@@ -291,7 +291,7 @@ class TrackManager:
                         tra_conf_list.append(second_tras_list[i].conf)
                     tra_app_feats  = torch.stack(tra_app_feats,dim=0).to(self.device).to(torch.float32)
 
-                    det_app_feats  = second_det_graph.x[det_idx]
+                    det_app_feats  = second_det_graph.app[det_idx]
                     det_conf_list  = [second_dets_list[i][4] for i in det_idx]
 
                     smooth_app_feats  = self.smooth_feature(tra_app_feats,det_app_feats,tra_conf_list,det_conf_list,self.fusion_method)
@@ -372,7 +372,7 @@ class TrackManager:
         
         raw_x , geometric_info = [] , []
         for det in dets_list:
-            x,y,w,h = det[:4]
+            x,y,w,h = map(int,det[:4])
             w , h   = min(w, w+x)   , min(h,h+y)
             x , y   = max(x ,0)     , max(y,0)
             w , h   = min(w, w_im-x), min(h,h_im-y)

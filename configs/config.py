@@ -22,7 +22,7 @@ def get_config():
         EMABLE_AMP        = True,
         WORK_DIR          = "dustbin",
 
-        BATCH_SIZE        = 2,
+        BATCH_SIZE        = 1,
         MAXEPOCH          = 120,
 
         LR                = 1e-2,
@@ -49,7 +49,7 @@ def get_config():
         #---------------------------------#
         #  2. Model related
         #---------------------------------#
-        MODEL_YAML_PATH   = r'configs\hota-49[norm+affi_res].yaml',
+        MODEL_YAML_PATH   = r'configs\hota-49[lrelu+cosine+1dgraph+pe].yaml',
         
         #---------------------------------#
         #  3. Dataset related
@@ -70,7 +70,7 @@ def get_config():
         #  4. TrackManager related
         #---------------------------------#
         # PATH_TO_WEIGHTS   = r'model_weights\Exp_2025\K\k-12+woloop+AffinityLayer.pth',
-        PATH_TO_WEIGHTS   = r'model_weights\cur-exp\fastreid\fastreid2+graphConv-woloop+Msg+Dynamic-smooth+Fuse13.pth',
+        PATH_TO_WEIGHTS   = r'model_weights\latest.pth',
         PATH_TO_TRACKING_CFG = r'configs\tracking_config.yaml',
 
         #---------------------------------#

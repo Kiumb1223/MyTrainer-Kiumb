@@ -145,16 +145,6 @@ class GraphDataset(torch.utils.data.Dataset):
                 im_tensor = I.read_image(im_path).to(torch.float32) 
                 # H , W = im_tensor.shape[1:] 
             
-            # if x < 0:
-            #     w = w + x  
-            #     x = 0 
-
-            # if y < 0:
-            #     h = h + y  
-            #     y = 0  
-                
-            # w = min(w, im_tensor.shape[2] - x)  
-            # h = min(h, im_tensor.shape[1] - y)
             
             patch = T.crop(im_tensor,y,x,h,w)
             patch = T.resize(patch,self.resize_to_cnn)
